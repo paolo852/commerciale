@@ -1,37 +1,40 @@
 import { useState } from 'react';
+import { BookOpen, Users } from 'lucide-react';
 import ProjectManagersTab from '../components/anagrafiche/ProjectManagersTab';
 import FundingCallsTab from '../components/anagrafiche/FundingCallsTab';
 
 type Tab = 'pm' | 'fc';
 
+const tabs: { id: Tab; label: string; icon: typeof Users }[] = [
+  { id: 'pm', label: 'Project Managers', icon: Users },
+  { id: 'fc', label: 'Funding Calls', icon: BookOpen },
+];
+
 export default function Anagrafiche() {
   const [tab, setTab] = useState<Tab>('pm');
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-slate-900 mb-6">Anagrafiche</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">Anagrafiche</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Gestione project manager e bandi</p>
+      </div>
 
-      <div className="flex gap-1 mb-6 border-b border-slate-200">
-        <button
-          onClick={() => setTab('pm')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
-            tab === 'pm'
-              ? 'border-indigo-600 text-indigo-700'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Project Managers
-        </button>
-        <button
-          onClick={() => setTab('fc')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
-            tab === 'fc'
-              ? 'border-indigo-600 text-indigo-700'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Funding Calls
-        </button>
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+              tab === id
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
       </div>
 
       {tab === 'pm' ? <ProjectManagersTab /> : <FundingCallsTab />}
