@@ -17,6 +17,7 @@ import type { Offer, OfferOutcome, OfferStatus, OfferType } from '../types';
 
 type SortBy = 'deadline' | 'budget' | 'created_at' | 'name';
 type SortDir = 'asc' | 'desc';
+type ViewTab = 'all' | 'in_corso' | 'approvate' | 'respinte';
 
 interface Filters {
   search: string;
@@ -25,6 +26,7 @@ interface Filters {
   type: OfferType | 'all';
   projectManagerId: string | 'all';
   fundingCall: string | 'all';
+  year: number | 'all';
 }
 
 const defaultFilters: Filters = {
@@ -34,7 +36,24 @@ const defaultFilters: Filters = {
   type: 'all',
   projectManagerId: 'all',
   fundingCall: 'all',
+  year: 'all',
 };
+
+function matchesView(o: Offer, view: ViewTab): boolean {
+  switch (view) {
+    case 'all': return true;
+    case 'in_corso': return o.outcome === 'nessuno' && o.status !== 'ferma';
+    case 'approvate': return o.outcome === 'approvato';
+    case 'respinte': return o.outcome === 'rifiutato';
+  }
+}
+
+function offerYear(o: Offer): number | null {
+  // L'anno di riferimento è la deadline (anno fiscale dell'offerta)
+  const y = o.deadline?.slice(0, 4);
+  const n = Number(y);
+  return Number.isFinite(n) ? n : null;
+}
 
 const selectClass =
   'px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
@@ -42,10 +61,33 @@ const selectClass =
 export default function Offerte() {
   const { offers, projectManagers, fundingCalls, loading, error, reload } = useOffersData();
 
+  const [view, setView] = useState<ViewTab>('all');
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>('deadline');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  // Anni disponibili nelle offerte (dalla deadline)
+  const availableYears = useMemo(() => {
+    const set = new Set<number>();
+    for (const o of offers) {
+      const y = offerYear(o);
+      if (y !== null) set.add(y);
+    }
+    return Array.from(set).sort((a, b) => b - a); // più recenti prima
+  }, [offers]);
+
+  // Conteggi per ogni tab (sull'eventuale filtro anno applicato)
+  const yearScopedOffers = useMemo(
+    () => filters.year === 'all' ? offers : offers.filter((o) => offerYear(o) === filters.year),
+    [offers, filters.year],
+  );
+  const tabCounts = useMemo(() => ({
+    all: yearScopedOffers.length,
+    in_corso: yearScopedOffers.filter((o) => matchesView(o, 'in_corso')).length,
+    approvate: yearScopedOffers.filter((o) => matchesView(o, 'approvate')).length,
+    respinte: yearScopedOffers.filter((o) => matchesView(o, 'respinte')).length,
+  }), [yearScopedOffers]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Offer | null>(null);
@@ -68,6 +110,8 @@ export default function Offerte() {
   const visibleOffers = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
     const filtered = offers.filter((o) => {
+      if (!matchesView(o, view)) return false;
+      if (filters.year !== 'all' && offerYear(o) !== filters.year) return false;
       if (search && !o.name.toLowerCase().includes(search)) return false;
       if (filters.status !== 'all' && o.status !== filters.status) return false;
       if (filters.outcome !== 'all' && o.outcome !== filters.outcome) return false;
@@ -88,7 +132,7 @@ export default function Offerte() {
       else cmp = a.name.localeCompare(b.name, 'it');
       return cmp * dir;
     });
-  }, [offers, filters, sortBy, sortDir]);
+  }, [offers, filters, view, sortBy, sortDir]);
 
   function toggleSort(col: SortBy) {
     if (sortBy === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -161,6 +205,45 @@ export default function Offerte() {
       {error && (
         <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
+
+      {/* Tabs vista + selettore anno */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+          {([
+            { id: 'all', label: 'Tutte' },
+            { id: 'in_corso', label: 'In corso' },
+            { id: 'approvate', label: 'Approvate' },
+            { id: 'respinte', label: 'Respinte' },
+          ] as const).map(({ id, label }) => {
+            const active = view === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setView(id)}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                  active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {label}
+                <span className={`text-xs px-1.5 py-0.5 rounded-md tabular-nums ${
+                  active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/70 text-slate-500'
+                }`}>
+                  {tabCounts[id]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <select
+          value={filters.year}
+          onChange={(e) => setFilters({ ...filters, year: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
+          className="px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+        >
+          <option value="all">Tutti gli anni</option>
+          {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
 
       {/* Search + filter toggle */}
       <div className="flex gap-3">
