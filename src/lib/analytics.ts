@@ -12,6 +12,30 @@ import type {
 // in memoria (caricato da useOffersData). Niente query dedicate.
 // ============================================================
 
+// ----------------------------------------------------------------
+// Helper: anno di riferimento di un'offerta = anno della deadline
+// ----------------------------------------------------------------
+
+export function offerYear(o: Offer): number | null {
+  const y = o.deadline?.slice(0, 4);
+  const n = Number(y);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function getAvailableYears(offers: Offer[]): number[] {
+  const set = new Set<number>();
+  for (const o of offers) {
+    const y = offerYear(o);
+    if (y !== null) set.add(y);
+  }
+  return Array.from(set).sort((a, b) => b - a);
+}
+
+export function filterByYear(offers: Offer[], year: number | 'all'): Offer[] {
+  if (year === 'all') return offers;
+  return offers.filter((o) => offerYear(o) === year);
+}
+
 export function computeKPIs(offers: Offer[]): DashboardKPIs {
   let totalInOfferta = 0;
   let inLavorazione = 0;
@@ -147,34 +171,42 @@ function lastNMonths(n: number): string[] {
   return out;
 }
 
-/**
- * Aggregazione mensile basata su submitted_at:
- * un'offerta presentata in marzo conta come "presentata" a marzo,
- * e in più "approvata" o "rifiutata" se l'esito esiste.
- */
-export function computeMonthlyStats(offers: Offer[], months = 12): MonthlyStats[] {
-  const buckets = new Map<string, MonthlyStats>();
-  for (const m of lastNMonths(months)) {
-    buckets.set(m, {
-      month: m,
-      presentate: 0,
-      approvate: 0,
-      rifiutate: 0,
-      budgetPresentato: 0,
-    });
-  }
+/** Restituisce i 12 mesi dell'anno specificato come "YYYY-MM". */
+function monthsOfYear(year: number): string[] {
+  return Array.from({ length: 12 }, (_, i) =>
+    `${year}-${String(i + 1).padStart(2, '0')}`,
+  );
+}
 
+/**
+ * Aggregazione mensile basata su submitted_at.
+ * Se year è specificato, mostra i 12 mesi dell'anno; altrimenti gli ultimi N mesi.
+ */
+export function computeMonthlyStats(
+  offers: Offer[],
+  optionsOrMonths: number | { months?: number; year?: number } = 12,
+): MonthlyStats[] {
+  const months = typeof optionsOrMonths === 'number' ? optionsOrMonths : (optionsOrMonths.months ?? 12);
+  const year = typeof optionsOrMonths === 'number' ? undefined : optionsOrMonths.year;
+  const keys = year !== undefined ? monthsOfYear(year) : lastNMonths(months);
+  return computeMonthlyStatsForKeys(offers, keys);
+}
+
+function computeMonthlyStatsForKeys(offers: Offer[], keys: string[]): MonthlyStats[] {
+  const buckets = new Map<string, MonthlyStats>();
+  for (const m of keys) {
+    buckets.set(m, { month: m, presentate: 0, approvate: 0, rifiutate: 0, budgetPresentato: 0 });
+  }
   for (const o of offers) {
     if (!o.submitted_at) continue;
     const key = o.submitted_at.slice(0, 7);
     const bucket = buckets.get(key);
-    if (!bucket) continue; // fuori dal range
+    if (!bucket) continue;
     bucket.presentate++;
     bucket.budgetPresentato += o.budget;
     if (o.outcome === 'approvato') bucket.approvate++;
     if (o.outcome === 'rifiutato') bucket.rifiutate++;
   }
-
   return Array.from(buckets.values());
 }
 

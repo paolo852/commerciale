@@ -14,19 +14,23 @@ import type { Offer } from '../../types';
 import { computeMonthlyStats, monthLabel } from '../../lib/analytics';
 import { formatEUR } from '../../lib/format';
 
-export default function MonthlyTrend({ offers }: { offers: Offer[] }) {
+interface Props { offers: Offer[]; year?: number; }
+
+export default function MonthlyTrend({ offers, year }: Props) {
   const data = useMemo(
     () =>
-      computeMonthlyStats(offers, 12).map((m) => ({
+      computeMonthlyStats(offers, year !== undefined ? { year } : { months: 12 }).map((m) => ({
         ...m,
         label: monthLabel(m.month),
       })),
-    [offers],
+    [offers, year],
   );
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5">
-      <h2 className="text-base font-semibold text-slate-900 mb-1">Trend temporale</h2>
+      <h2 className="text-base font-semibold text-slate-900 mb-1">
+        Trend temporale{year !== undefined ? ` ${year}` : ''}
+      </h2>
       <p className="text-xs text-slate-500 mb-4">
         Numero di offerte presentate e budget totale per mese
       </p>

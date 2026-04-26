@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { ArrowUpDown, ChevronDown, ChevronUp, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
+import { offerYear } from '../lib/analytics';
+import YearSelector from '../components/YearSelector';
 import { formatDate, formatEUR } from '../lib/format';
 import {
   StatusBadge,
@@ -48,12 +50,6 @@ function matchesView(o: Offer, view: ViewTab): boolean {
   }
 }
 
-function offerYear(o: Offer): number | null {
-  // L'anno di riferimento è la deadline (anno fiscale dell'offerta)
-  const y = o.deadline?.slice(0, 4);
-  const n = Number(y);
-  return Number.isFinite(n) ? n : null;
-}
 
 const selectClass =
   'px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
@@ -66,16 +62,6 @@ export default function Offerte() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>('deadline');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  // Anni disponibili nelle offerte (dalla deadline)
-  const availableYears = useMemo(() => {
-    const set = new Set<number>();
-    for (const o of offers) {
-      const y = offerYear(o);
-      if (y !== null) set.add(y);
-    }
-    return Array.from(set).sort((a, b) => b - a); // più recenti prima
-  }, [offers]);
 
   // Conteggi per ogni tab (sull'eventuale filtro anno applicato)
   const yearScopedOffers = useMemo(
@@ -235,14 +221,11 @@ export default function Offerte() {
           })}
         </div>
 
-        <select
+        <YearSelector
+          offers={offers}
           value={filters.year}
-          onChange={(e) => setFilters({ ...filters, year: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
-          className="px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-        >
-          <option value="all">Tutti gli anni</option>
-          {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+          onChange={(year) => setFilters({ ...filters, year })}
+        />
       </div>
 
       {/* Search + filter toggle */}

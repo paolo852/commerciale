@@ -12,19 +12,24 @@ import {
 import type { Offer } from '../../types';
 import { computeMonthlyStats, monthLabel } from '../../lib/analytics';
 
-export default function MonthlyChart({ offers }: { offers: Offer[] }) {
+interface Props {
+  offers: Offer[];
+  year?: number;
+}
+
+export default function MonthlyChart({ offers, year }: Props) {
   const data = useMemo(() => {
-    return computeMonthlyStats(offers, 12).map((m) => ({
+    return computeMonthlyStats(offers, year !== undefined ? { year } : { months: 12 }).map((m) => ({
       ...m,
       label: monthLabel(m.month),
     }));
-  }, [offers]);
+  }, [offers, year]);
+
+  const title = year !== undefined ? `Andamento mensile ${year}` : 'Andamento mensile (ultimi 12 mesi)';
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5">
-      <h2 className="text-base font-semibold text-slate-900 mb-4">
-        Andamento mensile (ultimi 12 mesi)
-      </h2>
+      <h2 className="text-base font-semibold text-slate-900 mb-4">{title}</h2>
       <div style={{ width: '100%', height: 280 }}>
         <ResponsiveContainer>
           <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>

@@ -1,23 +1,33 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CheckCircle, Clock, Euro, TrendingUp } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
-import { computeKPIs } from '../lib/analytics';
+import { computeKPIs, filterByYear } from '../lib/analytics';
 import { formatEUR } from '../lib/format';
 import KpiCard from '../components/dashboard/KpiCard';
 import UpcomingDeadlines from '../components/dashboard/UpcomingDeadlines';
 import MonthlyChart from '../components/dashboard/MonthlyChart';
 import StatusDistribution from '../components/dashboard/StatusDistribution';
 import ProbabilisticRevenue from '../components/dashboard/ProbabilisticRevenue';
+import YearSelector from '../components/YearSelector';
 
 export default function Dashboard() {
   const { offers, projectManagers, loading, error } = useOffersData();
-  const kpis = useMemo(() => computeKPIs(offers), [offers]);
+  const [year, setYear] = useState<number | 'all'>('all');
+
+  const filteredOffers = useMemo(() => filterByYear(offers, year), [offers, year]);
+  const kpis = useMemo(() => computeKPIs(filteredOffers), [filteredOffers]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Panoramica delle offerte commerciali</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Panoramica delle offerte commerciali
+            {year !== 'all' && <> · anno <strong className="text-slate-700">{year}</strong></>}
+          </p>
+        </div>
+        <YearSelector offers={offers} value={year} onChange={setYear} />
       </div>
 
       {error && (
@@ -61,15 +71,16 @@ export default function Dashboard() {
         />
       </div>
 
-      <ProbabilisticRevenue offers={offers} />
+      <ProbabilisticRevenue offers={filteredOffers} />
 
+      {/* Le scadenze prossime sono sempre "prossimi 30 giorni" indipendentemente dall'anno */}
       <UpcomingDeadlines offers={offers} projectManagers={projectManagers} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2">
-          <MonthlyChart offers={offers} />
+          <MonthlyChart offers={filteredOffers} year={year === 'all' ? undefined : year} />
         </div>
-        <StatusDistribution offers={offers} />
+        <StatusDistribution offers={filteredOffers} />
       </div>
     </div>
   );
