@@ -7,6 +7,7 @@ import KpiCard from '../components/dashboard/KpiCard';
 import UpcomingDeadlines from '../components/dashboard/UpcomingDeadlines';
 import MonthlyChart from '../components/dashboard/MonthlyChart';
 import StatusDistribution from '../components/dashboard/StatusDistribution';
+import ProbabilisticRevenue from '../components/dashboard/ProbabilisticRevenue';
 
 export default function Dashboard() {
   const { offers, projectManagers, loading, error } = useOffersData();
@@ -59,6 +60,8 @@ export default function Dashboard() {
           accent="emerald"
         />
       </div>
+
+      <ProbabilisticRevenue offers={offers} />
 
       <UpcomingDeadlines offers={offers} projectManagers={projectManagers} />
 

@@ -41,6 +41,7 @@ export interface Offer {
   client: string | null;        // solo se type = 'consulting'
   deadline: string;             // ISO date string
   budget: number;
+  probability: number; // 0-100, probabilità di successo stimata
   project_manager_id: string | null;
   status: OfferStatus;
   outcome: OfferOutcome;

@@ -264,6 +264,7 @@ export default function Offerte() {
                 <th className={`${thClass} text-right`}>
                   <button onClick={() => toggleSort('budget')} className="inline-flex items-center gap-1.5 ml-auto">Importo <SortIcon col="budget" /></button>
                 </th>
+                <th className={`${thClass} text-right`}>Prob.</th>
                 <th className={thClass}>Stato</th>
                 <th className={thClass}>Esito</th>
                 <th className={`${thClass} text-right`} />
@@ -271,9 +272,9 @@ export default function Offerte() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
+                <tr><td colSpan={11} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
               ) : visibleOffers.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">
+                <tr><td colSpan={11} className="text-center py-12 text-slate-400 text-sm">
                   {offers.length === 0 ? 'Nessuna offerta. Clicca "+ Nuova offerta" per iniziare.' : 'Nessuna offerta corrisponde ai filtri.'}
                 </td></tr>
               ) : visibleOffers.map((o) => {
@@ -294,6 +295,12 @@ export default function Offerte() {
                     <td className="px-4 py-3.5 text-sm text-slate-600">{pm?.name ?? <span className="text-slate-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-700 tabular-nums">{formatDate(o.deadline)}</td>
                     <td className="px-4 py-3.5 text-sm text-right tabular-nums font-medium text-slate-900">{formatEUR(o.budget)}</td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className={`text-sm font-semibold tabular-nums ${
+                        (o.probability ?? 50) >= 70 ? 'text-emerald-600' :
+                        (o.probability ?? 50) >= 40 ? 'text-amber-600' : 'text-red-500'
+                      }`}>{o.probability ?? 50}%</span>
+                    </td>
                     <td className="px-4 py-3.5"><StatusBadge value={o.status} /></td>
                     <td className="px-4 py-3.5"><OutcomeBadge value={o.outcome} /></td>
                     <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>

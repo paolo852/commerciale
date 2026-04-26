@@ -36,6 +36,57 @@ export function computeKPIs(offers: Offer[]): DashboardKPIs {
 }
 
 // ----------------------------------------------------------------
+// Previsione probabilistica del fatturato (P10 / P50 / P90)
+// ----------------------------------------------------------------
+
+export interface ProbabilisticRevenue {
+  confermato: number;    // offerte già approvate
+  p10: number;           // scenario pessimistico (10° percentile)
+  p50: number;           // scenario atteso (valore medio)
+  p90: number;           // scenario ottimistico (90° percentile)
+  pipelineCount: number; // numero offerte attive incluse nel calcolo
+}
+
+/**
+ * Calcola la distribuzione del fatturato atteso usando l'approssimazione
+ * normale (Teorema del Limite Centrale).
+ *
+ * Vengono incluse le offerte con outcome = 'nessuno' e status != 'ferma'.
+ * μ = Σ(p_i × b_i)
+ * σ² = Σ(p_i × (1−p_i) × b_i²)
+ * P10 = μ − 1.282σ  /  P50 = μ  /  P90 = μ + 1.282σ
+ *
+ * Al risultato viene sommato il fatturato già confermato (outcome='approvato').
+ */
+export function computeProbabilisticRevenue(offers: Offer[]): ProbabilisticRevenue {
+  const confermato = offers
+    .filter((o) => o.outcome === 'approvato')
+    .reduce((s, o) => s + o.budget, 0);
+
+  const pipeline = offers.filter(
+    (o) => o.outcome === 'nessuno' && o.status !== 'ferma',
+  );
+
+  let mu = 0;
+  let variance = 0;
+  for (const o of pipeline) {
+    const p = (o.probability ?? 50) / 100;
+    mu += p * o.budget;
+    variance += p * (1 - p) * o.budget * o.budget;
+  }
+  const sigma = Math.sqrt(variance);
+
+  const Z_P10 = 1.282;
+  return {
+    confermato,
+    p10: Math.max(0, confermato + mu - Z_P10 * sigma),
+    p50: confermato + mu,
+    p90: confermato + mu + Z_P10 * sigma,
+    pipelineCount: pipeline.length,
+  };
+}
+
+// ----------------------------------------------------------------
 // Scadenze imminenti
 // ----------------------------------------------------------------
 

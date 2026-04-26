@@ -49,6 +49,7 @@ CREATE TABLE offers (
   client               text,          -- solo se type = 'consulting'
   deadline             date NOT NULL,
   budget               numeric(15, 2) NOT NULL CHECK (budget >= 0),
+  probability          integer NOT NULL DEFAULT 50 CHECK (probability >= 0 AND probability <= 100),
   project_manager_id   uuid REFERENCES project_managers(id) ON DELETE SET NULL,
   status               offer_status NOT NULL DEFAULT 'in_lavorazione',
   outcome              offer_outcome NOT NULL DEFAULT 'nessuno',
@@ -125,3 +126,10 @@ CREATE POLICY "fc: update own" ON funding_calls
 
 CREATE POLICY "fc: delete own" ON funding_calls
   FOR DELETE USING (auth.uid() = user_id);
+
+-- ============================================================
+-- Migration: aggiungi colonna probability (se schema già eseguito)
+-- Esegui SOLO se la tabella offers esiste già senza la colonna.
+-- ============================================================
+-- ALTER TABLE offers ADD COLUMN IF NOT EXISTS
+--   probability integer NOT NULL DEFAULT 50 CHECK (probability >= 0 AND probability <= 100);
