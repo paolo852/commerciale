@@ -123,7 +123,14 @@ export default function OfferFormModal({
       else await offersService.create(payload, user.id);
       onSaved(); onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore nel salvataggio');
+      // Gli errori Supabase non sono istanze di Error: estrai message + hint
+      const msg = (e as { message?: string })?.message
+        ?? (e instanceof Error ? e.message : null)
+        ?? 'Errore nel salvataggio';
+      const hint = (e as { hint?: string; details?: string })?.hint
+        ?? (e as { details?: string })?.details;
+      setError(hint ? `${msg} — ${hint}` : msg);
+      console.error('Save offer failed:', e);
     } finally { setSaving(false); }
   }
 
