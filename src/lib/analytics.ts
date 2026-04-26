@@ -65,22 +65,29 @@ export function computeKPIs(offers: Offer[]): DashboardKPIs {
 
 export interface ProbabilisticRevenue {
   confermato: number;    // offerte già approvate
-  p10: number;           // scenario pessimistico (10° percentile)
-  p50: number;           // scenario atteso (valore medio)
-  p90: number;           // scenario ottimistico (90° percentile)
-  pipelineCount: number; // numero offerte attive incluse nel calcolo
+  expected: number;      // valore atteso E[X] = Σ(p_i × budget_i)
+  p10: number;           // 10° percentile della distribuzione esatta
+  p50: number;           // mediana
+  p90: number;           // 90° percentile
+  maxPossible: number;   // somma di TUTTI i budget della pipeline (limite superiore)
+  pipelineCount: number; // numero offerte attive
+  method: 'exact' | 'monte-carlo';
 }
 
+const EXACT_LIMIT = 20;       // sopra ~1M combinazioni passiamo a Monte Carlo
+const MC_SAMPLES = 50_000;
+
 /**
- * Calcola la distribuzione del fatturato atteso usando l'approssimazione
- * normale (Teorema del Limite Centrale).
+ * Calcola la distribuzione del fatturato come convoluzione di n distribuzioni
+ * Bernoulli (una per offerta): ogni offerta ha probabilità p di contribuire
+ * con budget e probabilità (1-p) di contribuire con 0.
  *
- * Vengono incluse le offerte con outcome = 'nessuno' e status != 'ferma'.
- * μ = Σ(p_i × b_i)
- * σ² = Σ(p_i × (1−p_i) × b_i²)
- * P10 = μ − 1.282σ  /  P50 = μ  /  P90 = μ + 1.282σ
+ * Per pipeline ≤ 20 offerte usa la distribuzione esatta (2^n combinazioni).
+ * Sopra usa Monte Carlo con 50k simulazioni.
  *
- * Al risultato viene sommato il fatturato già confermato (outcome='approvato').
+ * Il fatturato confermato (outcome='approvato') è additivo a tutti i percentili.
+ *
+ * Pipeline = offerte con outcome='nessuno' AND status≠'ferma'.
  */
 export function computeProbabilisticRevenue(offers: Offer[]): ProbabilisticRevenue {
   const confermato = offers
@@ -91,22 +98,104 @@ export function computeProbabilisticRevenue(offers: Offer[]): ProbabilisticReven
     (o) => o.outcome === 'nessuno' && o.status !== 'ferma',
   );
 
-  let mu = 0;
-  let variance = 0;
-  for (const o of pipeline) {
-    const p = (o.probability ?? 50) / 100;
-    mu += p * o.budget;
-    variance += p * (1 - p) * o.budget * o.budget;
-  }
-  const sigma = Math.sqrt(variance);
+  const maxPossible = confermato + pipeline.reduce((s, o) => s + o.budget, 0);
+  const expected = confermato + pipeline.reduce(
+    (s, o) => s + ((o.probability ?? 50) / 100) * o.budget,
+    0,
+  );
 
-  const Z_P10 = 1.282;
+  if (pipeline.length === 0) {
+    return {
+      confermato,
+      expected: confermato,
+      p10: confermato, p50: confermato, p90: confermato,
+      maxPossible: confermato,
+      pipelineCount: 0,
+      method: 'exact',
+    };
+  }
+
+  const useExact = pipeline.length <= EXACT_LIMIT;
+  const { p10, p50, p90 } = useExact
+    ? exactPercentiles(pipeline)
+    : monteCarloPercentiles(pipeline);
+
   return {
     confermato,
-    p10: Math.max(0, confermato + mu - Z_P10 * sigma),
-    p50: confermato + mu,
-    p90: confermato + mu + Z_P10 * sigma,
+    expected,
+    p10: confermato + p10,
+    p50: confermato + p50,
+    p90: confermato + p90,
+    maxPossible,
     pipelineCount: pipeline.length,
+    method: useExact ? 'exact' : 'monte-carlo',
+  };
+}
+
+/**
+ * Convoluzione esatta delle distribuzioni Bernoulli.
+ * Parte da {0: 1.0} e per ogni offerta espande la mappa value→prob.
+ */
+function exactPercentiles(pipeline: Offer[]): { p10: number; p50: number; p90: number } {
+  let dist = new Map<number, number>([[0, 1]]);
+  for (const o of pipeline) {
+    const p = Math.max(0, Math.min(1, (o.probability ?? 50) / 100));
+    const next = new Map<number, number>();
+    for (const [value, prob] of dist) {
+      if (1 - p > 0) {
+        next.set(value, (next.get(value) ?? 0) + prob * (1 - p));
+      }
+      if (p > 0) {
+        const newVal = value + o.budget;
+        next.set(newVal, (next.get(newVal) ?? 0) + prob * p);
+      }
+    }
+    dist = next;
+  }
+  return percentilesFromDistribution(dist);
+}
+
+function percentilesFromDistribution(
+  dist: Map<number, number>,
+): { p10: number; p50: number; p90: number } {
+  const sorted = Array.from(dist.entries()).sort((a, b) => a[0] - b[0]);
+  let cum = 0;
+  let p10: number | null = null;
+  let p50: number | null = null;
+  let p90: number | null = null;
+  for (const [value, prob] of sorted) {
+    cum += prob;
+    if (p10 === null && cum >= 0.10) p10 = value;
+    if (p50 === null && cum >= 0.50) p50 = value;
+    if (p90 === null && cum >= 0.90) p90 = value;
+  }
+  // Fallback ai valori estremi se mai null (non dovrebbe succedere)
+  const last = sorted[sorted.length - 1]?.[0] ?? 0;
+  return {
+    p10: p10 ?? sorted[0]?.[0] ?? 0,
+    p50: p50 ?? last,
+    p90: p90 ?? last,
+  };
+}
+
+/** Simulazione Monte Carlo per portafogli con > EXACT_LIMIT offerte. */
+function monteCarloPercentiles(
+  pipeline: Offer[],
+): { p10: number; p50: number; p90: number } {
+  const samples = new Float64Array(MC_SAMPLES);
+  for (let i = 0; i < MC_SAMPLES; i++) {
+    let total = 0;
+    for (const o of pipeline) {
+      const p = (o.probability ?? 50) / 100;
+      if (Math.random() < p) total += o.budget;
+    }
+    samples[i] = total;
+  }
+  const sorted = Array.from(samples).sort((a, b) => a - b);
+  return {
+    p10: sorted[Math.floor(0.10 * MC_SAMPLES)],
+    p50: sorted[Math.floor(0.50 * MC_SAMPLES)],
+    p90: sorted[Math.floor(0.90 * MC_SAMPLES)],
   };
 }
 
