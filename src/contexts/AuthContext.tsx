@@ -43,11 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Timeout di sicurezza: se getSession() non risponde entro 4s, mostra login
+    // Timeout di sicurezza: se getSession() non risponde entro 25s, mostra login
+    // (Supabase free tier può impiegare 15-20s per riavviarsi dalla pausa)
     const timeout = setTimeout(() => {
       setUser(null);
       setLoading(false);
-    }, 4000);
+    }, 25000);
 
     supabase!.auth.getSession()
       .then(({ data }) => {
