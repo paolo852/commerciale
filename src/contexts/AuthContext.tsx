@@ -43,38 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Timeout di sicurezza: se getSession() non risponde entro 25s, mostra login
-    // (Supabase free tier può impiegare 15-20s per riavviarsi dalla pausa)
-    const timeout = setTimeout(() => {
+    supabase!.auth.getSession().then(({ data }) => {
+      setUser(toAuthUser(data.session?.user ?? null));
+      setLoading(false);
+    }).catch(() => {
       setUser(null);
       setLoading(false);
-    }, 25000);
+    });
 
-    supabase!.auth.getSession()
-      .then(({ data }) => {
-        clearTimeout(timeout);
-        setUser(toAuthUser(data.session?.user ?? null));
-        setLoading(false);
-      })
-      .catch(() => {
-        clearTimeout(timeout);
-        setUser(null);
-        setLoading(false);
-      });
-
-    // onAuthStateChange gestisce login/logout successivi e il whitelist check
-    const { data: sub } = supabase!.auth.onAuthStateChange(async (_event, session) => {
-      const sessionUser = session?.user ?? null;
-      setUser(toAuthUser(sessionUser));
-
-      if (sessionUser?.email) {
-        try {
-          const allowed = await allowedUsersService.isAllowed(sessionUser.email);
-          if (!allowed) await supabase!.auth.signOut();
-        } catch {
-          // fail open
-        }
-      }
+    const { data: sub } = supabase!.auth.onAuthStateChange((_event, session) => {
+      setUser(toAuthUser(session?.user ?? null));
     });
 
     return () => sub.subscription.unsubscribe();
