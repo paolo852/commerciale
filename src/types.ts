@@ -105,6 +105,15 @@ export type UpdateOfferForm = Partial<CreateOfferForm>;
 // Tipi per la Dashboard / Analytics
 // ============================================================
 
+export interface AllowedUser {
+  id: string;
+  email: string;
+  name: string | null;
+  created_at: string;
+}
+
+export type CreateAllowedUserForm = Pick<AllowedUser, 'email' | 'name'>;
+
 export interface DashboardKPIs {
   totalInOfferta: number;       // somma budget presentate non rifiutate
   inLavorazione: number;        // count offerte in_lavorazione

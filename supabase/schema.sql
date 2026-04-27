@@ -74,6 +74,25 @@ CREATE TABLE offers (
 );
 
 -- ============================================================
+-- Tabella allowed_users (registro utenti autorizzati)
+-- ============================================================
+CREATE TABLE allowed_users (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email      text NOT NULL UNIQUE,
+  name       text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Funzione helper: verifica se l'utente corrente è nel registro
+-- SECURITY DEFINER = bypassa RLS sulla tabella allowed_users
+CREATE OR REPLACE FUNCTION is_allowed_user()
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM allowed_users WHERE lower(email) = lower(auth.email())
+  )
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- ============================================================
 -- Indici
 -- ============================================================
 CREATE INDEX idx_offers_user_id          ON offers(user_id);
@@ -90,45 +109,56 @@ CREATE INDEX idx_fc_user_id              ON funding_calls(user_id);
 ALTER TABLE offers           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_managers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE funding_calls    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE allowed_users    ENABLE ROW LEVEL SECURITY;
 
--- Policies offers
-CREATE POLICY "offers: select own" ON offers
-  FOR SELECT USING (auth.uid() = user_id);
+-- Policies offers: tutti gli utenti autorizzati vedono e modificano tutti i dati
+CREATE POLICY "offers: select allowed" ON offers
+  FOR SELECT USING (is_allowed_user());
 
-CREATE POLICY "offers: insert own" ON offers
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "offers: insert allowed" ON offers
+  FOR INSERT WITH CHECK (is_allowed_user());
 
-CREATE POLICY "offers: update own" ON offers
-  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "offers: update allowed" ON offers
+  FOR UPDATE USING (is_allowed_user()) WITH CHECK (is_allowed_user());
 
-CREATE POLICY "offers: delete own" ON offers
-  FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "offers: delete allowed" ON offers
+  FOR DELETE USING (is_allowed_user());
 
 -- Policies project_managers
-CREATE POLICY "pm: select own" ON project_managers
-  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "pm: select allowed" ON project_managers
+  FOR SELECT USING (is_allowed_user());
 
-CREATE POLICY "pm: insert own" ON project_managers
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "pm: insert allowed" ON project_managers
+  FOR INSERT WITH CHECK (is_allowed_user());
 
-CREATE POLICY "pm: update own" ON project_managers
-  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "pm: update allowed" ON project_managers
+  FOR UPDATE USING (is_allowed_user()) WITH CHECK (is_allowed_user());
 
-CREATE POLICY "pm: delete own" ON project_managers
-  FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "pm: delete allowed" ON project_managers
+  FOR DELETE USING (is_allowed_user());
 
 -- Policies funding_calls
-CREATE POLICY "fc: select own" ON funding_calls
-  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "fc: select allowed" ON funding_calls
+  FOR SELECT USING (is_allowed_user());
 
-CREATE POLICY "fc: insert own" ON funding_calls
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "fc: insert allowed" ON funding_calls
+  FOR INSERT WITH CHECK (is_allowed_user());
 
-CREATE POLICY "fc: update own" ON funding_calls
-  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "fc: update allowed" ON funding_calls
+  FOR UPDATE USING (is_allowed_user()) WITH CHECK (is_allowed_user());
 
-CREATE POLICY "fc: delete own" ON funding_calls
-  FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "fc: delete allowed" ON funding_calls
+  FOR DELETE USING (is_allowed_user());
+
+-- Policies allowed_users: lettura per tutti gli autenticati, scrittura solo per utenti autorizzati
+CREATE POLICY "au: select authenticated" ON allowed_users
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "au: insert allowed" ON allowed_users
+  FOR INSERT WITH CHECK (is_allowed_user());
+
+CREATE POLICY "au: delete allowed" ON allowed_users
+  FOR DELETE USING (is_allowed_user());
 
 -- ============================================================
 -- Migrations (da eseguire SOLO se lo schema è già stato applicato)

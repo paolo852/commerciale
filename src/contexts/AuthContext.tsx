@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { isDemoMode, supabase } from '../lib/supabase';
 import { demoAuth, type DemoUser } from '../lib/demoStorage';
+import { allowedUsersService } from '../lib/dataService';
 
 export interface AuthUser {
   id: string;
@@ -65,6 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { error } = await supabase!.auth.signInWithPassword({ email, password });
     if (error) throw error;
+
+    const allowed = await allowedUsersService.isAllowed(email);
+    if (!allowed) {
+      await supabase!.auth.signOut();
+      throw new Error('Accesso non autorizzato. Contatta l\'amministratore per essere aggiunto al registro utenti.');
+    }
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {

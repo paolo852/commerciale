@@ -3,8 +3,11 @@ import {
   demoOffers,
   demoProjectManagers,
   demoFundingCalls,
+  demoAllowedUsers,
 } from './demoStorage';
 import type {
+  AllowedUser,
+  CreateAllowedUserForm,
   Offer,
   ProjectManager,
   FundingCall,
@@ -23,6 +26,51 @@ function ensureSb() {
   if (!supabase) throw new Error('Supabase client non inizializzato');
   return supabase;
 }
+
+// ----------------------------------------------------------------
+// Allowed Users
+// ----------------------------------------------------------------
+
+export const allowedUsersService = {
+  async list(): Promise<AllowedUser[]> {
+    if (isDemoMode) return demoAllowedUsers.list();
+    const { data, error } = await ensureSb()
+      .from('allowed_users')
+      .select('*')
+      .order('email', { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  async create(input: CreateAllowedUserForm): Promise<AllowedUser> {
+    if (isDemoMode) {
+      return demoAllowedUsers.create({ email: input.email.toLowerCase().trim(), name: input.name ?? null });
+    }
+    const { data, error } = await ensureSb()
+      .from('allowed_users')
+      .insert({ email: input.email.toLowerCase().trim(), name: input.name ?? null })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as AllowedUser;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoAllowedUsers.remove(id); return; }
+    const { error } = await ensureSb().from('allowed_users').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async isAllowed(email: string): Promise<boolean> {
+    if (isDemoMode) return true;
+    const { data } = await ensureSb()
+      .from('allowed_users')
+      .select('id')
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle();
+    return data !== null;
+  },
+};
 
 // ----------------------------------------------------------------
 // Project Managers

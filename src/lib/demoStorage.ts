@@ -1,4 +1,4 @@
-import type { Offer, ProjectManager, FundingCall } from '../types';
+import type { AllowedUser, Offer, ProjectManager, FundingCall } from '../types';
 
 // ============================================================
 // Demo storage: emula Supabase usando localStorage.
@@ -10,6 +10,7 @@ const KEYS = {
   offers: 'commerciale.demo.offers',
   projectManagers: 'commerciale.demo.projectManagers',
   fundingCalls: 'commerciale.demo.fundingCalls',
+  allowedUsers: 'commerciale.demo.allowedUsers',
 } as const;
 
 export interface DemoUser {
@@ -122,6 +123,30 @@ export const demoProjectManagers = {
   },
   remove(id: string): void {
     write(KEYS.projectManagers, this.list().filter((i) => i.id !== id));
+  },
+};
+
+// ============================================================
+// Allowed Users
+// ============================================================
+
+export const demoAllowedUsers = {
+  list(): AllowedUser[] {
+    return read<AllowedUser[]>(KEYS.allowedUsers, []);
+  },
+  create(input: Omit<AllowedUser, 'id' | 'created_at'>): AllowedUser {
+    const items = this.list();
+    const item: AllowedUser = {
+      ...input,
+      id: uuid(),
+      created_at: new Date().toISOString(),
+    };
+    items.push(item);
+    write(KEYS.allowedUsers, items);
+    return item;
+  },
+  remove(id: string): void {
+    write(KEYS.allowedUsers, this.list().filter((i) => i.id !== id));
   },
 };
 

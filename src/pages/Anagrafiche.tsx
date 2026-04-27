@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { BookOpen, Users } from 'lucide-react';
+import { BookOpen, ShieldCheck, Users } from 'lucide-react';
 import ProjectManagersTab from '../components/anagrafiche/ProjectManagersTab';
 import FundingCallsTab from '../components/anagrafiche/FundingCallsTab';
+import AllowedUsersTab from '../components/anagrafiche/AllowedUsersTab';
 
-type Tab = 'pm' | 'fc';
+type Tab = 'pm' | 'fc' | 'users';
 
 const tabs: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'pm', label: 'Project Managers', icon: Users },
   { id: 'fc', label: 'Funding Calls', icon: BookOpen },
+  { id: 'users', label: 'Utenti autorizzati', icon: ShieldCheck },
 ];
 
 export default function Anagrafiche() {
@@ -17,7 +19,7 @@ export default function Anagrafiche() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Anagrafiche</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Gestione project manager e bandi</p>
+        <p className="text-sm text-slate-500 mt-0.5">Gestione project manager, bandi e utenti</p>
       </div>
 
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
@@ -37,7 +39,9 @@ export default function Anagrafiche() {
         ))}
       </div>
 
-      {tab === 'pm' ? <ProjectManagersTab /> : <FundingCallsTab />}
+      {tab === 'pm' && <ProjectManagersTab />}
+      {tab === 'fc' && <FundingCallsTab />}
+      {tab === 'users' && <AllowedUsersTab />}
     </div>
   );
 }
