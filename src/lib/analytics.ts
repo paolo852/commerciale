@@ -214,7 +214,7 @@ function addDaysISO(days: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function getUpcomingDeadlines(offers: Offer[], days = 30): Offer[] {
+export function getUpcomingDeadlines(offers: Offer[], days = 365): Offer[] {
   const today = todayISO();
   const limit = addDaysISO(days);
   return offers

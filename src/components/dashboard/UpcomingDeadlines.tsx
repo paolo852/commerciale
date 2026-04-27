@@ -10,10 +10,19 @@ interface UpcomingDeadlinesProps {
   days?: number;
 }
 
+function deadlineBadge(d: number): { label: string; cls: string } {
+  if (d === 0) return { label: 'oggi', cls: 'bg-red-50 text-red-700 border-red-200' };
+  if (d === 1) return { label: 'domani', cls: 'bg-red-50 text-red-700 border-red-200' };
+  if (d <= 7)  return { label: `${d} gg`, cls: 'bg-red-50 text-red-700 border-red-200' };
+  if (d <= 30) return { label: `${d} gg`, cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+  const months = Math.round(d / 30);
+  return { label: `${months} mes${months === 1 ? 'e' : 'i'}`, cls: 'bg-slate-50 text-slate-500 border-slate-200' };
+}
+
 export default function UpcomingDeadlines({
   offers,
   projectManagers,
-  days = 30,
+  days = 365,
 }: UpcomingDeadlinesProps) {
   const upcoming = useMemo(() => getUpcomingDeadlines(offers, days), [offers, days]);
   const pmById = useMemo(
@@ -25,11 +34,11 @@ export default function UpcomingDeadlines({
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
         <h2 className="text-base font-semibold text-slate-900">Scadenze prossime</h2>
-        <span className="text-xs text-slate-500">prossimi {days} giorni</span>
+        <span className="text-xs text-slate-500">prossimi 12 mesi</span>
       </div>
       {upcoming.length === 0 ? (
         <p className="px-5 py-8 text-sm text-slate-400 text-center">
-          Nessuna scadenza nei prossimi {days} giorni.
+          Nessuna scadenza nei prossimi 12 mesi.
         </p>
       ) : (
         <div className="overflow-x-auto">
@@ -46,7 +55,7 @@ export default function UpcomingDeadlines({
             <tbody>
               {upcoming.map((o) => {
                 const d = daysUntil(o.deadline);
-                const urgent = d <= 7;
+                const badge = deadlineBadge(d);
                 return (
                   <tr key={o.id} className="border-t border-slate-100">
                     <td className="px-4 py-2.5 font-medium text-slate-900">{o.name}</td>
@@ -57,14 +66,8 @@ export default function UpcomingDeadlines({
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <span className="text-slate-700">{formatDate(o.deadline)}</span>
-                        <span
-                          className={`text-xs px-1.5 py-0.5 rounded-full border ${
-                            urgent
-                              ? 'bg-red-50 text-red-700 border-red-200'
-                              : 'bg-slate-50 text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          {d === 0 ? 'oggi' : d === 1 ? 'domani' : `${d} gg`}
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full border ${badge.cls}`}>
+                          {badge.label}
                         </span>
                       </div>
                     </td>
