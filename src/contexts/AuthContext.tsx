@@ -45,13 +45,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    supabase!.auth.getSession().then(({ data }) => {
-      setUser(toAuthUser(data.session?.user ?? null));
+    supabase!.auth.getSession().then(async ({ data }) => {
+      const sessionUser = data.session?.user ?? null;
+      if (sessionUser?.email) {
+        const allowed = await allowedUsersService.isAllowed(sessionUser.email);
+        if (!allowed) {
+          await supabase!.auth.signOut();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      }
+      setUser(toAuthUser(sessionUser));
       setLoading(false);
     });
 
-    const { data: sub } = supabase!.auth.onAuthStateChange((_event, session) => {
-      setUser(toAuthUser(session?.user ?? null));
+    const { data: sub } = supabase!.auth.onAuthStateChange(async (_event, session) => {
+      const sessionUser = session?.user ?? null;
+      if (sessionUser?.email) {
+        const allowed = await allowedUsersService.isAllowed(sessionUser.email);
+        if (!allowed) {
+          await supabase!.auth.signOut();
+          setUser(null);
+          return;
+        }
+      }
+      setUser(toAuthUser(sessionUser));
     });
     unsub = () => sub.subscription.unsubscribe();
 
