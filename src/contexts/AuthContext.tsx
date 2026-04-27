@@ -45,21 +45,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = supabase!.auth.onAuthStateChange(async (_event, session) => {
       const sessionUser = session?.user ?? null;
-      try {
-        if (sessionUser?.email) {
+
+      // Risolvi subito il loading — non aspettare il whitelist check
+      setUser(toAuthUser(sessionUser));
+      setLoading(false);
+
+      // Whitelist check in background: se non autorizzato, disconnetti
+      if (sessionUser?.email) {
+        try {
           const allowed = await allowedUsersService.isAllowed(sessionUser.email);
           if (!allowed) {
             await supabase!.auth.signOut();
-            setUser(null);
-            setLoading(false);
-            return;
           }
+        } catch {
+          // fail open
         }
-      } catch {
-        // fail open: non bloccare il caricamento per errori del whitelist
       }
-      setUser(toAuthUser(sessionUser));
-      setLoading(false);
     });
 
     return () => sub.subscription.unsubscribe();
