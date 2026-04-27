@@ -4,7 +4,8 @@ import Modal from '../Modal';
 import { useAuth } from '../../contexts/AuthContext';
 import { leadsService, leadFilesService } from '../../lib/dataService';
 import { formatDate } from '../../lib/format';
-import type { Lead, LeadFile, LeadStatus } from '../../types';
+import LeadMatchesPanel from './LeadMatchesPanel';
+import type { FundingCall, Lead, LeadFile, LeadStatus } from '../../types';
 
 interface Props {
   open: boolean;
@@ -12,6 +13,7 @@ interface Props {
   onSaved: () => void;
   onPromote?: (lead: Lead) => void;
   lead: Lead | null;
+  fundingCalls: FundingCall[];
 }
 
 interface FormState {
@@ -53,7 +55,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export default function LeadFormModal({ open, onClose, onSaved, onPromote, lead }: Props) {
+export default function LeadFormModal({ open, onClose, onSaved, onPromote, lead, fundingCalls }: Props) {
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -220,6 +222,8 @@ export default function LeadFormModal({ open, onClose, onSaved, onPromote, lead 
             )}
           </div>
         )}
+
+        {lead && <LeadMatchesPanel lead={lead} fundingCalls={fundingCalls} />}
 
         <div className="flex justify-between items-center pt-2 gap-2 flex-wrap">
           {lead && onPromote && lead.status !== 'promosso' && (

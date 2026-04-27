@@ -146,6 +146,15 @@ export interface LeadFile {
 export type CreateLeadForm = Pick<Lead, 'name' | 'pi' | 'ente' | 'description' | 'status' | 'notes'>;
 export type UpdateLeadForm = Partial<CreateLeadForm & Pick<Lead, 'promoted_offer_id'>>;
 
+export interface LeadMatch {
+  id: string;
+  lead_id: string;
+  funding_call_id: string;
+  score: number; // 0-100
+  rationale: string | null;
+  analyzed_at: string;
+}
+
 export interface DashboardKPIs {
   totalInOfferta: number;       // somma budget presentate non rifiutate
   inLavorazione: number;        // count offerte in_lavorazione
