@@ -37,16 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsub: (() => void) | undefined;
-
     if (isDemoMode) {
       setUser(toAuthUser(demoAuth.getUser()));
       setLoading(false);
       return;
     }
 
-    supabase!.auth.getSession().then(async ({ data }) => {
-      const sessionUser = data.session?.user ?? null;
+    const { data: sub } = supabase!.auth.onAuthStateChange(async (_event, session) => {
+      const sessionUser = session?.user ?? null;
       try {
         if (sessionUser?.email) {
           const allowed = await allowedUsersService.isAllowed(sessionUser.email);
@@ -58,31 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch {
-        // fail open: se il controllo non funziona, lascia passare
+        // fail open: non bloccare il caricamento per errori del whitelist
       }
       setUser(toAuthUser(sessionUser));
       setLoading(false);
     });
 
-    const { data: sub } = supabase!.auth.onAuthStateChange(async (_event, session) => {
-      const sessionUser = session?.user ?? null;
-      try {
-        if (sessionUser?.email) {
-          const allowed = await allowedUsersService.isAllowed(sessionUser.email);
-          if (!allowed) {
-            await supabase!.auth.signOut();
-            setUser(null);
-            return;
-          }
-        }
-      } catch {
-        // fail open
-      }
-      setUser(toAuthUser(sessionUser));
-    });
-    unsub = () => sub.subscription.unsubscribe();
-
-    return () => unsub?.();
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
