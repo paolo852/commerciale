@@ -183,6 +183,7 @@ export default function Leads() {
         onSaved={reload}
         onPromote={startPromote}
         lead={editing}
+        fundingCalls={fundingCalls}
       />
 
       <OfferFormModal

@@ -15,6 +15,7 @@ import type {
   FundingCall,
   Lead,
   LeadFile,
+  LeadMatch,
   CreateLeadForm,
   UpdateLeadForm,
   CreateProjectManagerForm,
@@ -351,6 +352,97 @@ export const leadFilesService = {
     await sb.storage.from(LEAD_BUCKET).remove([file.storage_path]);
     const { error } = await sb.from('lead_files').delete().eq('id', file.id);
     if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Lead Matches (cache risultati AI matching)
+// ----------------------------------------------------------------
+
+const matchKey = 'commerciale.demo.leadMatches';
+
+function readDemoMatches(): LeadMatch[] {
+  try { return JSON.parse(localStorage.getItem(matchKey) ?? '[]'); }
+  catch { return []; }
+}
+function writeDemoMatches(arr: LeadMatch[]) {
+  localStorage.setItem(matchKey, JSON.stringify(arr));
+}
+
+export const leadMatchesService = {
+  async list(leadId: string): Promise<LeadMatch[]> {
+    if (isDemoMode) {
+      return readDemoMatches().filter((m) => m.lead_id === leadId).sort((a, b) => b.score - a.score);
+    }
+    const { data, error } = await ensureSb()
+      .from('lead_matches')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('score', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as LeadMatch[];
+  },
+
+  async replace(leadId: string, matches: { funding_call_id: string; score: number; rationale: string }[]): Promise<LeadMatch[]> {
+    if (isDemoMode) {
+      const all = readDemoMatches().filter((m) => m.lead_id !== leadId);
+      const now = new Date().toISOString();
+      const created: LeadMatch[] = matches.map((m) => ({
+        id: crypto.randomUUID(),
+        lead_id: leadId,
+        funding_call_id: m.funding_call_id,
+        score: m.score,
+        rationale: m.rationale,
+        analyzed_at: now,
+      }));
+      writeDemoMatches([...all, ...created]);
+      return created.sort((a, b) => b.score - a.score);
+    }
+    const sb = ensureSb();
+    // Cancella i match esistenti per il lead
+    await sb.from('lead_matches').delete().eq('lead_id', leadId);
+    if (matches.length === 0) return [];
+    const { data, error } = await sb
+      .from('lead_matches')
+      .insert(matches.map((m) => ({ ...m, lead_id: leadId })))
+      .select();
+    if (error) throw error;
+    return ((data ?? []) as LeadMatch[]).sort((a, b) => b.score - a.score);
+  },
+
+  async analyze(lead: Lead, fundingCalls: FundingCall[]): Promise<{ matches: LeadMatch[]; model?: string }> {
+    // Filtra bandi non scaduti
+    const today = new Date().toISOString().slice(0, 10);
+    const active = fundingCalls.filter((fc) => !fc.deadline || fc.deadline >= today);
+
+    if (!lead.description?.trim()) {
+      throw new Error('Inserisci una descrizione della tecnologia prima di lanciare il match AI.');
+    }
+
+    const res = await fetch('/api/match', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        leadName: lead.name,
+        leadDescription: lead.description,
+        leadPi: lead.pi,
+        leadEnte: lead.ente,
+        fundingCalls: active.map((fc) => ({
+          id: fc.id, code: fc.code, name: fc.name,
+          body: fc.body, deadline: fc.deadline, notes: fc.notes,
+        })),
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(err.error ?? 'Errore matching AI');
+    }
+    const json = await res.json() as {
+      matches: { funding_call_id: string; score: number; rationale: string }[];
+      model?: string;
+    };
+    const stored = await this.replace(lead.id, json.matches);
+    return { matches: stored, model: json.model };
   },
 };
 
