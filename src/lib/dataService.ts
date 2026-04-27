@@ -64,15 +64,22 @@ export const allowedUsersService = {
   async isAllowed(email: string): Promise<boolean> {
     if (isDemoMode) return true;
     try {
+      // Se la tabella è vuota il whitelist non è ancora configurato → fail open
+      const { count, error: countErr } = await ensureSb()
+        .from('allowed_users')
+        .select('*', { count: 'exact', head: true });
+      if (countErr) return true; // tabella non ancora creata
+      if (!count) return true;   // tabella vuota → non ancora configurato
+
       const { data, error } = await ensureSb()
         .from('allowed_users')
         .select('id')
         .eq('email', email.toLowerCase().trim())
         .maybeSingle();
-      if (error) return true; // tabella non ancora creata: fail open
+      if (error) return true;
       return data !== null;
     } catch {
-      return true; // fail open su qualsiasi errore imprevisto
+      return true;
     }
   },
 };
