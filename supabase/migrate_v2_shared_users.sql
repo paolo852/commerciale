@@ -1,6 +1,7 @@
 -- ============================================================
 -- Migrazione v2: dati condivisi + registro utenti autorizzati
 -- Da eseguire nel SQL Editor di Supabase sul database esistente.
+-- Idempotente: può essere rieseguito senza errori.
 -- ============================================================
 
 -- 1. Nuove colonne (se non esistono già)
@@ -28,22 +29,28 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE;
 -- 4. RLS allowed_users
 ALTER TABLE allowed_users ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "au: select authenticated" ON allowed_users;
+DROP POLICY IF EXISTS "au: insert allowed"        ON allowed_users;
+DROP POLICY IF EXISTS "au: delete allowed"        ON allowed_users;
+
 CREATE POLICY "au: select authenticated" ON allowed_users
   FOR SELECT USING (auth.uid() IS NOT NULL);
-
 CREATE POLICY "au: insert allowed" ON allowed_users
   FOR INSERT WITH CHECK (is_allowed_user());
-
 CREATE POLICY "au: delete allowed" ON allowed_users
   FOR DELETE USING (is_allowed_user());
 
--- 5. Sostituisci le policy vecchie (per-user) con quelle condivise
+-- 5. Policy condivise sulle tabelle dati (drop old + new)
 
 -- offers
-DROP POLICY IF EXISTS "offers: select own" ON offers;
-DROP POLICY IF EXISTS "offers: insert own" ON offers;
-DROP POLICY IF EXISTS "offers: update own" ON offers;
-DROP POLICY IF EXISTS "offers: delete own" ON offers;
+DROP POLICY IF EXISTS "offers: select own"     ON offers;
+DROP POLICY IF EXISTS "offers: insert own"     ON offers;
+DROP POLICY IF EXISTS "offers: update own"     ON offers;
+DROP POLICY IF EXISTS "offers: delete own"     ON offers;
+DROP POLICY IF EXISTS "offers: select allowed" ON offers;
+DROP POLICY IF EXISTS "offers: insert allowed" ON offers;
+DROP POLICY IF EXISTS "offers: update allowed" ON offers;
+DROP POLICY IF EXISTS "offers: delete allowed" ON offers;
 
 CREATE POLICY "offers: select allowed" ON offers
   FOR SELECT USING (is_allowed_user());
@@ -55,10 +62,14 @@ CREATE POLICY "offers: delete allowed" ON offers
   FOR DELETE USING (is_allowed_user());
 
 -- project_managers
-DROP POLICY IF EXISTS "pm: select own" ON project_managers;
-DROP POLICY IF EXISTS "pm: insert own" ON project_managers;
-DROP POLICY IF EXISTS "pm: update own" ON project_managers;
-DROP POLICY IF EXISTS "pm: delete own" ON project_managers;
+DROP POLICY IF EXISTS "pm: select own"     ON project_managers;
+DROP POLICY IF EXISTS "pm: insert own"     ON project_managers;
+DROP POLICY IF EXISTS "pm: update own"     ON project_managers;
+DROP POLICY IF EXISTS "pm: delete own"     ON project_managers;
+DROP POLICY IF EXISTS "pm: select allowed" ON project_managers;
+DROP POLICY IF EXISTS "pm: insert allowed" ON project_managers;
+DROP POLICY IF EXISTS "pm: update allowed" ON project_managers;
+DROP POLICY IF EXISTS "pm: delete allowed" ON project_managers;
 
 CREATE POLICY "pm: select allowed" ON project_managers
   FOR SELECT USING (is_allowed_user());
@@ -70,10 +81,14 @@ CREATE POLICY "pm: delete allowed" ON project_managers
   FOR DELETE USING (is_allowed_user());
 
 -- funding_calls
-DROP POLICY IF EXISTS "fc: select own" ON funding_calls;
-DROP POLICY IF EXISTS "fc: insert own" ON funding_calls;
-DROP POLICY IF EXISTS "fc: update own" ON funding_calls;
-DROP POLICY IF EXISTS "fc: delete own" ON funding_calls;
+DROP POLICY IF EXISTS "fc: select own"     ON funding_calls;
+DROP POLICY IF EXISTS "fc: insert own"     ON funding_calls;
+DROP POLICY IF EXISTS "fc: update own"     ON funding_calls;
+DROP POLICY IF EXISTS "fc: delete own"     ON funding_calls;
+DROP POLICY IF EXISTS "fc: select allowed" ON funding_calls;
+DROP POLICY IF EXISTS "fc: insert allowed" ON funding_calls;
+DROP POLICY IF EXISTS "fc: update allowed" ON funding_calls;
+DROP POLICY IF EXISTS "fc: delete allowed" ON funding_calls;
 
 CREATE POLICY "fc: select allowed" ON funding_calls
   FOR SELECT USING (is_allowed_user());
