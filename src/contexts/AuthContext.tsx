@@ -43,14 +43,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // getSession() legge da localStorage — risolve quasi istantaneamente
-    // e garantisce che il loading venga sempre rimosso
+    // Timeout di sicurezza: se getSession() non risponde entro 4s, mostra login
+    const timeout = setTimeout(() => {
+      setUser(null);
+      setLoading(false);
+    }, 4000);
+
     supabase!.auth.getSession()
       .then(({ data }) => {
+        clearTimeout(timeout);
         setUser(toAuthUser(data.session?.user ?? null));
         setLoading(false);
       })
       .catch(() => {
+        clearTimeout(timeout);
         setUser(null);
         setLoading(false);
       });
