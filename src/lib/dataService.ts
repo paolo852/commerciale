@@ -63,12 +63,17 @@ export const allowedUsersService = {
 
   async isAllowed(email: string): Promise<boolean> {
     if (isDemoMode) return true;
-    const { data } = await ensureSb()
-      .from('allowed_users')
-      .select('id')
-      .eq('email', email.toLowerCase().trim())
-      .maybeSingle();
-    return data !== null;
+    try {
+      const { data, error } = await ensureSb()
+        .from('allowed_users')
+        .select('id')
+        .eq('email', email.toLowerCase().trim())
+        .maybeSingle();
+      if (error) return true; // tabella non ancora creata: fail open
+      return data !== null;
+    } catch {
+      return true; // fail open su qualsiasi errore imprevisto
+    }
   },
 };
 

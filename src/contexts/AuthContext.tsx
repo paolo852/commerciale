@@ -47,14 +47,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase!.auth.getSession().then(async ({ data }) => {
       const sessionUser = data.session?.user ?? null;
-      if (sessionUser?.email) {
-        const allowed = await allowedUsersService.isAllowed(sessionUser.email);
-        if (!allowed) {
-          await supabase!.auth.signOut();
-          setUser(null);
-          setLoading(false);
-          return;
+      try {
+        if (sessionUser?.email) {
+          const allowed = await allowedUsersService.isAllowed(sessionUser.email);
+          if (!allowed) {
+            await supabase!.auth.signOut();
+            setUser(null);
+            setLoading(false);
+            return;
+          }
         }
+      } catch {
+        // fail open: se il controllo non funziona, lascia passare
       }
       setUser(toAuthUser(sessionUser));
       setLoading(false);
@@ -62,13 +66,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = supabase!.auth.onAuthStateChange(async (_event, session) => {
       const sessionUser = session?.user ?? null;
-      if (sessionUser?.email) {
-        const allowed = await allowedUsersService.isAllowed(sessionUser.email);
-        if (!allowed) {
-          await supabase!.auth.signOut();
-          setUser(null);
-          return;
+      try {
+        if (sessionUser?.email) {
+          const allowed = await allowedUsersService.isAllowed(sessionUser.email);
+          if (!allowed) {
+            await supabase!.auth.signOut();
+            setUser(null);
+            return;
+          }
         }
+      } catch {
+        // fail open
       }
       setUser(toAuthUser(sessionUser));
     });
