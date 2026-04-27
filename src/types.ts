@@ -114,6 +114,38 @@ export interface AllowedUser {
 
 export type CreateAllowedUserForm = Pick<AllowedUser, 'email' | 'name'>;
 
+// ============================================================
+// Lead — tecnologie in valutazione (pre-offerta)
+// ============================================================
+
+export type LeadStatus = 'in_valutazione' | 'promosso' | 'rifiutato';
+
+export interface Lead {
+  id: string;
+  user_id: string;
+  name: string;
+  pi: string | null;
+  ente: string | null;
+  description: string | null;
+  status: LeadStatus;
+  notes: string | null;
+  promoted_offer_id: string | null;
+  created_at: string;
+}
+
+export interface LeadFile {
+  id: string;
+  lead_id: string;
+  filename: string;
+  storage_path: string;
+  size: number;
+  mime_type: string | null;
+  uploaded_at: string;
+}
+
+export type CreateLeadForm = Pick<Lead, 'name' | 'pi' | 'ente' | 'description' | 'status' | 'notes'>;
+export type UpdateLeadForm = Partial<CreateLeadForm & Pick<Lead, 'promoted_offer_id'>>;
+
 export interface DashboardKPIs {
   totalInOfferta: number;       // somma budget presentate non rifiutate
   inLavorazione: number;        // count offerte in_lavorazione

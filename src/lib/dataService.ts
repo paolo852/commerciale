@@ -4,6 +4,8 @@ import {
   demoProjectManagers,
   demoFundingCalls,
   demoAllowedUsers,
+  demoLeads,
+  demoLeadFiles,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -11,6 +13,10 @@ import type {
   Offer,
   ProjectManager,
   FundingCall,
+  Lead,
+  LeadFile,
+  CreateLeadForm,
+  UpdateLeadForm,
   CreateProjectManagerForm,
   UpdateProjectManagerForm,
   CreateFundingCallForm,
@@ -207,6 +213,143 @@ export const fundingCallsService = {
       return;
     }
     const { error } = await ensureSb().from('funding_calls').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Leads
+// ----------------------------------------------------------------
+
+export const leadsService = {
+  async list(): Promise<Lead[]> {
+    if (isDemoMode) {
+      return [...demoLeads.list()].sort((a, b) =>
+        b.created_at.localeCompare(a.created_at),
+      );
+    }
+    const { data, error } = await ensureSb()
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Lead[];
+  },
+
+  async create(input: CreateLeadForm, userId: string): Promise<Lead> {
+    if (isDemoMode) {
+      return demoLeads.create({
+        name: input.name,
+        pi: input.pi ?? null,
+        ente: input.ente ?? null,
+        description: input.description ?? null,
+        status: input.status ?? 'in_valutazione',
+        notes: input.notes ?? null,
+        promoted_offer_id: null,
+      });
+    }
+    const { data, error } = await ensureSb()
+      .from('leads')
+      .insert({ ...input, user_id: userId })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Lead;
+  },
+
+  async update(id: string, patch: UpdateLeadForm): Promise<Lead> {
+    if (isDemoMode) {
+      const updated = demoLeads.update(id, patch);
+      if (!updated) throw new Error('Lead non trovato');
+      return updated;
+    }
+    const { data, error } = await ensureSb()
+      .from('leads')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Lead;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoLeads.remove(id); return; }
+    const { error } = await ensureSb().from('leads').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Lead Files (Supabase Storage + tabella metadati)
+// ----------------------------------------------------------------
+
+const LEAD_BUCKET = 'lead-files';
+
+export const leadFilesService = {
+  async list(leadId: string): Promise<LeadFile[]> {
+    if (isDemoMode) return demoLeadFiles.list(leadId);
+    const { data, error } = await ensureSb()
+      .from('lead_files')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('uploaded_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as LeadFile[];
+  },
+
+  async upload(leadId: string, file: File): Promise<LeadFile> {
+    if (isDemoMode) {
+      // In demo mode salviamo solo metadati (no upload reale)
+      return demoLeadFiles.create({
+        lead_id: leadId,
+        filename: file.name,
+        storage_path: `demo/${file.name}`,
+        size: file.size,
+        mime_type: file.type || null,
+      });
+    }
+    const sb = ensureSb();
+    const safeName = file.name.replace(/[^\w.\-]/g, '_');
+    const path = `${leadId}/${Date.now()}-${safeName}`;
+    const { error: upErr } = await sb.storage.from(LEAD_BUCKET).upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+    if (upErr) throw upErr;
+    const { data, error } = await sb
+      .from('lead_files')
+      .insert({
+        lead_id: leadId,
+        filename: file.name,
+        storage_path: path,
+        size: file.size,
+        mime_type: file.type || null,
+      })
+      .select()
+      .single();
+    if (error) {
+      await sb.storage.from(LEAD_BUCKET).remove([path]);
+      throw error;
+    }
+    return data as LeadFile;
+  },
+
+  async signedUrl(path: string): Promise<string | null> {
+    if (isDemoMode) return null;
+    const { data, error } = await ensureSb()
+      .storage.from(LEAD_BUCKET)
+      .createSignedUrl(path, 60 * 10);
+    if (error) return null;
+    return data?.signedUrl ?? null;
+  },
+
+  async remove(file: LeadFile): Promise<void> {
+    if (isDemoMode) { demoLeadFiles.remove(file.id); return; }
+    const sb = ensureSb();
+    await sb.storage.from(LEAD_BUCKET).remove([file.storage_path]);
+    const { error } = await sb.from('lead_files').delete().eq('id', file.id);
     if (error) throw error;
   },
 };

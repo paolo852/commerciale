@@ -11,8 +11,9 @@ import type {
 interface OfferFormModalProps {
   open: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (offer?: Offer) => void;
   offer: Offer | null;
+  initial?: { name?: string; pi?: string; ente?: string; notes?: string };
   projectManagers: ProjectManager[];
   fundingCalls: FundingCall[];
 }
@@ -74,7 +75,7 @@ const inputClass =
 const selectClass = `${inputClass} bg-white`;
 
 export default function OfferFormModal({
-  open, onClose, onSaved, offer, projectManagers, fundingCalls,
+  open, onClose, onSaved, offer, initial, projectManagers, fundingCalls,
 }: OfferFormModalProps) {
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -82,8 +83,20 @@ export default function OfferFormModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) { setForm(offer ? fromOffer(offer) : emptyForm); setError(null); }
-  }, [open, offer]);
+    if (!open) return;
+    if (offer) {
+      setForm(fromOffer(offer));
+    } else {
+      setForm({
+        ...emptyForm,
+        ...(initial?.name !== undefined && { name: initial.name }),
+        ...(initial?.pi !== undefined && { pi: initial.pi }),
+        ...(initial?.ente !== undefined && { ente: initial.ente }),
+        ...(initial?.notes !== undefined && { notes: initial.notes }),
+      });
+    }
+    setError(null);
+  }, [open, offer, initial]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -143,9 +156,10 @@ export default function OfferFormModal({
         decided_at: form.outcome !== 'nessuno' ? form.decided_at : null,
         notes: form.notes.trim() || null,
       };
-      if (offer) await offersService.update(offer.id, payload);
-      else await offersService.create(payload, user.id);
-      onSaved(); onClose();
+      const saved = offer
+        ? await offersService.update(offer.id, payload)
+        : await offersService.create(payload, user.id);
+      onSaved(saved); onClose();
     } catch (e) {
       // Gli errori Supabase non sono istanze di Error: estrai message + hint
       const msg = (e as { message?: string })?.message

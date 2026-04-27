@@ -1,4 +1,4 @@
-import type { AllowedUser, Offer, ProjectManager, FundingCall } from '../types';
+import type { AllowedUser, Lead, LeadFile, Offer, ProjectManager, FundingCall } from '../types';
 
 // ============================================================
 // Demo storage: emula Supabase usando localStorage.
@@ -11,6 +11,8 @@ const KEYS = {
   projectManagers: 'commerciale.demo.projectManagers',
   fundingCalls: 'commerciale.demo.fundingCalls',
   allowedUsers: 'commerciale.demo.allowedUsers',
+  leads: 'commerciale.demo.leads',
+  leadFiles: 'commerciale.demo.leadFiles',
 } as const;
 
 export interface DemoUser {
@@ -147,6 +149,59 @@ export const demoAllowedUsers = {
   },
   remove(id: string): void {
     write(KEYS.allowedUsers, this.list().filter((i) => i.id !== id));
+  },
+};
+
+// ============================================================
+// Leads
+// ============================================================
+
+export const demoLeads = {
+  list(): Lead[] {
+    return read<Lead[]>(KEYS.leads, []);
+  },
+  create(input: Omit<Lead, 'id' | 'user_id' | 'created_at'>): Lead {
+    const items = this.list();
+    const item: Lead = {
+      ...input,
+      id: uuid(),
+      user_id: 'demo-user',
+      created_at: new Date().toISOString(),
+    };
+    items.push(item);
+    write(KEYS.leads, items);
+    return item;
+  },
+  update(id: string, patch: Partial<Lead>): Lead | null {
+    const items = this.list();
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx < 0) return null;
+    items[idx] = { ...items[idx], ...patch };
+    write(KEYS.leads, items);
+    return items[idx];
+  },
+  remove(id: string): void {
+    write(KEYS.leads, this.list().filter((i) => i.id !== id));
+  },
+};
+
+export const demoLeadFiles = {
+  list(leadId: string): LeadFile[] {
+    return read<LeadFile[]>(KEYS.leadFiles, []).filter((f) => f.lead_id === leadId);
+  },
+  create(input: Omit<LeadFile, 'id' | 'uploaded_at'>): LeadFile {
+    const all = read<LeadFile[]>(KEYS.leadFiles, []);
+    const item: LeadFile = {
+      ...input,
+      id: uuid(),
+      uploaded_at: new Date().toISOString(),
+    };
+    all.push(item);
+    write(KEYS.leadFiles, all);
+    return item;
+  },
+  remove(id: string): void {
+    write(KEYS.leadFiles, read<LeadFile[]>(KEYS.leadFiles, []).filter((f) => f.id !== id));
   },
 };
 
