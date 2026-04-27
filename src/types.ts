@@ -29,6 +29,7 @@ export interface FundingCall {
   body: string | null;
   deadline: string | null; // ISO date string
   notes: string | null;
+  probability: number; // 0-100, tasso di successo stimato del bando
   created_at: string;
 }
 
@@ -43,6 +44,8 @@ export interface Offer {
   budget: number;
   probability: number; // 0-100, probabilità di successo stimata
   project_manager_id: string | null;
+  pi: string | null;            // principal investigator
+  ente: string | null;          // ente di riferimento
   status: OfferStatus;
   outcome: OfferOutcome;
   submitted_at: string | null;  // ISO date string
@@ -62,7 +65,7 @@ export type CreateProjectManagerForm = Pick<ProjectManager, 'name' | 'email' | '
 
 export type UpdateProjectManagerForm = Partial<CreateProjectManagerForm>;
 
-export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'notes'>;
+export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'notes' | 'probability'>;
 
 export type UpdateFundingCallForm = Partial<CreateFundingCallForm>;
 
@@ -71,7 +74,10 @@ interface OfferFormBase {
   name: string;
   deadline: string;
   budget: number;
+  probability: number;
   project_manager_id: string | null;
+  pi: string | null;
+  ente: string | null;
   status: OfferStatus;
   outcome: OfferOutcome;
   submitted_at: string | null;

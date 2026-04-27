@@ -26,6 +26,8 @@ interface FormState {
   budget: string;
   probability: number;
   project_manager_id: string;
+  pi: string;
+  ente: string;
   status: OfferStatus;
   outcome: OfferOutcome;
   submitted_at: string;
@@ -36,7 +38,8 @@ interface FormState {
 const emptyForm: FormState = {
   name: '', type: 'financed', funding_call: '', client: '',
   deadline: '', budget: '', probability: 50,
-  project_manager_id: '', status: 'in_lavorazione',
+  project_manager_id: '', pi: '', ente: '',
+  status: 'in_lavorazione',
   outcome: 'nessuno', submitted_at: '', decided_at: '', notes: '',
 };
 
@@ -47,6 +50,7 @@ function fromOffer(o: Offer): FormState {
     deadline: toDateInputValue(o.deadline), budget: String(o.budget),
     probability: o.probability ?? 50,
     project_manager_id: o.project_manager_id ?? '',
+    pi: o.pi ?? '', ente: o.ente ?? '',
     status: o.status, outcome: o.outcome,
     submitted_at: toDateInputValue(o.submitted_at),
     decided_at: toDateInputValue(o.decided_at),
@@ -85,6 +89,24 @@ export default function OfferFormModal({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  function handleFundingCallChange(code: string) {
+    const fc = fundingCalls.find((f) => f.code === code);
+    setForm((f) => ({
+      ...f,
+      funding_call: code,
+      ...(fc?.probability != null ? { probability: fc.probability } : {}),
+      ...(fc?.deadline ? { deadline: toDateInputValue(fc.deadline) } : {}),
+    }));
+  }
+
+  function handleStatusChange(status: OfferStatus) {
+    setForm((f) => ({
+      ...f,
+      status,
+      ...(status === 'presentata' && f.deadline ? { submitted_at: f.deadline } : {}),
+    }));
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!user) return;
@@ -114,6 +136,8 @@ export default function OfferFormModal({
         deadline: form.deadline, budget,
         probability: form.probability,
         project_manager_id: form.project_manager_id || null,
+        pi: form.pi.trim() || null,
+        ente: form.ente.trim() || null,
         status: form.status, outcome: form.outcome,
         submitted_at: form.status === 'presentata' ? form.submitted_at : null,
         decided_at: form.outcome !== 'nessuno' ? form.decided_at : null,
@@ -157,7 +181,7 @@ export default function OfferFormModal({
           {form.type === 'financed' ? (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Bando *</label>
-              <select required value={form.funding_call} onChange={(e) => update('funding_call', e.target.value)} className={selectClass}>
+              <select required value={form.funding_call} onChange={(e) => handleFundingCallChange(e.target.value)} className={selectClass}>
                 <option value="">Seleziona bando…</option>
                 {fundingCalls.map((fc) => (
                   <option key={fc.id} value={fc.code}>{fc.code} — {fc.name}</option>
@@ -195,6 +219,17 @@ export default function OfferFormModal({
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Principal Investigator (PI)</label>
+            <input type="text" value={form.pi} onChange={(e) => update('pi', e.target.value)} className={inputClass} placeholder="Nome del PI…" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Ente di riferimento</label>
+            <input type="text" value={form.ente} onChange={(e) => update('ente', e.target.value)} className={inputClass} placeholder="Es. Politecnico di Milano…" />
+          </div>
+        </div>
+
         {/* Probabilità di successo */}
         <div className="bg-slate-50 rounded-xl px-4 py-3.5 border border-slate-200">
           <div className="flex items-center justify-between mb-2">
@@ -229,7 +264,7 @@ export default function OfferFormModal({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Stato *</label>
-            <select value={form.status} onChange={(e) => update('status', e.target.value as OfferStatus)} className={selectClass}>
+            <select value={form.status} onChange={(e) => handleStatusChange(e.target.value as OfferStatus)} className={selectClass}>
               {STATUS_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
             </select>
           </div>

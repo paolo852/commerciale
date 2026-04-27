@@ -113,6 +113,7 @@ export const fundingCallsService = {
         body: input.body ?? null,
         deadline: input.deadline ?? null,
         notes: input.notes ?? null,
+        probability: input.probability ?? 50,
       });
     }
     const { data, error } = await ensureSb()

@@ -57,7 +57,7 @@ const selectClass =
 export default function Offerte() {
   const { offers, projectManagers, fundingCalls, loading, error, reload } = useOffersData();
 
-  const [view, setView] = useState<ViewTab>('all');
+  const [view, setView] = useState<ViewTab>('in_corso');
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>('deadline');

@@ -7,8 +7,14 @@ import { formatDate, toDateInputValue } from '../../lib/format';
 import Modal from '../Modal';
 import ConfirmDialog from '../ConfirmDialog';
 
-interface FormState { code: string; name: string; body: string; deadline: string; notes: string; }
-const emptyForm: FormState = { code: '', name: '', body: '', deadline: '', notes: '' };
+interface FormState { code: string; name: string; body: string; deadline: string; notes: string; probability: number; }
+const emptyForm: FormState = { code: '', name: '', body: '', deadline: '', notes: '', probability: 50 };
+
+function probColor(p: number): string {
+  if (p >= 70) return 'text-emerald-600';
+  if (p >= 40) return 'text-amber-600';
+  return 'text-red-500';
+}
 
 const inputClass =
   'w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
@@ -36,7 +42,7 @@ export default function FundingCallsTab() {
   function openNew() { setEditing(null); setForm(emptyForm); setFormOpen(true); }
   function openEdit(fc: FundingCall) {
     setEditing(fc);
-    setForm({ code: fc.code, name: fc.name, body: fc.body ?? '', deadline: toDateInputValue(fc.deadline), notes: fc.notes ?? '' });
+    setForm({ code: fc.code, name: fc.name, body: fc.body ?? '', deadline: toDateInputValue(fc.deadline), notes: fc.notes ?? '', probability: fc.probability ?? 50 });
     setFormOpen(true);
   }
 
@@ -44,7 +50,7 @@ export default function FundingCallsTab() {
     e.preventDefault(); if (!user) return;
     setSaving(true);
     try {
-      const p = { code: form.code.trim(), name: form.name.trim(), body: form.body.trim() || null, deadline: form.deadline || null, notes: form.notes.trim() || null };
+      const p = { code: form.code.trim(), name: form.name.trim(), body: form.body.trim() || null, deadline: form.deadline || null, notes: form.notes.trim() || null, probability: form.probability };
       if (editing) await fundingCallsService.update(editing.id, p);
       else await fundingCallsService.create(p, user.id);
       setFormOpen(false); await reload();
@@ -78,14 +84,15 @@ export default function FundingCallsTab() {
               <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Nome</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Ente</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Scadenza</th>
+              <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Prob.</th>
               <th className="text-right px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-12">
+              <tr><td colSpan={6} className="text-center py-12">
                 <FileSearch className="w-10 h-10 text-slate-200 mx-auto mb-2" />
                 <p className="text-sm text-slate-400">Nessun bando. Aggiungine uno.</p>
               </td></tr>
@@ -97,6 +104,11 @@ export default function FundingCallsTab() {
                 <td className="px-4 py-3.5 text-sm font-medium text-slate-900">{fc.name}</td>
                 <td className="px-4 py-3.5 text-sm text-slate-600">{fc.body ?? <span className="text-slate-300">—</span>}</td>
                 <td className="px-4 py-3.5 text-sm text-slate-700 tabular-nums">{formatDate(fc.deadline)}</td>
+                <td className="px-4 py-3.5 text-right">
+                  <span className={`text-sm font-semibold tabular-nums ${probColor(fc.probability ?? 50)}`}>
+                    {fc.probability ?? 50}%
+                  </span>
+                </td>
                 <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => setToDelete(fc)} className="text-xs text-slate-400 hover:text-red-600 transition">Elimina</button>
                 </td>
@@ -125,6 +137,25 @@ export default function FundingCallsTab() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Scadenza bando</label>
             <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className={inputClass} />
+          </div>
+          <div className="bg-slate-50 rounded-xl px-4 py-3.5 border border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-slate-700">Probabilità di successo stimata</label>
+              <span className={`text-lg font-bold tabular-nums ${probColor(form.probability)}`}>
+                {form.probability}%
+              </span>
+            </div>
+            <input
+              type="range" min="0" max="100" step="5"
+              value={form.probability}
+              onChange={(e) => setForm({ ...form, probability: Number(e.target.value) })}
+              className="w-full h-2 rounded-full cursor-pointer"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+              <span>0% — impossibile</span>
+              <span>50% — incerto</span>
+              <span>100% — certo</span>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
