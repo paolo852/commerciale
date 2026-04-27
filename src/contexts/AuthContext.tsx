@@ -43,20 +43,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // getSession() legge da localStorage — risolve quasi istantaneamente
+    // e garantisce che il loading venga sempre rimosso
+    supabase!.auth.getSession()
+      .then(({ data }) => {
+        setUser(toAuthUser(data.session?.user ?? null));
+        setLoading(false);
+      })
+      .catch(() => {
+        setUser(null);
+        setLoading(false);
+      });
+
+    // onAuthStateChange gestisce login/logout successivi e il whitelist check
     const { data: sub } = supabase!.auth.onAuthStateChange(async (_event, session) => {
       const sessionUser = session?.user ?? null;
-
-      // Risolvi subito il loading — non aspettare il whitelist check
       setUser(toAuthUser(sessionUser));
-      setLoading(false);
 
-      // Whitelist check in background: se non autorizzato, disconnetti
       if (sessionUser?.email) {
         try {
           const allowed = await allowedUsersService.isAllowed(sessionUser.email);
-          if (!allowed) {
-            await supabase!.auth.signOut();
-          }
+          if (!allowed) await supabase!.auth.signOut();
         } catch {
           // fail open
         }
