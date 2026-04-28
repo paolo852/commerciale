@@ -11,12 +11,12 @@ interface Props {
 
 const PROGRAMMES = [
   { value: '', label: 'Tutti i programmi' },
-  { value: 'HORIZON', label: 'Horizon Europe' },
-  { value: 'EIC', label: 'EIC (European Innovation Council)' },
-  { value: 'EIT', label: 'EIT' },
-  { value: 'LIFE', label: 'LIFE' },
-  { value: 'ERASMUS+', label: 'Erasmus+' },
-  { value: 'CEF', label: 'CEF (Connecting Europe)' },
+  { value: '43108390', label: 'Horizon Europe (2021-2027)' },
+  { value: '31045243', label: 'Horizon 2020 (2014-2020)' },
+  { value: '43251567', label: 'Digital Europe' },
+  { value: '43152860', label: 'EU4Health' },
+  { value: '43298916', label: 'LIFE' },
+  { value: '43251882', label: 'CEF (Connecting Europe)' },
 ];
 
 const inputClass =

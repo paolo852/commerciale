@@ -1,13 +1,13 @@
 // Vercel Serverless Function (Edge runtime)
 // Proxy verso l'API pubblica del EU Funding & Tenders Portal (SEDIA).
-// Restituisce i bandi aperti (deadline futura) con i campi normalizzati.
+// Restituisce i bandi aperti (status Open o Forthcoming) ordinati per scadenza.
 
 export const config = { runtime: 'edge' };
 
 export interface EUCall {
   identifier: string;
   title: string;
-  programme: string;
+  programme: string; // periodo programma, es. "2021 - 2027"
   deadline: string | null;
   status: string;
   description: string | null;
@@ -22,18 +22,18 @@ interface EUApiMetadata {
   frameworkProgramme?: unknown;
   status?: unknown;
   description?: unknown;
+  callTitle?: unknown;
   callIdentifier?: unknown;
   topicCode?: unknown;
+  descriptionByte?: unknown;
 }
 
 interface EUApiResult {
   metadata?: EUApiMetadata;
   reference?: string;
-  url?: string;
+  url?: string | string[];
   summary?: string;
   title?: string;
-  language?: string;
-  contentType?: string;
 }
 
 interface EUApiResponse {
@@ -44,6 +44,20 @@ interface EUApiResponse {
 
 const EU_API = 'https://api.tech.ec.europa.eu/search-api/prod/rest/search';
 
+// Codici status EU Portal:
+// 31094501 = Forthcoming, 31094502 = Open, 31094503 = Closed
+const STATUS_OPEN_OR_FORTHCOMING = ['31094501', '31094502'];
+
+// Mappa di alcuni programmi noti (ID numerici frameworkProgramme)
+const PROGRAMME_NAMES: Record<string, string> = {
+  '43108390': 'Horizon Europe',
+  '31045243': 'Horizon 2020',
+  '43251567': 'Digital Europe',
+  '43152860': 'EU4Health',
+  '43298916': 'LIFE',
+  '43251882': 'CEF',
+};
+
 function first(v: unknown): string | null {
   if (v == null) return null;
   if (typeof v === 'string') return v;
@@ -52,6 +66,11 @@ function first(v: unknown): string | null {
     return String((v as Record<string, unknown>).value ?? '');
   }
   return null;
+}
+
+function stripHtml(html: string | null): string | null {
+  if (!html) return null;
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() || null;
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -65,21 +84,21 @@ export default async function handler(req: Request): Promise<Response> {
   const text = searchParams.get('text')?.trim() || '*';
   const programme = searchParams.get('programme') ?? '';
   const debug = searchParams.get('debug') === '1';
-  const fetchSize = Math.min(pageSize * 2, 100);
 
-  // Solo le call/topic aperti dei programmi di funding (filtro contentType)
-  // Niente filtri rigidi su status/type: filtriamo dopo per deadline.
-  const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${fetchSize}&pageNumber=${pageNumber}`;
+  const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${pageSize}&pageNumber=${pageNumber}`;
+
+  const mustClauses: object[] = [
+    { terms: { status: STATUS_OPEN_OR_FORTHCOMING } },
+  ];
+  if (programme) {
+    mustClauses.push({ terms: { frameworkProgramme: [programme] } });
+  }
 
   const formBody = new URLSearchParams({
     languages: 'en',
+    query: JSON.stringify({ bool: { must: mustClauses } }),
+    sort: JSON.stringify([{ field: 'deadlineDate', order: 'ASC' }]),
   });
-  // Filtro per programma quadro (Horizon, EIC, LIFE, ecc.) — opzionale
-  if (programme) {
-    formBody.set('query', JSON.stringify({
-      bool: { must: [{ terms: { 'frameworkProgramme': [programme] } }] },
-    }));
-  }
 
   let euRes: Response;
   try {
@@ -121,32 +140,31 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const results: EUApiResult[] = raw.results ?? [];
-  const today = new Date().toISOString().slice(0, 10);
 
   const calls: EUCall[] = results
     .map((r) => {
       const m = r.metadata ?? {};
       const id = first(m.identifier) ?? first(m.callIdentifier) ?? first(m.topicCode) ?? r.reference ?? null;
-      const title = first(m.title) ?? r.title ?? null;
+      const title = first(m.title) ?? first(m.callTitle) ?? r.title ?? null;
       if (!id || !title) return null;
-      const prog = first(m.frameworkProgramme) ?? first(m.programmePeriod) ?? '';
+      const fwProgId = first(m.frameworkProgramme) ?? '';
+      const periodo = first(m.programmePeriod) ?? '';
+      const programmeLabel = PROGRAMME_NAMES[fwProgId] ?? (periodo ? `Programma ${periodo}` : '');
       const rawDeadline = first(m.deadlineDate);
       const deadline = rawDeadline ? rawDeadline.slice(0, 10) : null;
-      const description = first(m.description) ?? r.summary ?? null;
-      const portalUrl = r.url ?? `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent(id.toLowerCase())}`;
+      const description = stripHtml(first(m.descriptionByte) ?? first(m.description) ?? r.summary ?? null);
+      const portalUrl = first(m as { url?: unknown }) ?? (typeof r.url === 'string' ? r.url : Array.isArray(r.url) ? r.url[0] : '') ?? `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent(id.toLowerCase())}`;
       return {
         identifier: id,
         title,
-        programme: prog,
+        programme: programmeLabel,
         deadline,
         status: first(m.status) ?? 'OPEN',
-        description,
-        url: portalUrl,
+        description: description ? description.slice(0, 600) : null,
+        url: typeof portalUrl === 'string' ? portalUrl : `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent(id.toLowerCase())}`,
       } satisfies EUCall;
     })
-    .filter((c): c is EUCall => c !== null)
-    .filter((c) => !c.deadline || c.deadline >= today)
-    .slice(0, pageSize);
+    .filter((c): c is EUCall => c !== null);
 
   const responseBody: Record<string, unknown> = {
     calls,
@@ -154,7 +172,6 @@ export default async function handler(req: Request): Promise<Response> {
     rawResultCount: results.length,
   };
 
-  // Modalità debug: ?debug=1 → mostra il primo risultato grezzo per ispezione
   if (debug && results.length > 0) {
     responseBody.firstRaw = results[0];
   } else if (debug && results.length === 0) {
