@@ -181,6 +181,8 @@ export const fundingCallsService = {
         deadline: input.deadline ?? null,
         notes: input.notes ?? null,
         probability: input.probability ?? 50,
+        pdf_path: null,
+        pdf_filename: null,
       });
     }
     const { data, error } = await ensureSb()
@@ -215,6 +217,58 @@ export const fundingCallsService = {
     }
     const { error } = await ensureSb().from('funding_calls').delete().eq('id', id);
     if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Funding Call PDFs (Supabase Storage)
+// ----------------------------------------------------------------
+
+const FC_BUCKET = 'funding-call-files';
+
+export const fundingCallPdfService = {
+  async upload(callId: string, file: File): Promise<FundingCall> {
+    const sb = ensureSb();
+    const safeName = file.name.replace(/[^\w.\-]/g, '_');
+    const path = `${callId}/${Date.now()}-${safeName}`;
+    const { error: upErr } = await sb.storage.from(FC_BUCKET).upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || 'application/pdf',
+    });
+    if (upErr) throw upErr;
+    const { data, error } = await sb
+      .from('funding_calls')
+      .update({ pdf_path: path, pdf_filename: file.name })
+      .eq('id', callId)
+      .select()
+      .single();
+    if (error) {
+      await sb.storage.from(FC_BUCKET).remove([path]);
+      throw error;
+    }
+    return data as FundingCall;
+  },
+
+  async signedUrl(path: string): Promise<string | null> {
+    const { data, error } = await ensureSb()
+      .storage.from(FC_BUCKET)
+      .createSignedUrl(path, 60 * 10);
+    if (error) return null;
+    return data?.signedUrl ?? null;
+  },
+
+  async remove(callId: string, path: string): Promise<FundingCall> {
+    const sb = ensureSb();
+    await sb.storage.from(FC_BUCKET).remove([path]);
+    const { data, error } = await sb
+      .from('funding_calls')
+      .update({ pdf_path: null, pdf_filename: null })
+      .eq('id', callId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as FundingCall;
   },
 };
 
@@ -419,6 +473,24 @@ export const leadMatchesService = {
       throw new Error('Inserisci una descrizione della tecnologia prima di lanciare il match AI.');
     }
 
+    // Per i bandi con PDF allegato, scarica e codifica in base64
+    const callsWithPdf = await Promise.all(
+      active.map(async (fc) => {
+        if (!fc.pdf_path) {
+          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, notes: fc.notes };
+        }
+        try {
+          const url = await fundingCallPdfService.signedUrl(fc.pdf_path);
+          if (!url) return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, notes: fc.notes };
+          const blob = await fetch(url).then((r) => r.arrayBuffer());
+          const b64 = btoa(String.fromCharCode(...new Uint8Array(blob)));
+          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, notes: fc.notes, pdf_base64: b64 };
+        } catch {
+          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, notes: fc.notes };
+        }
+      }),
+    );
+
     const res = await fetch('/api/match', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -427,10 +499,7 @@ export const leadMatchesService = {
         leadDescription: lead.description,
         leadPi: lead.pi,
         leadEnte: lead.ente,
-        fundingCalls: active.map((fc) => ({
-          id: fc.id, code: fc.code, name: fc.name,
-          body: fc.body, deadline: fc.deadline, notes: fc.notes,
-        })),
+        fundingCalls: callsWithPdf,
       }),
     });
     if (!res.ok) {
