@@ -15,13 +15,15 @@ export interface EUCall {
 }
 
 interface EUApiMetadata {
-  identifier?: string[];
-  title?: Array<{ value?: string } | string> | string;
-  deadlineDate?: string[];
-  programmePeriod?: string[];
-  frameworkProgramme?: string[];
-  status?: string[];
-  description?: Array<{ value?: string } | string> | string;
+  identifier?: unknown;
+  title?: unknown;
+  deadlineDate?: unknown;
+  programmePeriod?: unknown;
+  frameworkProgramme?: unknown;
+  status?: unknown;
+  description?: unknown;
+  callIdentifier?: unknown;
+  topicCode?: unknown;
 }
 
 interface EUApiResult {
@@ -31,6 +33,7 @@ interface EUApiResult {
   summary?: string;
   title?: string;
   language?: string;
+  contentType?: string;
 }
 
 interface EUApiResponse {
@@ -39,7 +42,6 @@ interface EUApiResponse {
   totalCount?: number;
 }
 
-// Endpoint corretto del portale SEDIA (verificato via 404 path-not-found su /get-results)
 const EU_API = 'https://api.tech.ec.europa.eu/search-api/prod/rest/search';
 
 function first(v: unknown): string | null {
@@ -62,27 +64,22 @@ export default async function handler(req: Request): Promise<Response> {
   const pageNumber = Number(searchParams.get('pageNumber') ?? '1');
   const text = searchParams.get('text')?.trim() || '*';
   const programme = searchParams.get('programme') ?? '';
+  const debug = searchParams.get('debug') === '1';
   const fetchSize = Math.min(pageSize * 2, 100);
 
-  // L'API SEDIA accetta POST con multipart/form-data o x-www-form-urlencoded.
-  // Costruiamo la query Elasticsearch nel body.
+  // Solo le call/topic aperti dei programmi di funding (filtro contentType)
+  // Niente filtri rigidi su status/type: filtriamo dopo per deadline.
   const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${fetchSize}&pageNumber=${pageNumber}`;
-
-  const today = new Date().toISOString().slice(0, 10);
-  const mustClauses: object[] = [
-    { terms: { type: ['1', '2', '8'] } }, // 1=tenders, 2=grants, 8=calls
-    { range: { deadlineDate: { gte: today } } },
-    { term: { status: '31094502' } }, // 31094502 = OPEN
-  ];
-  if (programme) {
-    mustClauses.push({ terms: { frameworkProgramme: [programme] } });
-  }
 
   const formBody = new URLSearchParams({
     languages: 'en',
-    query: JSON.stringify({ bool: { must: mustClauses } }),
-    sort: JSON.stringify({ field: 'deadlineDate', order: 'ASC' }),
   });
+  // Filtro per programma quadro (Horizon, EIC, LIFE, ecc.) — opzionale
+  if (programme) {
+    formBody.set('query', JSON.stringify({
+      bool: { must: [{ terms: { 'frameworkProgramme': [programme] } }] },
+    }));
+  }
 
   let euRes: Response;
   try {
@@ -112,22 +109,24 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
+  const rawText = await euRes.text();
   let raw: EUApiResponse;
   try {
-    raw = await euRes.json() as EUApiResponse;
+    raw = JSON.parse(rawText) as EUApiResponse;
   } catch (e) {
     return new Response(
-      JSON.stringify({ error: 'Risposta EU Portal non è JSON', detail: String(e) }),
+      JSON.stringify({ error: 'Risposta EU Portal non è JSON', detail: rawText.slice(0, 500), parseError: String(e) }),
       { status: 502 },
     );
   }
 
   const results: EUApiResult[] = raw.results ?? [];
+  const today = new Date().toISOString().slice(0, 10);
 
   const calls: EUCall[] = results
     .map((r) => {
       const m = r.metadata ?? {};
-      const id = first(m.identifier) ?? r.reference ?? null;
+      const id = first(m.identifier) ?? first(m.callIdentifier) ?? first(m.topicCode) ?? r.reference ?? null;
       const title = first(m.title) ?? r.title ?? null;
       if (!id || !title) return null;
       const prog = first(m.frameworkProgramme) ?? first(m.programmePeriod) ?? '';
@@ -149,8 +148,21 @@ export default async function handler(req: Request): Promise<Response> {
     .filter((c) => !c.deadline || c.deadline >= today)
     .slice(0, pageSize);
 
-  return new Response(
-    JSON.stringify({ calls, total: raw.totalResults ?? raw.totalCount ?? calls.length }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } },
-  );
+  const responseBody: Record<string, unknown> = {
+    calls,
+    total: raw.totalResults ?? raw.totalCount ?? calls.length,
+    rawResultCount: results.length,
+  };
+
+  // Modalità debug: ?debug=1 → mostra il primo risultato grezzo per ispezione
+  if (debug && results.length > 0) {
+    responseBody.firstRaw = results[0];
+  } else if (debug && results.length === 0) {
+    responseBody.rawText = rawText.slice(0, 1500);
+  }
+
+  return new Response(JSON.stringify(responseBody), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
