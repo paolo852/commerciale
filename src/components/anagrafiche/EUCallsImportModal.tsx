@@ -40,8 +40,11 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
       if (programme) params.set('programme', programme);
       const res = await fetch(`/api/eu-calls?${params.toString()}`);
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(err.error ?? `HTTP ${res.status}`);
+        const err = await res.json().catch(() => ({})) as { error?: string; detail?: string; url?: string };
+        const lines = [err.error ?? `HTTP ${res.status}`];
+        if (err.url) lines.push(`URL: ${err.url}`);
+        if (err.detail) lines.push(`Dettaglio: ${err.detail.slice(0, 200)}`);
+        throw new Error(lines.join('\n'));
       }
       const json = await res.json() as { calls: EUCall[]; total: number };
       setCalls(json.calls);
@@ -122,7 +125,7 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
         </div>
 
         {error && (
-          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+          <pre className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 whitespace-pre-wrap break-all font-sans">{error}</pre>
         )}
 
         {/* Lista bandi */}
