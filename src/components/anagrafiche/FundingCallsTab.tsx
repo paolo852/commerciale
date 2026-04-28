@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { FileSearch, FileText, Globe, Plus, Trash2, Upload } from 'lucide-react';
+import { ExternalLink, FileSearch, FileText, Globe, Plus, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { fundingCallPdfService, fundingCallsService } from '../../lib/dataService';
 import type { EUCall } from '../../../api/eu-calls';
@@ -9,8 +9,8 @@ import Modal from '../Modal';
 import ConfirmDialog from '../ConfirmDialog';
 import EUCallsImportModal from './EUCallsImportModal';
 
-interface FormState { code: string; name: string; body: string; deadline: string; notes: string; probability: number; }
-const emptyForm: FormState = { code: '', name: '', body: '', deadline: '', notes: '', probability: 50 };
+interface FormState { code: string; name: string; body: string; deadline: string; description: string; notes: string; probability: number; }
+const emptyForm: FormState = { code: '', name: '', body: '', deadline: '', description: '', notes: '', probability: 50 };
 
 function probColor(p: number): string {
   if (p >= 70) return 'text-emerald-600';
@@ -48,7 +48,7 @@ export default function FundingCallsTab() {
   function openNew() { setEditing(null); setForm(emptyForm); setFormOpen(true); }
   function openEdit(fc: FundingCall) {
     setEditing(fc);
-    setForm({ code: fc.code, name: fc.name, body: fc.body ?? '', deadline: toDateInputValue(fc.deadline), notes: fc.notes ?? '', probability: fc.probability ?? 50 });
+    setForm({ code: fc.code, name: fc.name, body: fc.body ?? '', deadline: toDateInputValue(fc.deadline), description: fc.description ?? '', notes: fc.notes ?? '', probability: fc.probability ?? 50 });
     setFormOpen(true);
   }
 
@@ -56,7 +56,7 @@ export default function FundingCallsTab() {
     e.preventDefault(); if (!user) return;
     setSaving(true);
     try {
-      const p = { code: form.code.trim(), name: form.name.trim(), body: form.body.trim() || null, deadline: form.deadline || null, notes: form.notes.trim() || null, probability: form.probability };
+      const p = { code: form.code.trim(), name: form.name.trim(), body: form.body.trim() || null, deadline: form.deadline || null, description: form.description.trim() || null, notes: form.notes.trim() || null, probability: form.probability, source_url: editing?.source_url ?? null };
       if (editing) await fundingCallsService.update(editing.id, p);
       else await fundingCallsService.create(p, user.id);
       setFormOpen(false); await reload();
@@ -116,8 +116,10 @@ export default function FundingCallsTab() {
           name: c.title,
           body: c.programme || null,
           deadline: c.deadline,
-          notes: c.description ?? null,
+          description: c.description ?? null,
+          notes: null,
           probability: 50,
+          source_url: c.url,
         },
         user.id,
       );
@@ -179,7 +181,15 @@ export default function FundingCallsTab() {
                   </span>
                 </td>
                 <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => setToDelete(fc)} className="text-xs text-slate-400 hover:text-red-600 transition">Elimina</button>
+                  <div className="flex items-center justify-end gap-2">
+                    {fc.source_url && (
+                      <a href={fc.source_url} target="_blank" rel="noopener noreferrer"
+                        className="text-slate-400 hover:text-indigo-500 transition" title="Apri nel portale">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    <button onClick={() => setToDelete(fc)} className="text-xs text-slate-400 hover:text-red-600 transition">Elimina</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -227,8 +237,21 @@ export default function FundingCallsTab() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
-            <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={`${inputClass} resize-none`} />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Descrizione del bando
+              <span className="ml-1.5 text-xs font-normal text-violet-600">(letta da Gemini per il matching AI)</span>
+            </label>
+            <textarea
+              rows={5}
+              placeholder="Obiettivi, criteri di ammissibilità, settori tematici, TRL richiesto, tipologia di soggetti ammessi…"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className={`${inputClass} resize-none`}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Note operative</label>
+            <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={`${inputClass} resize-none`} />
           </div>
 
           {editing && (

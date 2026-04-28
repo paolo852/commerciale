@@ -10,6 +10,7 @@ interface FundingCallInput {
   name: string;
   body: string | null;
   deadline: string | null;
+  description: string | null; // testo descrittivo del bando
   notes: string | null;
   probability?: number;
   pdf_base64?: string; // base64 del PDF del bando, se disponibile
@@ -38,9 +39,19 @@ const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
 function buildParts(body: RequestBody): GeminiPart[] {
   const hasPdfs = body.fundingCalls.some((fc) => fc.pdf_base64);
 
-  const callsList = body.fundingCalls.map((fc, i) =>
-    `${i + 1}. ID: ${fc.id}\n   Codice: ${fc.code}\n   Nome: ${fc.name}\n   Ente erogatore: ${fc.body ?? 'non specificato'}\n   Scadenza: ${fc.deadline ?? 'non specificata'}\n   Note: ${fc.notes ?? 'nessuna'}${fc.pdf_base64 ? '\n   [Testo completo del bando disponibile come documento allegato]' : ''}`
-  ).join('\n');
+  const callsList = body.fundingCalls.map((fc, i) => {
+    const lines = [
+      `${i + 1}. ID: ${fc.id}`,
+      `   Codice: ${fc.code}`,
+      `   Nome: ${fc.name}`,
+      `   Ente erogatore: ${fc.body ?? 'non specificato'}`,
+      `   Scadenza: ${fc.deadline ?? 'non specificata'}`,
+    ];
+    if (fc.description) lines.push(`   Descrizione: ${fc.description}`);
+    if (fc.notes) lines.push(`   Note: ${fc.notes}`);
+    if (fc.pdf_base64) lines.push(`   [Testo completo del bando disponibile come documento allegato]`);
+    return lines.join('\n');
+  }).join('\n\n');
 
   const promptText = `Sei un esperto di trasferimento tecnologico e matching tra tecnologie da brevetto e bandi di finanziamento pubblici/privati. Devi analizzare se una tecnologia in valutazione potrebbe rispondere con successo a uno o più bandi.
 

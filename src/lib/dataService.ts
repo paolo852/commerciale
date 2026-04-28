@@ -179,10 +179,12 @@ export const fundingCallsService = {
         name: input.name,
         body: input.body ?? null,
         deadline: input.deadline ?? null,
+        description: input.description ?? null,
         notes: input.notes ?? null,
         probability: input.probability ?? 50,
         pdf_path: null,
         pdf_filename: null,
+        source_url: input.source_url ?? null,
       });
     }
     const { data, error } = await ensureSb()
@@ -477,16 +479,16 @@ export const leadMatchesService = {
     const callsWithPdf = await Promise.all(
       active.map(async (fc) => {
         if (!fc.pdf_path) {
-          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, notes: fc.notes };
+          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, description: fc.description, notes: fc.notes };
         }
         try {
           const url = await fundingCallPdfService.signedUrl(fc.pdf_path);
-          if (!url) return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, notes: fc.notes };
+          if (!url) return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, description: fc.description, notes: fc.notes };
           const blob = await fetch(url).then((r) => r.arrayBuffer());
           const b64 = btoa(String.fromCharCode(...new Uint8Array(blob)));
-          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, notes: fc.notes, pdf_base64: b64 };
+          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, description: fc.description, notes: fc.notes, pdf_base64: b64 };
         } catch {
-          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, notes: fc.notes };
+          return { id: fc.id, code: fc.code, name: fc.name, body: fc.body, deadline: fc.deadline, description: fc.description, notes: fc.notes };
         }
       }),
     );
