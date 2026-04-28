@@ -85,18 +85,17 @@ export default async function handler(req: Request): Promise<Response> {
   const programme = searchParams.get('programme') ?? '';
   const debug = searchParams.get('debug') === '1';
 
-  const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${pageSize}&pageNumber=${pageNumber}`;
-
-  const mustClauses: object[] = [
-    { terms: { status: STATUS_OPEN_OR_FORTHCOMING } },
-  ];
-  if (programme) {
-    mustClauses.push({ terms: { frameworkProgramme: [programme] } });
-  }
+  // Programma filtrato lato client (vedi EUCallsImportModal.tsx) perché il campo
+  // frameworkProgramme nell'indice EU non risponde affidabilmente al filtro
+  // server-side. Qui ignoriamo `programme` ma teniamo il parametro per retrocompat.
+  void programme;
+  // Aumentiamo pageSize per dare margine al filtro client
+  const fetchSize = Math.min(pageSize * 3, 250);
+  const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${fetchSize}&pageNumber=${pageNumber}`;
 
   const formBody = new URLSearchParams({
     languages: 'en',
-    query: JSON.stringify({ bool: { must: mustClauses } }),
+    query: JSON.stringify({ bool: { must: [{ terms: { status: STATUS_OPEN_OR_FORTHCOMING } }] } }),
     sort: JSON.stringify([{ field: 'deadlineDate', order: 'ASC' }]),
   });
 

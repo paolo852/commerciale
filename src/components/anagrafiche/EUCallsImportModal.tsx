@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ExternalLink, Globe, Loader2, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarOff, ExternalLink, Globe, Loader2, Search } from 'lucide-react';
 import type { EUCall } from '../../../api/eu-calls';
 import Modal from '../Modal';
 
@@ -9,14 +9,50 @@ interface Props {
   onImport: (calls: EUCall[]) => Promise<void>;
 }
 
-const PROGRAMMES = [
-  { value: '', label: 'Tutti i programmi' },
-  { value: '43108390', label: 'Horizon Europe (2021-2027)' },
-  { value: '31045243', label: 'Horizon 2020 (2014-2020)' },
-  { value: '43251567', label: 'Digital Europe' },
-  { value: '43152860', label: 'EU4Health' },
-  { value: '43298916', label: 'LIFE' },
-  { value: '43251882', label: 'CEF (Connecting Europe)' },
+// Filtri per programma basati su prefisso dell'identifier (più affidabile
+// del filtro server-side su frameworkProgramme che non risponde correttamente).
+const PROGRAMMES: { value: string; label: string; match: (id: string) => boolean }[] = [
+  { value: '', label: 'Tutti i programmi', match: () => true },
+  {
+    value: 'HORIZON',
+    label: 'Horizon Europe (2021-2027)',
+    match: (id) => id.toUpperCase().startsWith('HORIZON-') || id.toUpperCase().startsWith('ERC-') || id.toUpperCase().startsWith('MSCA-'),
+  },
+  {
+    value: 'H2020',
+    label: 'Horizon 2020 (2014-2020)',
+    match: (id) => id.toUpperCase().startsWith('H2020-') || id.toUpperCase().includes('H2020'),
+  },
+  {
+    value: 'EIC',
+    label: 'EIC (European Innovation Council)',
+    match: (id) => id.toUpperCase().includes('EIC-') || id.toUpperCase().startsWith('EIC'),
+  },
+  {
+    value: 'DIGITAL',
+    label: 'Digital Europe',
+    match: (id) => id.toUpperCase().startsWith('DIGITAL-'),
+  },
+  {
+    value: 'LIFE',
+    label: 'LIFE',
+    match: (id) => id.toUpperCase().startsWith('LIFE-'),
+  },
+  {
+    value: 'CEF',
+    label: 'CEF (Connecting Europe)',
+    match: (id) => id.toUpperCase().startsWith('CEF-') || id.toUpperCase().startsWith('CINEA-CEF'),
+  },
+  {
+    value: 'ERASMUS',
+    label: 'Erasmus+',
+    match: (id) => id.toUpperCase().startsWith('ERASMUS-'),
+  },
+  {
+    value: 'EU4HEALTH',
+    label: 'EU4Health',
+    match: (id) => id.toUpperCase().startsWith('EU4H-') || id.toUpperCase().startsWith('EU4HEALTH'),
+  },
 ];
 
 const inputClass =
@@ -28,6 +64,7 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [programme, setProgramme] = useState('');
+  const [futureOnly, setFutureOnly] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [total, setTotal] = useState(0);
@@ -35,9 +72,8 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
   async function fetchCalls() {
     setLoading(true); setError(null);
     try {
-      const params = new URLSearchParams({ pageSize: '50', pageNumber: '1' });
+      const params = new URLSearchParams({ pageSize: '100', pageNumber: '1' });
       if (search.trim()) params.set('text', search.trim());
-      if (programme) params.set('programme', programme);
       const res = await fetch(`/api/eu-calls?${params.toString()}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string; detail?: string; url?: string };
@@ -50,11 +86,6 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
       setCalls(json.calls);
       setTotal(json.total);
       setSelected(new Set());
-      // Diagnostica: se il portale ha restituito risultati ma la nostra logica di parsing
-      // li ha tutti scartati, mostra un avviso
-      if ((json.rawResultCount ?? 0) > 0 && json.calls.length === 0) {
-        setError(`Il portale ha restituito ${json.rawResultCount} risultati ma nessuno aveva i campi attesi (id+titolo). Apri /api/eu-calls?debug=1 in una nuova tab per vedere la struttura grezza.`);
-      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore caricamento bandi EU');
     } finally {
@@ -64,13 +95,29 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
 
   useEffect(() => {
     if (open) { void fetchCalls(); }
-    else { setCalls([]); setSelected(new Set()); setSearch(''); setProgramme(''); }
+    else { setCalls([]); setSelected(new Set()); setSearch(''); setProgramme(''); setFutureOnly(true); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Filtri lato client (programma + scadenza futura)
+  const displayedCalls = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const matcher = PROGRAMMES.find((p) => p.value === programme)?.match ?? (() => true);
+    return calls
+      .filter((c) => matcher(c.identifier))
+      .filter((c) => !futureOnly || !c.deadline || c.deadline >= today);
+  }, [calls, programme, futureOnly]);
+
   function toggleAll() {
-    if (selected.size === calls.length) setSelected(new Set());
-    else setSelected(new Set(calls.map((c) => c.identifier)));
+    const allDisplayedSelected = displayedCalls.length > 0 && displayedCalls.every((c) => selected.has(c.identifier));
+    const next = new Set(selected);
+    if (allDisplayedSelected) {
+      // Deseleziona tutti i visibili
+      displayedCalls.forEach((c) => next.delete(c.identifier));
+    } else {
+      displayedCalls.forEach((c) => next.add(c.identifier));
+    }
+    setSelected(next);
   }
 
   function toggle(id: string) {
@@ -94,12 +141,15 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
     }
   }
 
+  const allDisplayedSelected = displayedCalls.length > 0 && displayedCalls.every((c) => selected.has(c.identifier));
+  const hiddenCount = calls.length - displayedCalls.length;
+
   return (
     <Modal open={open} onClose={onClose} title="Importa bandi da EU Participant Portal">
       <div className="space-y-4">
         {/* Filtri */}
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex-1 min-w-[200px] relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
@@ -129,6 +179,17 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
           </button>
         </div>
 
+        <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={futureOnly}
+            onChange={(e) => setFutureOnly(e.target.checked)}
+            className="rounded"
+          />
+          <CalendarOff className="w-3.5 h-3.5" />
+          Mostra solo bandi con scadenza futura o senza scadenza
+        </label>
+
         {error && (
           <pre className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 whitespace-pre-wrap break-all font-sans">{error}</pre>
         )}
@@ -140,10 +201,14 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
               <Loader2 className="w-4 h-4 animate-spin" />
               Caricamento bandi EU…
             </div>
-          ) : calls.length === 0 ? (
+          ) : displayedCalls.length === 0 ? (
             <div className="text-center py-12">
               <Globe className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">Nessun bando trovato.</p>
+              <p className="text-sm text-slate-400">
+                {calls.length === 0
+                  ? 'Nessun bando trovato.'
+                  : `Nessun bando corrisponde ai filtri (${calls.length} totali, ${hiddenCount} nascosti).`}
+              </p>
             </div>
           ) : (
             <>
@@ -151,18 +216,20 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
                 <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600">
                   <input
                     type="checkbox"
-                    checked={selected.size === calls.length && calls.length > 0}
+                    checked={allDisplayedSelected}
                     onChange={toggleAll}
                     className="rounded"
                   />
-                  Seleziona tutti ({calls.length}{total > calls.length ? ` di ${total}` : ''})
+                  Seleziona tutti i visibili ({displayedCalls.length}
+                  {hiddenCount > 0 ? ` · ${hiddenCount} nascosti` : ''}
+                  {total > calls.length ? ` di ${total} totali` : ''})
                 </label>
                 {selected.size > 0 && (
                   <span className="text-xs font-medium text-indigo-600">{selected.size} selezionat{selected.size === 1 ? 'o' : 'i'}</span>
                 )}
               </div>
               <ul className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-                {calls.map((c) => (
+                {displayedCalls.map((c) => (
                   <li
                     key={c.identifier}
                     onClick={() => toggle(c.identifier)}
