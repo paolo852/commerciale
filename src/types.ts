@@ -28,10 +28,12 @@ export interface FundingCall {
   name: string;
   body: string | null;
   deadline: string | null; // ISO date string
+  description: string | null; // testo del bando (usato da Gemini per il matching)
   notes: string | null;
   probability: number; // 0-100, tasso di successo stimato del bando
   pdf_path: string | null;
   pdf_filename: string | null;
+  source_url: string | null; // URL di origine (es. EU Participant Portal)
   created_at: string;
 }
 
@@ -67,7 +69,7 @@ export type CreateProjectManagerForm = Pick<ProjectManager, 'name' | 'email' | '
 
 export type UpdateProjectManagerForm = Partial<CreateProjectManagerForm>;
 
-export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'notes' | 'probability'>;
+export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'description' | 'notes' | 'probability' | 'source_url'>;
 
 export type UpdateFundingCallForm = Partial<CreateFundingCallForm>;
 
