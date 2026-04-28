@@ -44,10 +44,6 @@ interface EUApiResponse {
 
 const EU_API = 'https://api.tech.ec.europa.eu/search-api/prod/rest/search';
 
-// Codici status EU Portal:
-// 31094501 = Forthcoming, 31094502 = Open, 31094503 = Closed
-const STATUS_OPEN_OR_FORTHCOMING = ['31094501', '31094502'];
-
 // Mappa di alcuni programmi noti (ID numerici frameworkProgramme)
 const PROGRAMME_NAMES: Record<string, string> = {
   '43108390': 'Horizon Europe',
@@ -93,9 +89,19 @@ export default async function handler(req: Request): Promise<Response> {
   const fetchSize = Math.min(pageSize * 3, 250);
   const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${fetchSize}&pageNumber=${pageNumber}`;
 
+  // Filtro per data server-side: solo bandi con scadenza futura.
+  // Il filtro per status non è affidabile nell'indice SEDIA (restituisce bandi
+  // del 2016-2020 ancora marcati come Open). Il range su deadlineDate è più preciso.
+  const nowISO = new Date().toISOString();
   const formBody = new URLSearchParams({
     languages: 'en',
-    query: JSON.stringify({ bool: { must: [{ terms: { status: STATUS_OPEN_OR_FORTHCOMING } }] } }),
+    query: JSON.stringify({
+      bool: {
+        must: [
+          { range: { deadlineDate: { gte: nowISO } } },
+        ],
+      },
+    }),
     sort: JSON.stringify([{ field: 'deadlineDate', order: 'ASC' }]),
   });
 

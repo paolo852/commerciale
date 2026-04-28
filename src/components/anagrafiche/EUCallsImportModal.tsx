@@ -37,7 +37,7 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [programme, setProgramme] = useState('');
-  const [futureOnly, setFutureOnly] = useState(true);
+  const [futureOnly, setFutureOnly] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [total, setTotal] = useState(0);
@@ -166,18 +166,6 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
           <pre className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 whitespace-pre-wrap break-all font-sans">{error}</pre>
         )}
 
-        {/* DEBUG — rimuovere dopo diagnosi */}
-        {calls.length > 0 && (
-          <details className="text-[10px] text-slate-400 border border-slate-100 rounded-lg px-2 py-1">
-            <summary className="cursor-pointer select-none">Debug: prime 5 voci restituite dall'API</summary>
-            <pre className="mt-1 whitespace-pre-wrap break-all">
-              {calls.slice(0, 5).map((c) =>
-                `id: ${c.identifier}\nprogramme: "${c.programme}"\ndeadline: ${c.deadline ?? 'null'}\n`
-              ).join('\n')}
-              oggi: {new Date().toISOString().slice(0, 10)}
-            </pre>
-          </details>
-        )}
 
         {/* Lista bandi */}
         <div className="border border-slate-200 rounded-xl overflow-hidden">
