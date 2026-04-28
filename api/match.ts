@@ -1,5 +1,5 @@
 // Vercel Serverless Function (Edge runtime)
-// Riceve un lead + lista bandi, chiama Gemini per il matching AI,
+// Riceve un lead + lista bandi (con eventuale PDF base64), chiama Gemini per il matching AI,
 // e ritorna i match con score e motivazione.
 
 export const config = { runtime: 'edge' };
@@ -12,6 +12,7 @@ interface FundingCallInput {
   deadline: string | null;
   notes: string | null;
   probability?: number;
+  pdf_base64?: string; // base64 del PDF del bando, se disponibile
 }
 
 interface RequestBody {
@@ -28,18 +29,20 @@ interface MatchResult {
   rationale: string;
 }
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3-pro-preview';
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
 
-function buildPrompt(body: RequestBody): string {
-  const callsList = body.fundingCalls.map((fc, i) => `
-${i + 1}. ID: ${fc.id}
-   Codice: ${fc.code}
-   Nome: ${fc.name}
-   Ente erogatore: ${fc.body ?? 'non specificato'}
-   Scadenza: ${fc.deadline ?? 'non specificata'}
-   Note: ${fc.notes ?? 'nessuna'}`).join('\n');
+const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
 
-  return `Sei un esperto di trasferimento tecnologico e matching tra tecnologie da brevetto e bandi di finanziamento pubblici/privati. Devi analizzare se una tecnologia in valutazione potrebbe rispondere con successo a uno o più bandi.
+function buildParts(body: RequestBody): GeminiPart[] {
+  const hasPdfs = body.fundingCalls.some((fc) => fc.pdf_base64);
+
+  const callsList = body.fundingCalls.map((fc, i) =>
+    `${i + 1}. ID: ${fc.id}\n   Codice: ${fc.code}\n   Nome: ${fc.name}\n   Ente erogatore: ${fc.body ?? 'non specificato'}\n   Scadenza: ${fc.deadline ?? 'non specificata'}\n   Note: ${fc.notes ?? 'nessuna'}${fc.pdf_base64 ? '\n   [Testo completo del bando disponibile come documento allegato]' : ''}`
+  ).join('\n');
+
+  const promptText = `Sei un esperto di trasferimento tecnologico e matching tra tecnologie da brevetto e bandi di finanziamento pubblici/privati. Devi analizzare se una tecnologia in valutazione potrebbe rispondere con successo a uno o più bandi.
 
 # TECNOLOGIA IN VALUTAZIONE
 Nome: ${body.leadName}
@@ -50,14 +53,14 @@ ${body.leadDescription}
 
 # BANDI DISPONIBILI (non scaduti)
 ${callsList}
-
+${hasPdfs ? '\nI PDF dei bandi contrassegnati sono allegati in sequenza dopo questo testo. Leggili attentamente per valutare i criteri di ammissibilità, gli obiettivi specifici e le priorità tematiche.\n' : ''}
 # COMPITO
 Per ogni bando, valuta in modo approfondito (NON tramite semplice keyword matching) se la tecnologia descritta — anche attraverso possibili declinazioni applicative non immediatamente evidenti — possa rispondere alle richieste della call. Considera:
 - Match tematico/applicativo: la tecnologia, anche in applicazioni derivate, rientra nello scope del bando?
 - Possibili use-case in cui la tecnologia diventa rilevante per quel bando
 - Tipologia di soggetti ammissibili (PMI, università, startup, ecc.) coerente con l'ente proponente
 - Maturità tecnologica plausibile (TRL) richiesta vs presunta della tecnologia
-
+${hasPdfs ? '- Per i bandi con PDF allegato, usa il testo integrale per una valutazione più precisa\n' : ''}
 # OUTPUT
 Rispondi SOLO con un oggetto JSON valido (nessun testo extra) nel formato:
 {
@@ -71,6 +74,18 @@ Rispondi SOLO con un oggetto JSON valido (nessun testo extra) nel formato:
 }
 
 Includi SOLO i bandi con score >= 30. Ordina dal punteggio più alto al più basso. Se nessun bando ha score >= 30, ritorna { "matches": [] }.`;
+
+  const parts: GeminiPart[] = [{ text: promptText }];
+
+  // Allega i PDF in ordine (solo quelli con pdf_base64)
+  for (const fc of body.fundingCalls) {
+    if (fc.pdf_base64) {
+      parts.push({ text: `\n--- PDF del bando "${fc.code} — ${fc.name}" (ID: ${fc.id}) ---\n` });
+      parts.push({ inlineData: { mimeType: 'application/pdf', data: fc.pdf_base64 } });
+    }
+  }
+
+  return parts;
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -99,11 +114,10 @@ export default async function handler(req: Request): Promise<Response> {
     });
   }
 
-  const prompt = buildPrompt(body);
-
+  const parts = buildParts(body);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
   const geminiBody = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    contents: [{ role: 'user', parts }],
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0.3,
@@ -123,7 +137,10 @@ export default async function handler(req: Request): Promise<Response> {
 
   if (!geminiRes.ok) {
     const txt = await geminiRes.text();
-    return new Response(JSON.stringify({ error: `Gemini ha risposto ${geminiRes.status}`, detail: txt }), {
+    const status429 = geminiRes.status === 429
+      ? ' — rate limit superato, riprova tra qualche minuto o usa un modello diverso (imposta GEMINI_MODEL su Vercel)'
+      : '';
+    return new Response(JSON.stringify({ error: `Gemini ha risposto ${geminiRes.status}${status429}`, detail: txt }), {
       status: 502,
     });
   }
@@ -135,7 +152,6 @@ export default async function handler(req: Request): Promise<Response> {
 
   let parsed: { matches: MatchResult[] };
   try {
-    // Pulizia eventuali wrapper markdown
     const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
     parsed = JSON.parse(cleaned);
   } catch {

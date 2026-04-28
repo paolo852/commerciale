@@ -30,6 +30,8 @@ export interface FundingCall {
   deadline: string | null; // ISO date string
   notes: string | null;
   probability: number; // 0-100, tasso di successo stimato del bando
+  pdf_path: string | null;
+  pdf_filename: string | null;
   created_at: string;
 }
 

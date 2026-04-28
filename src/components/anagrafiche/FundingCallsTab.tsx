@@ -1,11 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { FileSearch, Plus } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { FileSearch, FileText, Globe, Plus, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { fundingCallsService } from '../../lib/dataService';
+import { fundingCallPdfService, fundingCallsService } from '../../lib/dataService';
+import type { EUCall } from '../../../api/eu-calls';
 import type { FundingCall } from '../../types';
 import { formatDate, toDateInputValue } from '../../lib/format';
 import Modal from '../Modal';
 import ConfirmDialog from '../ConfirmDialog';
+import EUCallsImportModal from './EUCallsImportModal';
 
 interface FormState { code: string; name: string; body: string; deadline: string; notes: string; probability: number; }
 const emptyForm: FormState = { code: '', name: '', body: '', deadline: '', notes: '', probability: 50 };
@@ -29,6 +31,10 @@ export default function FundingCallsTab() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<FundingCall | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfRemoving, setPdfRemoving] = useState(false);
+  const [euModalOpen, setEuModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function reload() {
     setLoading(true); setError(null);
@@ -64,14 +70,77 @@ export default function FundingCallsTab() {
     catch (e) { setError(e instanceof Error ? e.message : 'Errore nell\'eliminazione'); }
   }
 
+  async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!editing) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPdfUploading(true);
+    try {
+      const updated = await fundingCallPdfService.upload(editing.id, file);
+      setEditing(updated);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore upload PDF');
+    } finally {
+      setPdfUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handlePdfRemove() {
+    if (!editing?.pdf_path) return;
+    setPdfRemoving(true);
+    try {
+      const updated = await fundingCallPdfService.remove(editing.id, editing.pdf_path);
+      setEditing(updated);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore rimozione PDF');
+    } finally {
+      setPdfRemoving(false);
+    }
+  }
+
+  async function openPdf() {
+    if (!editing?.pdf_path) return;
+    const url = await fundingCallPdfService.signedUrl(editing.pdf_path);
+    if (url) window.open(url, '_blank');
+  }
+
+  async function handleEUImport(calls: EUCall[]) {
+    if (!user) return;
+    for (const c of calls) {
+      await fundingCallsService.create(
+        {
+          code: c.identifier,
+          name: c.title,
+          body: c.programme || null,
+          deadline: c.deadline,
+          notes: c.description ?? null,
+          probability: 50,
+        },
+        user.id,
+      );
+    }
+    await reload();
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-slate-500">{items.length} {items.length === 1 ? 'bando' : 'bandi'}</p>
-        <button onClick={openNew}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition">
-          <Plus className="w-4 h-4" /> Nuovo bando
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setEuModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-white text-indigo-700 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition"
+          >
+            <Globe className="w-4 h-4" /> Importa da EU Portal
+          </button>
+          <button onClick={openNew}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition">
+            <Plus className="w-4 h-4" /> Nuovo bando
+          </button>
+        </div>
       </div>
 
       {error && <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
@@ -161,6 +230,56 @@ export default function FundingCallsTab() {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
             <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={`${inputClass} resize-none`} />
           </div>
+
+          {editing && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5">
+              <p className="text-sm font-medium text-slate-700 mb-2.5">Documento bando (PDF)</p>
+              {editing.pdf_path ? (
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
+                  <button
+                    type="button"
+                    onClick={openPdf}
+                    className="text-sm text-indigo-600 hover:underline flex-1 text-left truncate"
+                  >
+                    {editing.pdf_filename ?? 'documento.pdf'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePdfRemove}
+                    disabled={pdfRemoving}
+                    className="text-xs text-slate-400 hover:text-red-600 transition flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {pdfRemoving ? 'Rimozione…' : 'Rimuovi'}
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={handlePdfUpload}
+                  />
+                  <button
+                    type="button"
+                    disabled={pdfUploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    {pdfUploading ? 'Upload in corso…' : 'Carica PDF del bando'}
+                  </button>
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    Il PDF viene letto da Gemini durante l'analisi AI dei lead.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setFormOpen(false)}
               className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition">
@@ -177,6 +296,12 @@ export default function FundingCallsTab() {
       <ConfirmDialog open={!!toDelete} title="Eliminare il bando?"
         message={toDelete ? `"${toDelete.code} — ${toDelete.name}" verrà rimosso.` : ''}
         confirmLabel="Elimina" variant="danger" onConfirm={handleDelete} onCancel={() => setToDelete(null)} />
+
+      <EUCallsImportModal
+        open={euModalOpen}
+        onClose={() => setEuModalOpen(false)}
+        onImport={handleEUImport}
+      />
     </div>
   );
 }
