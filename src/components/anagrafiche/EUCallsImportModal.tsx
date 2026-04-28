@@ -9,50 +9,23 @@ interface Props {
   onImport: (calls: EUCall[]) => Promise<void>;
 }
 
-// Filtri per programma basati su prefisso dell'identifier (più affidabile
-// del filtro server-side su frameworkProgramme che non risponde correttamente).
-const PROGRAMMES: { value: string; label: string; match: (id: string) => boolean }[] = [
-  { value: '', label: 'Tutti i programmi', match: () => true },
-  {
-    value: 'HORIZON',
-    label: 'Horizon Europe (2021-2027)',
-    match: (id) => id.toUpperCase().startsWith('HORIZON-') || id.toUpperCase().startsWith('ERC-') || id.toUpperCase().startsWith('MSCA-'),
-  },
-  {
-    value: 'H2020',
-    label: 'Horizon 2020 (2014-2020)',
-    match: (id) => id.toUpperCase().startsWith('H2020-') || id.toUpperCase().includes('H2020'),
-  },
-  {
-    value: 'EIC',
-    label: 'EIC (European Innovation Council)',
-    match: (id) => id.toUpperCase().includes('EIC-') || id.toUpperCase().startsWith('EIC'),
-  },
-  {
-    value: 'DIGITAL',
-    label: 'Digital Europe',
-    match: (id) => id.toUpperCase().startsWith('DIGITAL-'),
-  },
-  {
-    value: 'LIFE',
-    label: 'LIFE',
-    match: (id) => id.toUpperCase().startsWith('LIFE-'),
-  },
-  {
-    value: 'CEF',
-    label: 'CEF (Connecting Europe)',
-    match: (id) => id.toUpperCase().startsWith('CEF-') || id.toUpperCase().startsWith('CINEA-CEF'),
-  },
-  {
-    value: 'ERASMUS',
-    label: 'Erasmus+',
-    match: (id) => id.toUpperCase().startsWith('ERASMUS-'),
-  },
-  {
-    value: 'EU4HEALTH',
-    label: 'EU4Health',
-    match: (id) => id.toUpperCase().startsWith('EU4H-') || id.toUpperCase().startsWith('EU4HEALTH'),
-  },
+// I valori corrispondono esattamente al campo `programme` calcolato dal server (eu-calls.ts).
+// Filtrare per c.programme è più affidabile che ri-applicare la logica di prefisso sul client.
+const PROGRAMME_FILTERS: { value: string; label: string }[] = [
+  { value: '', label: 'Tutti i programmi' },
+  { value: 'Horizon Europe', label: 'Horizon Europe (2021-2027)' },
+  { value: 'Horizon 2020', label: 'Horizon 2020 (2014-2020)' },
+  { value: 'Digital Europe', label: 'Digital Europe' },
+  { value: 'LIFE', label: 'LIFE' },
+  { value: 'CEF', label: 'CEF (Connecting Europe)' },
+  { value: 'Erasmus+', label: 'Erasmus+' },
+  { value: 'EU4Health', label: 'EU4Health' },
+  { value: 'AMIF', label: 'AMIF' },
+  { value: 'CERV', label: 'CERV' },
+  { value: 'Justice', label: 'Justice' },
+  { value: 'European Defence Fund', label: 'European Defence Fund' },
+  { value: 'Civil Protection', label: 'Civil Protection' },
+  { value: 'Single Market Programme', label: 'Single Market Programme' },
 ];
 
 const inputClass =
@@ -102,9 +75,8 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
   // Filtri lato client (programma + scadenza futura)
   const displayedCalls = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const matcher = PROGRAMMES.find((p) => p.value === programme)?.match ?? (() => true);
     return calls
-      .filter((c) => matcher(c.identifier))
+      .filter((c) => !programme || c.programme === programme)
       .filter((c) => !futureOnly || !c.deadline || c.deadline >= today);
   }, [calls, programme, futureOnly]);
 
@@ -165,7 +137,7 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
             onChange={(e) => setProgramme(e.target.value)}
             className="px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
           >
-            {PROGRAMMES.map((p) => (
+            {PROGRAMME_FILTERS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
