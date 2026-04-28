@@ -143,16 +143,41 @@ export default async function handler(req: Request): Promise<Response> {
   const calls: EUCall[] = results
     .map((r) => {
       const m = r.metadata ?? {};
-      const id = first(m.identifier) ?? first(m.callIdentifier) ?? first(m.topicCode) ?? r.reference ?? null;
+      // PREFERIAMO callIdentifier (es. "HORIZON-CL3-2024-CIVSEC-01") perché contiene
+      // il prefisso del programma; usiamo identifier (es. "CIVSEC-01-01") solo come fallback
+      const callId = first(m.callIdentifier);
+      const topicId = first(m.identifier) ?? first(m.topicCode) ?? r.reference;
+      const id = callId ?? topicId ?? null;
       const title = first(m.title) ?? first(m.callTitle) ?? r.title ?? null;
       if (!id || !title) return null;
       const fwProgId = first(m.frameworkProgramme) ?? '';
       const periodo = first(m.programmePeriod) ?? '';
-      const programmeLabel = PROGRAMME_NAMES[fwProgId] ?? (periodo ? `Programma ${periodo}` : '');
+      // Inferenza del nome programma: 1) ID numerico noto, 2) prefisso identifier, 3) periodo
+      const idUpper = id.toUpperCase();
+      let programmeLabel = PROGRAMME_NAMES[fwProgId] ?? '';
+      if (!programmeLabel) {
+        if (idUpper.startsWith('HORIZON-') || idUpper.startsWith('ERC-') || idUpper.startsWith('MSCA-')) programmeLabel = 'Horizon Europe';
+        else if (idUpper.startsWith('H2020-')) programmeLabel = 'Horizon 2020';
+        else if (idUpper.startsWith('LIFE-')) programmeLabel = 'LIFE';
+        else if (idUpper.startsWith('DIGITAL-')) programmeLabel = 'Digital Europe';
+        else if (idUpper.startsWith('CEF-') || idUpper.startsWith('CINEA-CEF')) programmeLabel = 'CEF';
+        else if (idUpper.startsWith('ERASMUS-')) programmeLabel = 'Erasmus+';
+        else if (idUpper.startsWith('EU4H-') || idUpper.startsWith('EU4HEALTH')) programmeLabel = 'EU4Health';
+        else if (idUpper.startsWith('AMIF-')) programmeLabel = 'AMIF';
+        else if (idUpper.startsWith('ISF-')) programmeLabel = 'ISF';
+        else if (idUpper.startsWith('EMFAF-')) programmeLabel = 'EMFAF';
+        else if (idUpper.startsWith('CERV-')) programmeLabel = 'CERV';
+        else if (idUpper.startsWith('JUST-')) programmeLabel = 'Justice';
+        else if (idUpper.startsWith('I3-')) programmeLabel = 'Interregional Innovation';
+        else if (idUpper.startsWith('SMP-')) programmeLabel = 'Single Market Programme';
+        else if (idUpper.startsWith('UCPM-')) programmeLabel = 'Civil Protection';
+        else if (idUpper.startsWith('EDF-')) programmeLabel = 'European Defence Fund';
+        else programmeLabel = periodo ? `Programma ${periodo}` : 'Altro';
+      }
       const rawDeadline = first(m.deadlineDate);
       const deadline = rawDeadline ? rawDeadline.slice(0, 10) : null;
       const description = stripHtml(first(m.descriptionByte) ?? first(m.description) ?? r.summary ?? null);
-      const portalUrl = first(m as { url?: unknown }) ?? (typeof r.url === 'string' ? r.url : Array.isArray(r.url) ? r.url[0] : '') ?? `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent(id.toLowerCase())}`;
+      const portalUrl = (typeof r.url === 'string' ? r.url : Array.isArray(r.url) ? r.url[0] : '') ?? '';
       return {
         identifier: id,
         title,
@@ -160,7 +185,7 @@ export default async function handler(req: Request): Promise<Response> {
         deadline,
         status: first(m.status) ?? 'OPEN',
         description: description ? description.slice(0, 600) : null,
-        url: typeof portalUrl === 'string' ? portalUrl : `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent(id.toLowerCase())}`,
+        url: portalUrl || `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent((topicId ?? id).toLowerCase())}`,
       } satisfies EUCall;
     })
     .filter((c): c is EUCall => c !== null);
