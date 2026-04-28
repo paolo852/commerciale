@@ -4,6 +4,8 @@
 
 export const config = { runtime: 'edge' };
 
+declare const process: { env: Record<string, string | undefined> };
+
 interface FundingCallInput {
   id: string;
   code: string;
