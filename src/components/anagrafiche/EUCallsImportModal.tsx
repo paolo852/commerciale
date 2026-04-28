@@ -46,10 +46,15 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
         if (err.detail) lines.push(`Dettaglio: ${err.detail.slice(0, 200)}`);
         throw new Error(lines.join('\n'));
       }
-      const json = await res.json() as { calls: EUCall[]; total: number };
+      const json = await res.json() as { calls: EUCall[]; total: number; rawResultCount?: number };
       setCalls(json.calls);
       setTotal(json.total);
       setSelected(new Set());
+      // Diagnostica: se il portale ha restituito risultati ma la nostra logica di parsing
+      // li ha tutti scartati, mostra un avviso
+      if ((json.rawResultCount ?? 0) > 0 && json.calls.length === 0) {
+        setError(`Il portale ha restituito ${json.rawResultCount} risultati ma nessuno aveva i campi attesi (id+titolo). Apri /api/eu-calls?debug=1 in una nuova tab per vedere la struttura grezza.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore caricamento bandi EU');
     } finally {
