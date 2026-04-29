@@ -1,8 +1,9 @@
-// Vercel Serverless Function (Node.js runtime — timeout 30s)
-// Fonte primaria: file JSON statico pubblicato dal EU Funding & Tenders Portal.
-// Contiene tutti i bandi aperti/forthcoming con scadenza futura.
+// Vercel Serverless Function (Edge runtime)
+// Proxy verso l'API pubblica EU Funding & Tenders Portal (SEDIA).
+// Nota: l'indice SEDIA include sia bandi storici sia correnti; usare la
+// ricerca per keyword (es. "HORIZON 2026") per trovare bandi recenti.
 
-export const config = { maxDuration: 30 };
+export const config = { runtime: 'edge' };
 
 export interface EUCall {
   identifier: string;
@@ -14,187 +15,173 @@ export interface EUCall {
   url: string;
 }
 
-// JSON statico pubblicato dal portale EU — aggiornato frequentemente.
-const GRANTS_URL =
-  'https://ec.europa.eu/info/funding-tenders/opportunities/data/referenceData/grantsTenders.json';
-
-function stripHtml(html: string | null | undefined): string | null {
-  if (!html) return null;
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() || null;
+interface EUMeta {
+  identifier?: unknown;
+  callIdentifier?: unknown;
+  topicCode?: unknown;
+  title?: unknown;
+  callTitle?: unknown;
+  deadlineDate?: unknown;
+  programmePeriod?: unknown;
+  frameworkProgramme?: unknown;
+  status?: unknown;
+  description?: unknown;
+  descriptionByte?: unknown;
 }
 
-function toDateStr(v: unknown): string | null {
-  if (v == null) return null;
-  if (typeof v === 'number') {
-    // Unix ms timestamp
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
-  }
-  if (typeof v === 'string') {
-    const s = v.slice(0, 10);
-    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
-  }
-  return null;
+interface EUResult {
+  metadata?: EUMeta;
+  reference?: string;
+  url?: string | string[];
+  summary?: string;
+  title?: string;
 }
 
-function str(v: unknown): string | null {
+interface EUResponse {
+  results?: EUResult[];
+  totalResults?: number;
+  totalCount?: number;
+}
+
+const EU_API = 'https://api.tech.ec.europa.eu/search-api/prod/rest/search';
+
+const PROGRAMME_NAMES: Record<string, string> = {
+  '43108390': 'Horizon Europe',
+  '31045243': 'Horizon 2020',
+  '43251567': 'Digital Europe',
+  '43152860': 'EU4Health',
+  '43298916': 'LIFE',
+  '43251882': 'CEF',
+};
+
+function first(v: unknown): string | null {
   if (v == null) return null;
   if (typeof v === 'string') return v || null;
-  if (Array.isArray(v)) return str(v[0]);
+  if (Array.isArray(v)) return first(v[0]);
+  if (typeof v === 'object' && 'value' in (v as object))
+    return String((v as Record<string, unknown>).value ?? '') || null;
   return null;
 }
 
-function programmeName(id: string, rawProgramme: string | null): string {
-  const up = id.toUpperCase();
-  const prog = (rawProgramme ?? '').toUpperCase();
-  if (up.startsWith('HORIZON-') || up.startsWith('ERC-') || up.startsWith('MSCA-') || prog.includes('HORIZON')) return 'Horizon Europe';
-  if (up.startsWith('H2020-') || prog.includes('H2020')) return 'Horizon 2020';
-  if (up.startsWith('LIFE-') || prog.includes('LIFE')) return 'LIFE';
-  if (up.startsWith('DIGITAL-') || prog.includes('DIGITAL')) return 'Digital Europe';
-  if (up.startsWith('CEF-') || up.startsWith('CINEA-CEF')) return 'CEF';
-  if (up.startsWith('ERASMUS-')) return 'Erasmus+';
-  if (up.startsWith('EU4H-') || up.startsWith('EU4HEALTH')) return 'EU4Health';
-  if (up.startsWith('AMIF-')) return 'AMIF';
-  if (up.startsWith('ISF-')) return 'ISF';
-  if (up.startsWith('EMFAF-')) return 'EMFAF';
-  if (up.startsWith('CERV-')) return 'CERV';
-  if (up.startsWith('JUST-')) return 'Justice';
-  if (up.startsWith('SMP-')) return 'Single Market Programme';
-  if (up.startsWith('UCPM-')) return 'Civil Protection';
-  if (up.startsWith('EDF-')) return 'European Defence Fund';
-  if (rawProgramme) return rawProgramme;
-  return 'Altro';
+function stripHtml(s: string | null): string | null {
+  if (!s) return null;
+  return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() || null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseCall(item: Record<string, any>): EUCall | null {
-  // Prova vari nomi campo usati dal portale EU
-  const id =
-    str(item.identifier) ??
-    str(item.callIdentifier) ??
-    str(item.topicCode) ??
-    str(item.id) ??
-    null;
-  const title =
-    str(item.title) ??
-    str(item.callTitle) ??
-    str(item.name) ??
-    null;
-  if (!id || !title) return null;
-
-  const deadline = toDateStr(item.deadlineDate ?? item.deadline ?? item.submissionDeadline ?? null);
-  const rawProg = str(item.frameworkProgramme ?? item.programme ?? item.programmeAcronym ?? null);
-  const prog = programmeName(id, rawProg);
-  const desc = stripHtml(
-    str(item.description ?? item.descriptionByte ?? item.abstract ?? item.summary ?? null),
-  );
-  const statusRaw = str(item.status ?? item.callStatus ?? null) ?? 'OPEN';
-  const portalUrl =
-    str(item.url ?? item.urlHref ?? null) ??
-    `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent(id.toLowerCase())}`;
-
-  return {
-    identifier: id,
-    title,
-    programme: prog,
-    deadline,
-    status: statusRaw,
-    description: desc ? desc.slice(0, 600) : null,
-    url: portalUrl,
-  } satisfies EUCall;
+function inferProgramme(id: string, fwProgId: string, periodo: string): string {
+  const label = PROGRAMME_NAMES[fwProgId];
+  if (label) return label;
+  const u = id.toUpperCase();
+  if (u.startsWith('HORIZON-') || u.startsWith('ERC-') || u.startsWith('MSCA-')) return 'Horizon Europe';
+  if (u.startsWith('H2020-')) return 'Horizon 2020';
+  if (u.startsWith('LIFE-')) return 'LIFE';
+  if (u.startsWith('DIGITAL-')) return 'Digital Europe';
+  if (u.startsWith('CEF-') || u.startsWith('CINEA-CEF')) return 'CEF';
+  if (u.startsWith('ERASMUS-')) return 'Erasmus+';
+  if (u.startsWith('EU4H-') || u.startsWith('EU4HEALTH')) return 'EU4Health';
+  if (u.startsWith('AMIF-')) return 'AMIF';
+  if (u.startsWith('ISF-')) return 'ISF';
+  if (u.startsWith('EMFAF-')) return 'EMFAF';
+  if (u.startsWith('CERV-')) return 'CERV';
+  if (u.startsWith('JUST-')) return 'Justice';
+  if (u.startsWith('SMP-')) return 'Single Market Programme';
+  if (u.startsWith('UCPM-')) return 'Civil Protection';
+  if (u.startsWith('EDF-')) return 'European Defence Fund';
+  return periodo ? `Programma ${periodo}` : 'Altro';
 }
 
 export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET')
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
-  }
 
   const { searchParams } = new URL(req.url);
   const pageSize = Math.min(Number(searchParams.get('pageSize') ?? '100'), 200);
-  const text = (searchParams.get('text') ?? '').trim().toLowerCase();
+  const pageNumber = Number(searchParams.get('pageNumber') ?? '1');
+  const text = searchParams.get('text')?.trim() || '*';
   const debug = searchParams.get('debug') === '1';
 
-  let rawJson: unknown;
+  const fetchSize = Math.min(pageSize * 3, 300);
+  const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${fetchSize}&pageNumber=${pageNumber}`;
+
+  const formBody = new URLSearchParams({
+    languages: 'en',
+    query: JSON.stringify({ bool: { must: [{ terms: { status: ['31094501', '31094502'] } }] } }),
+    sort: JSON.stringify([{ field: 'startDate', order: 'DESC' }]),
+  });
+
+  let euRes: Response;
   try {
-    const abort = new AbortController();
-    const timer = setTimeout(() => abort.abort(), 22000); // 22s max
-    const res = await fetch(GRANTS_URL, {
-      signal: abort.signal,
-      headers: { Accept: 'application/json', 'User-Agent': 'commerciale-app/1.0' },
+    euRes = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+        'User-Agent': 'commerciale-app/1.0',
+      },
+      body: formBody.toString(),
     });
-    clearTimeout(timer);
-    if (!res.ok) {
-      return new Response(
-        JSON.stringify({ error: `grantsTenders.json ha risposto ${res.status}` }),
-        { status: 502 },
-      );
-    }
-    // Leggi il body come testo per poter limitare la dimensione se necessario
-    const text = await res.text();
-    rawJson = JSON.parse(text);
   } catch (e) {
+    return new Response(JSON.stringify({ error: 'Errore rete EU Portal', detail: String(e) }), { status: 502 });
+  }
+
+  if (!euRes.ok) {
+    const txt = await euRes.text().catch(() => '');
     return new Response(
-      JSON.stringify({ error: 'Errore fetch grantsTenders.json', detail: String(e) }),
+      JSON.stringify({ error: `EU Portal ha risposto ${euRes.status}`, detail: txt.slice(0, 600) }),
       { status: 502 },
     );
   }
 
-  // Debug: mostra struttura raw per diagnosi
-  if (debug) {
-    const isArr = Array.isArray(rawJson);
-    const keys = !isArr && typeof rawJson === 'object' && rawJson !== null
-      ? Object.keys(rawJson as object)
-      : [];
-    // Prendi il primo elemento per capire i campi disponibili
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const arr: unknown[] = isArr ? rawJson as unknown[] : (rawJson as any)[keys[0]] ?? [];
+  const rawText = await euRes.text();
+  let raw: EUResponse;
+  try {
+    raw = JSON.parse(rawText) as EUResponse;
+  } catch (e) {
     return new Response(
-      JSON.stringify({
-        isArray: isArr,
-        topLevelKeys: keys,
-        totalItems: arr.length,
-        firstItem: arr[0],
-        sampleKeys: arr[0] != null && typeof arr[0] === 'object' ? Object.keys(arr[0] as object) : [],
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
+      JSON.stringify({ error: 'Risposta non JSON', detail: rawText.slice(0, 400), parseError: String(e) }),
+      { status: 502 },
     );
   }
 
-  // Ricava l'array di bandi dalla struttura (array diretto o oggetto con una chiave)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let items: Record<string, any>[];
-  if (Array.isArray(rawJson)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    items = rawJson as Record<string, any>[];
-  } else if (typeof rawJson === 'object' && rawJson !== null) {
-    const obj = rawJson as Record<string, unknown>;
-    // Cerca la prima chiave il cui valore è un array
-    const arrayKey = Object.keys(obj).find((k) => Array.isArray(obj[k]));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    items = arrayKey ? (obj[arrayKey] as Record<string, any>[]) : [];
-  } else {
-    items = [];
-  }
+  const results: EUResult[] = raw.results ?? [];
 
-  const today = new Date().toISOString().slice(0, 10);
+  const calls: EUCall[] = results
+    .map((r) => {
+      const m = r.metadata ?? {};
+      const callId = first(m.callIdentifier);
+      const topicId = first(m.identifier) ?? first(m.topicCode) ?? r.reference ?? null;
+      const id = callId ?? topicId;
+      const title = first(m.title) ?? first(m.callTitle) ?? r.title ?? null;
+      if (!id || !title) return null;
 
-  const calls = items
-    .map((item) => parseCall(item))
-    .filter((c): c is EUCall => {
-      if (!c) return false;
-      // Filtro scadenza futura (o null = forthcoming senza data)
-      if (c.deadline && c.deadline < today) return false;
-      // Filtro testo libero
-      if (text) {
-        const haystack = `${c.identifier} ${c.title} ${c.programme} ${c.description ?? ''}`.toLowerCase();
-        if (!haystack.includes(text)) return false;
-      }
-      return true;
+      const programme = inferProgramme(id, first(m.frameworkProgramme) ?? '', first(m.programmePeriod) ?? '');
+      const deadline = (() => { const d = first(m.deadlineDate); return d ? d.slice(0, 10) : null; })();
+      const description = stripHtml(first(m.descriptionByte) ?? first(m.description) ?? r.summary ?? null);
+      const portalUrl =
+        (typeof r.url === 'string' ? r.url : Array.isArray(r.url) ? r.url[0] : null) ??
+        `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent((topicId ?? id).toLowerCase())}`;
+
+      return {
+        identifier: id,
+        title,
+        programme,
+        deadline,
+        status: first(m.status) ?? 'OPEN',
+        description: description ? description.slice(0, 600) : null,
+        url: portalUrl,
+      } satisfies EUCall;
     })
-    .slice(0, pageSize);
+    .filter((c): c is EUCall => c !== null);
 
-  return new Response(
-    JSON.stringify({ calls, total: calls.length, rawResultCount: items.length }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } },
-  );
+  const body: Record<string, unknown> = {
+    calls,
+    total: raw.totalResults ?? raw.totalCount ?? calls.length,
+    rawResultCount: results.length,
+  };
+  if (debug) body.firstRaw = results[0] ?? null;
+
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
