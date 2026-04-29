@@ -1,72 +1,107 @@
 // Vercel Serverless Function (Edge runtime)
-// Proxy verso l'API pubblica del EU Funding & Tenders Portal (SEDIA).
-// Restituisce i bandi aperti (status Open o Forthcoming) ordinati per scadenza.
+// Fonte primaria: file JSON statico pubblicato dal EU Funding & Tenders Portal.
+// Contiene tutti i bandi aperti/forthcoming con scadenza futura.
 
 export const config = { runtime: 'edge' };
 
 export interface EUCall {
   identifier: string;
   title: string;
-  programme: string; // periodo programma, es. "2021 - 2027"
+  programme: string;
   deadline: string | null;
   status: string;
   description: string | null;
   url: string;
 }
 
-interface EUApiMetadata {
-  identifier?: unknown;
-  title?: unknown;
-  deadlineDate?: unknown;
-  programmePeriod?: unknown;
-  frameworkProgramme?: unknown;
-  status?: unknown;
-  description?: unknown;
-  callTitle?: unknown;
-  callIdentifier?: unknown;
-  topicCode?: unknown;
-  descriptionByte?: unknown;
+// JSON statico pubblicato dal portale EU — aggiornato frequentemente.
+const GRANTS_URL =
+  'https://ec.europa.eu/info/funding-tenders/opportunities/data/referenceData/grantsTenders.json';
+
+function stripHtml(html: string | null | undefined): string | null {
+  if (!html) return null;
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() || null;
 }
 
-interface EUApiResult {
-  metadata?: EUApiMetadata;
-  reference?: string;
-  url?: string | string[];
-  summary?: string;
-  title?: string;
-}
-
-interface EUApiResponse {
-  results?: EUApiResult[];
-  totalResults?: number;
-  totalCount?: number;
-}
-
-const EU_API = 'https://api.tech.ec.europa.eu/search-api/prod/rest/search';
-
-// Mappa di alcuni programmi noti (ID numerici frameworkProgramme)
-const PROGRAMME_NAMES: Record<string, string> = {
-  '43108390': 'Horizon Europe',
-  '31045243': 'Horizon 2020',
-  '43251567': 'Digital Europe',
-  '43152860': 'EU4Health',
-  '43298916': 'LIFE',
-  '43251882': 'CEF',
-};
-
-function first(v: unknown): string | null {
+function toDateStr(v: unknown): string | null {
   if (v == null) return null;
-  if (typeof v === 'string') return v;
-  if (Array.isArray(v) && v.length > 0) return first(v[0]);
-  if (typeof v === 'object' && v !== null && 'value' in v) {
-    return String((v as Record<string, unknown>).value ?? '');
+  if (typeof v === 'number') {
+    // Unix ms timestamp
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  }
+  if (typeof v === 'string') {
+    const s = v.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
   }
   return null;
 }
 
-function stripHtml(html: string | null): string | null {
-  if (!html) return null;
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() || null;
+function str(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v || null;
+  if (Array.isArray(v)) return str(v[0]);
+  return null;
+}
+
+function programmeName(id: string, rawProgramme: string | null): string {
+  const up = id.toUpperCase();
+  const prog = (rawProgramme ?? '').toUpperCase();
+  if (up.startsWith('HORIZON-') || up.startsWith('ERC-') || up.startsWith('MSCA-') || prog.includes('HORIZON')) return 'Horizon Europe';
+  if (up.startsWith('H2020-') || prog.includes('H2020')) return 'Horizon 2020';
+  if (up.startsWith('LIFE-') || prog.includes('LIFE')) return 'LIFE';
+  if (up.startsWith('DIGITAL-') || prog.includes('DIGITAL')) return 'Digital Europe';
+  if (up.startsWith('CEF-') || up.startsWith('CINEA-CEF')) return 'CEF';
+  if (up.startsWith('ERASMUS-')) return 'Erasmus+';
+  if (up.startsWith('EU4H-') || up.startsWith('EU4HEALTH')) return 'EU4Health';
+  if (up.startsWith('AMIF-')) return 'AMIF';
+  if (up.startsWith('ISF-')) return 'ISF';
+  if (up.startsWith('EMFAF-')) return 'EMFAF';
+  if (up.startsWith('CERV-')) return 'CERV';
+  if (up.startsWith('JUST-')) return 'Justice';
+  if (up.startsWith('SMP-')) return 'Single Market Programme';
+  if (up.startsWith('UCPM-')) return 'Civil Protection';
+  if (up.startsWith('EDF-')) return 'European Defence Fund';
+  if (rawProgramme) return rawProgramme;
+  return 'Altro';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseCall(item: Record<string, any>): EUCall | null {
+  // Prova vari nomi campo usati dal portale EU
+  const id =
+    str(item.identifier) ??
+    str(item.callIdentifier) ??
+    str(item.topicCode) ??
+    str(item.id) ??
+    null;
+  const title =
+    str(item.title) ??
+    str(item.callTitle) ??
+    str(item.name) ??
+    null;
+  if (!id || !title) return null;
+
+  const deadline = toDateStr(item.deadlineDate ?? item.deadline ?? item.submissionDeadline ?? null);
+  const rawProg = str(item.frameworkProgramme ?? item.programme ?? item.programmeAcronym ?? null);
+  const prog = programmeName(id, rawProg);
+  const desc = stripHtml(
+    str(item.description ?? item.descriptionByte ?? item.abstract ?? item.summary ?? null),
+  );
+  const statusRaw = str(item.status ?? item.callStatus ?? null) ?? 'OPEN';
+  const portalUrl =
+    str(item.url ?? item.urlHref ?? null) ??
+    `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent(id.toLowerCase())}`;
+
+  return {
+    identifier: id,
+    title,
+    programme: prog,
+    deadline,
+    status: statusRaw,
+    description: desc ? desc.slice(0, 600) : null,
+    url: portalUrl,
+  } satisfies EUCall;
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -75,138 +110,85 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const { searchParams } = new URL(req.url);
-  const pageSize = Math.min(Number(searchParams.get('pageSize') ?? '50'), 100);
-  const pageNumber = Number(searchParams.get('pageNumber') ?? '1');
-  const text = searchParams.get('text')?.trim() || '*';
-  const programme = searchParams.get('programme') ?? '';
+  const pageSize = Math.min(Number(searchParams.get('pageSize') ?? '100'), 200);
+  const text = (searchParams.get('text') ?? '').trim().toLowerCase();
   const debug = searchParams.get('debug') === '1';
 
-  // Programma filtrato lato client (vedi EUCallsImportModal.tsx) perché il campo
-  // frameworkProgramme nell'indice EU non risponde affidabilmente al filtro
-  // server-side. Qui ignoriamo `programme` ma teniamo il parametro per retrocompat.
-  void programme;
-  // Fetch 500 per dare margine al filtro client — l'indice SEDIA mescola
-  // bandi aperti recenti e storici, e quelli con scadenza futura potrebbero
-  // essere oltre i primi 100.
-  const fetchSize = Math.min(pageSize * 5, 500);
-  const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${fetchSize}&pageNumber=${pageNumber}`;
-
-  // Status Open/Forthcoming + sort per startDate DESC (aperti più di recente prima).
-  // deadlineDate non sembra essere un campo sortable affidabile nell'indice SEDIA.
-  const STATUS_OPEN = ['31094501', '31094502'];
-  const formBody = new URLSearchParams({
-    languages: 'en',
-    query: JSON.stringify({
-      bool: { must: [{ terms: { status: STATUS_OPEN } }] },
-    }),
-    sort: JSON.stringify([{ field: 'startDate', order: 'DESC' }]),
-  });
-
-  let euRes: Response;
+  let rawJson: unknown;
   try {
-    euRes = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-        'User-Agent': 'commerciale-app/1.0',
-      },
-      body: formBody.toString(),
+    const res = await fetch(GRANTS_URL, {
+      headers: { Accept: 'application/json', 'User-Agent': 'commerciale-app/1.0' },
     });
+    if (!res.ok) {
+      return new Response(
+        JSON.stringify({ error: `grantsTenders.json ha risposto ${res.status}` }),
+        { status: 502 },
+      );
+    }
+    rawJson = await res.json();
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'Errore di rete verso EU Portal', detail: String(e) }), { status: 502 });
+    return new Response(
+      JSON.stringify({ error: 'Errore fetch grantsTenders.json', detail: String(e) }),
+      { status: 502 },
+    );
   }
 
-  if (!euRes.ok) {
-    const txt = await euRes.text().catch(() => '');
+  // Debug: mostra struttura raw per diagnosi
+  if (debug) {
+    const isArr = Array.isArray(rawJson);
+    const keys = !isArr && typeof rawJson === 'object' && rawJson !== null
+      ? Object.keys(rawJson as object)
+      : [];
+    // Prendi il primo elemento per capire i campi disponibili
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const arr: unknown[] = isArr ? rawJson as unknown[] : (rawJson as any)[keys[0]] ?? [];
     return new Response(
       JSON.stringify({
-        error: `EU Portal ha risposto ${euRes.status}`,
-        detail: txt.slice(0, 800),
-        url: url.replace(/apiKey=[^&]+/, 'apiKey=***'),
-        body: formBody.toString().slice(0, 500),
+        isArray: isArr,
+        topLevelKeys: keys,
+        totalItems: arr.length,
+        firstItem: arr[0],
+        sampleKeys: arr[0] != null && typeof arr[0] === 'object' ? Object.keys(arr[0] as object) : [],
       }),
-      { status: 502 },
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
-  const rawText = await euRes.text();
-  let raw: EUApiResponse;
-  try {
-    raw = JSON.parse(rawText) as EUApiResponse;
-  } catch (e) {
-    return new Response(
-      JSON.stringify({ error: 'Risposta EU Portal non è JSON', detail: rawText.slice(0, 500), parseError: String(e) }),
-      { status: 502 },
-    );
+  // Ricava l'array di bandi dalla struttura (array diretto o oggetto con una chiave)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let items: Record<string, any>[];
+  if (Array.isArray(rawJson)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items = rawJson as Record<string, any>[];
+  } else if (typeof rawJson === 'object' && rawJson !== null) {
+    const obj = rawJson as Record<string, unknown>;
+    // Cerca la prima chiave il cui valore è un array
+    const arrayKey = Object.keys(obj).find((k) => Array.isArray(obj[k]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items = arrayKey ? (obj[arrayKey] as Record<string, any>[]) : [];
+  } else {
+    items = [];
   }
 
-  const results: EUApiResult[] = raw.results ?? [];
+  const today = new Date().toISOString().slice(0, 10);
 
-  const calls: EUCall[] = results
-    .map((r) => {
-      const m = r.metadata ?? {};
-      // PREFERIAMO callIdentifier (es. "HORIZON-CL3-2024-CIVSEC-01") perché contiene
-      // il prefisso del programma; usiamo identifier (es. "CIVSEC-01-01") solo come fallback
-      const callId = first(m.callIdentifier);
-      const topicId = first(m.identifier) ?? first(m.topicCode) ?? r.reference;
-      const id = callId ?? topicId ?? null;
-      const title = first(m.title) ?? first(m.callTitle) ?? r.title ?? null;
-      if (!id || !title) return null;
-      const fwProgId = first(m.frameworkProgramme) ?? '';
-      const periodo = first(m.programmePeriod) ?? '';
-      // Inferenza del nome programma: 1) ID numerico noto, 2) prefisso identifier, 3) periodo
-      const idUpper = id.toUpperCase();
-      let programmeLabel = PROGRAMME_NAMES[fwProgId] ?? '';
-      if (!programmeLabel) {
-        if (idUpper.startsWith('HORIZON-') || idUpper.startsWith('ERC-') || idUpper.startsWith('MSCA-')) programmeLabel = 'Horizon Europe';
-        else if (idUpper.startsWith('H2020-')) programmeLabel = 'Horizon 2020';
-        else if (idUpper.startsWith('LIFE-')) programmeLabel = 'LIFE';
-        else if (idUpper.startsWith('DIGITAL-')) programmeLabel = 'Digital Europe';
-        else if (idUpper.startsWith('CEF-') || idUpper.startsWith('CINEA-CEF')) programmeLabel = 'CEF';
-        else if (idUpper.startsWith('ERASMUS-')) programmeLabel = 'Erasmus+';
-        else if (idUpper.startsWith('EU4H-') || idUpper.startsWith('EU4HEALTH')) programmeLabel = 'EU4Health';
-        else if (idUpper.startsWith('AMIF-')) programmeLabel = 'AMIF';
-        else if (idUpper.startsWith('ISF-')) programmeLabel = 'ISF';
-        else if (idUpper.startsWith('EMFAF-')) programmeLabel = 'EMFAF';
-        else if (idUpper.startsWith('CERV-')) programmeLabel = 'CERV';
-        else if (idUpper.startsWith('JUST-')) programmeLabel = 'Justice';
-        else if (idUpper.startsWith('I3-')) programmeLabel = 'Interregional Innovation';
-        else if (idUpper.startsWith('SMP-')) programmeLabel = 'Single Market Programme';
-        else if (idUpper.startsWith('UCPM-')) programmeLabel = 'Civil Protection';
-        else if (idUpper.startsWith('EDF-')) programmeLabel = 'European Defence Fund';
-        else programmeLabel = periodo ? `Programma ${periodo}` : 'Altro';
+  const calls = items
+    .map((item) => parseCall(item))
+    .filter((c): c is EUCall => {
+      if (!c) return false;
+      // Filtro scadenza futura (o null = forthcoming senza data)
+      if (c.deadline && c.deadline < today) return false;
+      // Filtro testo libero
+      if (text) {
+        const haystack = `${c.identifier} ${c.title} ${c.programme} ${c.description ?? ''}`.toLowerCase();
+        if (!haystack.includes(text)) return false;
       }
-      const rawDeadline = first(m.deadlineDate);
-      const deadline = rawDeadline ? rawDeadline.slice(0, 10) : null;
-      const description = stripHtml(first(m.descriptionByte) ?? first(m.description) ?? r.summary ?? null);
-      const portalUrl = (typeof r.url === 'string' ? r.url : Array.isArray(r.url) ? r.url[0] : '') ?? '';
-      return {
-        identifier: id,
-        title,
-        programme: programmeLabel,
-        deadline,
-        status: first(m.status) ?? 'OPEN',
-        description: description ? description.slice(0, 600) : null,
-        url: portalUrl || `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${encodeURIComponent((topicId ?? id).toLowerCase())}`,
-      } satisfies EUCall;
+      return true;
     })
-    .filter((c): c is EUCall => c !== null);
+    .slice(0, pageSize);
 
-  const responseBody: Record<string, unknown> = {
-    calls,
-    total: raw.totalResults ?? raw.totalCount ?? calls.length,
-    rawResultCount: results.length,
-  };
-
-  if (debug && results.length > 0) {
-    responseBody.firstRaw = results[0];
-  } else if (debug && results.length === 0) {
-    responseBody.rawText = rawText.slice(0, 1500);
-  }
-
-  return new Response(JSON.stringify(responseBody), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return new Response(
+    JSON.stringify({ calls, total: calls.length, rawResultCount: items.length }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  );
 }
