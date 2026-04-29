@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarOff, ExternalLink, Globe, Loader2, Search } from 'lucide-react';
+import { ExternalLink, Globe, Info, Loader2, Search } from 'lucide-react';
 import type { EUCall } from '../../../api/eu-calls';
 import Modal from '../Modal';
 
@@ -37,7 +37,7 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [programme, setProgramme] = useState('');
-  const [futureOnly, setFutureOnly] = useState(true);
+  const [futureOnly] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [total, setTotal] = useState(0);
@@ -68,7 +68,7 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
 
   useEffect(() => {
     if (open) { void fetchCalls(); }
-    else { setCalls([]); setSelected(new Set()); setSearch(''); setProgramme(''); setFutureOnly(true); }
+    else { setCalls([]); setSelected(new Set()); setSearch(''); setProgramme(''); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -125,7 +125,7 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Cerca per parola chiave…"
+              placeholder="es. HORIZON 2026, EIC, MSCA…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchCalls()}
@@ -151,16 +151,13 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
           </button>
         </div>
 
-        <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={futureOnly}
-            onChange={(e) => setFutureOnly(e.target.checked)}
-            className="rounded"
-          />
-          <CalendarOff className="w-3.5 h-3.5" />
-          Mostra solo bandi con scadenza futura o senza scadenza
-        </label>
+        <div className="flex items-start gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
+          <span>
+            Cerca per parola chiave per trovare bandi recenti (es. <strong>HORIZON 2026</strong>, <strong>EIC 2025</strong>, <strong>MSCA</strong>).
+            Lasciando vuoto vengono mostrati i bandi aperti più recenti nell'indice EU.
+          </span>
+        </div>
 
         {error && (
           <pre className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 whitespace-pre-wrap break-all font-sans">{error}</pre>
