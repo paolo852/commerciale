@@ -89,20 +89,13 @@ export default async function handler(req: Request): Promise<Response> {
   const fetchSize = Math.min(pageSize * 3, 250);
   const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${fetchSize}&pageNumber=${pageNumber}`;
 
-  // Filtro per data server-side: solo bandi con scadenza futura.
-  // Il filtro per status non è affidabile nell'indice SEDIA (restituisce bandi
-  // del 2016-2020 ancora marcati come Open). Il range su deadlineDate è più preciso.
-  const nowISO = new Date().toISOString();
+  // Nessun filtro server-side sulla query: l'API SEDIA ignora o non supporta
+  // il range su deadlineDate e il filtro per status restituisce comunque bandi vecchi.
+  // Ordiniamo per scadenza DESC così le scadenze più future/recenti vengono per prime,
+  // poi filtriamo client-side.
   const formBody = new URLSearchParams({
     languages: 'en',
-    query: JSON.stringify({
-      bool: {
-        must: [
-          { range: { deadlineDate: { gte: nowISO } } },
-        ],
-      },
-    }),
-    sort: JSON.stringify([{ field: 'deadlineDate', order: 'ASC' }]),
+    sort: JSON.stringify([{ field: 'deadlineDate', order: 'DESC' }]),
   });
 
   let euRes: Response;
