@@ -85,17 +85,21 @@ export default async function handler(req: Request): Promise<Response> {
   // frameworkProgramme nell'indice EU non risponde affidabilmente al filtro
   // server-side. Qui ignoriamo `programme` ma teniamo il parametro per retrocompat.
   void programme;
-  // Aumentiamo pageSize per dare margine al filtro client
-  const fetchSize = Math.min(pageSize * 3, 250);
+  // Fetch 500 per dare margine al filtro client — l'indice SEDIA mescola
+  // bandi aperti recenti e storici, e quelli con scadenza futura potrebbero
+  // essere oltre i primi 100.
+  const fetchSize = Math.min(pageSize * 5, 500);
   const url = `${EU_API}?apiKey=SEDIA&text=${encodeURIComponent(text)}&pageSize=${fetchSize}&pageNumber=${pageNumber}`;
 
-  // Nessun filtro server-side sulla query: l'API SEDIA ignora o non supporta
-  // il range su deadlineDate e il filtro per status restituisce comunque bandi vecchi.
-  // Ordiniamo per scadenza DESC così le scadenze più future/recenti vengono per prime,
-  // poi filtriamo client-side.
+  // Status Open/Forthcoming + sort per startDate DESC (aperti più di recente prima).
+  // deadlineDate non sembra essere un campo sortable affidabile nell'indice SEDIA.
+  const STATUS_OPEN = ['31094501', '31094502'];
   const formBody = new URLSearchParams({
     languages: 'en',
-    sort: JSON.stringify([{ field: 'deadlineDate', order: 'DESC' }]),
+    query: JSON.stringify({
+      bool: { must: [{ terms: { status: STATUS_OPEN } }] },
+    }),
+    sort: JSON.stringify([{ field: 'startDate', order: 'DESC' }]),
   });
 
   let euRes: Response;
