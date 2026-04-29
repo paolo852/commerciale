@@ -37,7 +37,7 @@ export default function EUCallsImportModal({ open, onClose, onImport }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [programme, setProgramme] = useState('');
-  const [futureOnly, setFutureOnly] = useState(false);
+  const [futureOnly, setFutureOnly] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [total, setTotal] = useState(0);
