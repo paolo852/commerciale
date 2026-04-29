@@ -1,8 +1,8 @@
-// Vercel Serverless Function (Edge runtime)
+// Vercel Serverless Function (Node.js runtime — timeout 30s)
 // Fonte primaria: file JSON statico pubblicato dal EU Funding & Tenders Portal.
 // Contiene tutti i bandi aperti/forthcoming con scadenza futura.
 
-export const config = { runtime: 'edge' };
+export const config = { maxDuration: 30 };
 
 export interface EUCall {
   identifier: string;
@@ -116,16 +116,22 @@ export default async function handler(req: Request): Promise<Response> {
 
   let rawJson: unknown;
   try {
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 22000); // 22s max
     const res = await fetch(GRANTS_URL, {
+      signal: abort.signal,
       headers: { Accept: 'application/json', 'User-Agent': 'commerciale-app/1.0' },
     });
+    clearTimeout(timer);
     if (!res.ok) {
       return new Response(
         JSON.stringify({ error: `grantsTenders.json ha risposto ${res.status}` }),
         { status: 502 },
       );
     }
-    rawJson = await res.json();
+    // Leggi il body come testo per poter limitare la dimensione se necessario
+    const text = await res.text();
+    rawJson = JSON.parse(text);
   } catch (e) {
     return new Response(
       JSON.stringify({ error: 'Errore fetch grantsTenders.json', detail: String(e) }),
