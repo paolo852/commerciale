@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import Modal from '../Modal';
 import { useAuth } from '../../contexts/AuthContext';
 import { leadCandidatesService, fundingCallsService } from '../../lib/dataService';
-import type { FundingCall, LeadCandidate, LeadCandidateStatus } from '../../types';
+import type { FundingCall, LeadCandidate, LeadCandidateStatus, ProjectManager } from '../../types';
 
 interface Props {
   open: boolean;
@@ -11,6 +11,7 @@ interface Props {
   onSaved: (lead: LeadCandidate) => void;
   lead: LeadCandidate | null;
   fundingCalls: FundingCall[];
+  projectManagers: ProjectManager[];
 }
 
 interface FormState {
@@ -20,6 +21,7 @@ interface FormState {
   funding_call_id: string;
   potential_project: string;
   status: LeadCandidateStatus;
+  pm_id: string;
 }
 
 interface NewCallDraft {
@@ -39,7 +41,7 @@ const inputClass =
   'w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
 
 export default function LeadCandidateFormModal({
-  open, onClose, onSaved, lead, fundingCalls,
+  open, onClose, onSaved, lead, fundingCalls, projectManagers,
 }: Props) {
   const { user } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
@@ -53,7 +55,7 @@ export default function LeadCandidateFormModal({
 
   const [form, setForm] = useState<FormState>({
     researcher_name: '', institution: '', call_type: '',
-    funding_call_id: '', potential_project: '', status: 'attivo',
+    funding_call_id: '', potential_project: '', status: 'attivo', pm_id: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,11 +80,12 @@ export default function LeadCandidateFormModal({
         funding_call_id: lead.funding_call_id ?? '',
         potential_project: lead.potential_project ?? '',
         status: lead.status,
+        pm_id: lead.pm_id ?? '',
       });
     } else {
       setForm({
         researcher_name: '', institution: '', call_type: '',
-        funding_call_id: '', potential_project: '', status: 'attivo',
+        funding_call_id: '', potential_project: '', status: 'attivo', pm_id: '',
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,6 +150,7 @@ export default function LeadCandidateFormModal({
         funding_call_id: form.funding_call_id || null,
         potential_project: form.potential_project.trim() || null,
         status: form.status,
+        pm_id: form.pm_id || null,
       };
       const saved = lead
         ? await leadCandidatesService.update(lead.id, payload)
@@ -273,11 +277,22 @@ export default function LeadCandidateFormModal({
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Stato</label>
-          <select value={form.status} onChange={(e) => update('status', e.target.value as LeadCandidateStatus)} className={inputClass}>
-            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Stato</label>
+            <select value={form.status} onChange={(e) => update('status', e.target.value as LeadCandidateStatus)} className={inputClass}>
+              {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Assegnato a</label>
+            <select value={form.pm_id} onChange={(e) => update('pm_id', e.target.value)} className={inputClass}>
+              <option value="">— Nessuno —</option>
+              {projectManagers.filter((p) => p.active).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

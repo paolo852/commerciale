@@ -163,6 +163,17 @@ export default function LeadCandidateDetail() {
                   {fc.code} — {fc.name}
                 </span>
               )}
+              {lead.pm_id && (() => {
+                const pm = projectManagers.find((p) => p.id === lead.pm_id);
+                return pm ? (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100 flex items-center gap-1">
+                    <span className="w-4 h-4 rounded-full bg-violet-200 text-violet-800 flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
+                      {pm.name[0]}
+                    </span>
+                    {pm.name}
+                  </span>
+                ) : null;
+              })()}
             </div>
           </div>
 
@@ -318,6 +329,7 @@ export default function LeadCandidateDetail() {
         onSaved={() => { setEditOpen(false); void reload(); }}
         lead={lead}
         fundingCalls={fundingCalls}
+        projectManagers={projectManagers}
       />
 
       <ConfirmDialog

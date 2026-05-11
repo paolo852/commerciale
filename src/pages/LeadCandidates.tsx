@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Archive, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, FlaskConical,
-  Percent, Plus, Search, TrendingUp, UserSearch, X,
+  Percent, Plus, Search, TrendingUp, User, UserSearch, X,
 } from 'lucide-react';
 import { leadCandidatesService } from '../lib/dataService';
 import { useOffersData } from '../hooks/useOffersData';
@@ -53,7 +53,8 @@ function StatCard({
 
 export default function LeadCandidates() {
   const navigate = useNavigate();
-  const { fundingCalls, offers } = useOffersData();
+  const { fundingCalls, offers, projectManagers } = useOffersData();
+  const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
 
   const [leads, setLeads] = useState<LeadCandidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -308,7 +309,14 @@ export default function LeadCandidates() {
                         )}
 
                         <div className="flex items-center justify-between text-xs text-slate-400 mt-auto pt-1">
-                          <span>Aggiunto {formatDate(lead.created_at)}</span>
+                          {lead.pm_id && pmById.get(lead.pm_id) ? (
+                            <span className="flex items-center gap-1 text-slate-500">
+                              <User className="w-3 h-3" />
+                              {pmById.get(lead.pm_id)!.name}
+                            </span>
+                          ) : (
+                            <span>Aggiunto {formatDate(lead.created_at)}</span>
+                          )}
                           <div className="flex items-center gap-3">
                             <button
                               onClick={(e) => { e.stopPropagation(); setToDelete(lead); }}
@@ -335,6 +343,7 @@ export default function LeadCandidates() {
         onSaved={(created) => { setFormOpen(false); void reload(); navigate(`/leads/${created.id}`); }}
         lead={null}
         fundingCalls={fundingCalls}
+        projectManagers={projectManagers}
       />
 
       <ConfirmDialog
