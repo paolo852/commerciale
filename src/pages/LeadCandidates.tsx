@@ -97,7 +97,7 @@ export default function LeadCandidates() {
     );
   }, [leads, tab, search]);
 
-  // Raggruppa per bando (funding_call_id → code+name), fallback su call_type
+  // Raggruppa solo per funding_call_id; lead senza bando → unica sezione in fondo
   const groups = useMemo(() => {
     const map = new Map<string, { label: string; sub?: string; fcId?: string; leads: LeadCandidate[] }>();
     filtered.forEach((l) => {
@@ -108,18 +108,23 @@ export default function LeadCandidates() {
       if (l.funding_call_id) {
         const fc = fcById.get(l.funding_call_id);
         key = l.funding_call_id;
-        label = fc ? fc.name : (l.call_type || 'Non classificato');
+        label = fc ? fc.name : 'Bando non trovato';
         sub = fc?.code;
         fcId = l.funding_call_id;
       } else {
-        key = `type:${l.call_type || 'none'}`;
-        label = l.call_type || 'Non classificato';
+        key = '__no_call__';
+        label = 'Senza bando specifico';
       }
       const grp = map.get(key) ?? { label, sub, fcId, leads: [] };
       grp.leads.push(l);
       map.set(key, grp);
     });
-    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'it'));
+    // Bandi specifici ordinati alfabeticamente, "Senza bando" sempre in fondo
+    const all = [...map.values()];
+    return [
+      ...all.filter((g) => g.fcId).sort((a, b) => a.label.localeCompare(b.label, 'it')),
+      ...all.filter((g) => !g.fcId),
+    ];
   }, [filtered, fcById]);
 
   async function handleDelete() {
