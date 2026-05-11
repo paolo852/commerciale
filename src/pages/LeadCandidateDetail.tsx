@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Archive, ArrowLeft, CheckCircle2, Clock, Edit3, FlaskConical, Plus, Send, Trash2,
+  Archive, ArrowLeft, CheckCircle2, Clock, Edit3, FlaskConical, Paperclip, Plus, Send, Trash2, X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
@@ -33,6 +33,8 @@ export default function LeadCandidateDetail() {
 
   // New update form
   const [newBody, setNewBody] = useState('');
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
 
@@ -66,13 +68,18 @@ export default function LeadCandidateDetail() {
     if (!lead || !newBody.trim()) return;
     setPosting(true); setPostError(null);
     try {
-      await leadUpdatesService.create({
-        lead_id: lead.id,
-        body: newBody.trim(),
-        author_id: currentPm?.id ?? null,
-        author_name: user?.email ?? currentPm?.name ?? 'Anonimo',
-      });
+      await leadUpdatesService.create(
+        {
+          lead_id: lead.id,
+          body: newBody.trim(),
+          author_id: currentPm?.id ?? null,
+          author_name: user?.email ?? currentPm?.name ?? 'Anonimo',
+        },
+        attachFile ?? undefined,
+        user?.id,
+      );
       setNewBody('');
+      setAttachFile(null);
       await reload();
     } catch (e) {
       setPostError((e as { message?: string })?.message ?? 'Errore invio');
@@ -206,9 +213,8 @@ export default function LeadCandidateDetail() {
           </p>
         ) : (
           <ol className="relative border-l-2 border-slate-100 space-y-0 ml-2 mb-6">
-            {updates.map((u, i) => (
-              <li key={u.id} className={`pl-5 pb-5 relative ${i === updates.length - 1 ? '' : ''}`}>
-                {/* dot */}
+            {updates.map((u) => (
+              <li key={u.id} className="pl-5 pb-5 relative">
                 <span className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-400 ring-2 ring-white" />
                 <div className="bg-slate-50 rounded-xl px-4 py-3">
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -216,14 +222,23 @@ export default function LeadCandidateDetail() {
                       <span className="text-xs font-semibold text-slate-700">{u.author_name}</span>
                       <span className="text-[11px] text-slate-400">{formatDate(u.created_at)}</span>
                     </div>
-                    <button
-                      onClick={() => removeUpdate(u)}
-                      className="text-slate-300 hover:text-red-500 transition"
-                    >
+                    <button onClick={() => removeUpdate(u)} className="text-slate-300 hover:text-red-500 transition">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{u.body}</p>
+                  {u.attachment_url && (
+                    <a
+                      href={u.attachment_url}
+                      download={u.attachment_name ?? true}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 mt-2 text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5 hover:bg-indigo-100 transition"
+                    >
+                      <Paperclip className="w-3 h-3" />
+                      {u.attachment_name ?? 'Allegato'}
+                    </a>
+                  )}
                 </div>
               </li>
             ))}
@@ -236,18 +251,47 @@ export default function LeadCandidateDetail() {
             <Plus className="w-3.5 h-3.5" /> Nuovo aggiornamento
           </label>
           <div className="flex gap-2 items-end">
-            <textarea
-              rows={3}
-              value={newBody}
-              onChange={(e) => setNewBody(e.target.value)}
-              placeholder="Descrivi l'interazione avuta, le note del colloquio, i prossimi passi…"
-              disabled={posting}
-              className="flex-1 px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none disabled:opacity-50"
-            />
+            <div className="flex-1 space-y-2">
+              <textarea
+                rows={3}
+                value={newBody}
+                onChange={(e) => setNewBody(e.target.value)}
+                placeholder="Descrivi l'interazione avuta, le note del colloquio, i prossimi passi…"
+                disabled={posting}
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none disabled:opacity-50"
+              />
+              {/* File attachment */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={posting}
+                  className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 transition disabled:opacity-50"
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                  {attachFile ? attachFile.name : 'Allega file'}
+                </button>
+                {attachFile && (
+                  <button
+                    type="button"
+                    onClick={() => { setAttachFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="text-slate-300 hover:text-red-500 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => setAttachFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            </div>
             <button
               onClick={postUpdate}
               disabled={!newBody.trim() || posting}
-              className="px-3 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5 shrink-0 transition"
+              className="px-3 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5 shrink-0 transition self-start mt-0"
             >
               <Send className="w-4 h-4" />
               {posting ? 'Invio…' : 'Aggiungi'}

@@ -255,5 +255,7 @@ export interface LeadUpdate {
   body: string;
   author_id: string | null;
   author_name: string;
+  attachment_url: string | null;
+  attachment_name: string | null;
   created_at: string;
 }

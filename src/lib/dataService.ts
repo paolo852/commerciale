@@ -832,11 +832,41 @@ export const leadUpdatesService = {
     return (data ?? []) as LeadUpdate[];
   },
 
-  async create(input: Omit<LeadUpdate, 'id' | 'created_at'>): Promise<LeadUpdate> {
-    if (isDemoMode) return demoLeadUpdates.create(input);
+  async create(
+    input: Omit<LeadUpdate, 'id' | 'created_at' | 'attachment_url' | 'attachment_name'>,
+    file?: File,
+    userId?: string,
+  ): Promise<LeadUpdate> {
+    let attachment_url: string | null = null;
+    let attachment_name: string | null = null;
+
+    if (file) {
+      attachment_name = file.name;
+      if (isDemoMode) {
+        attachment_url = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      } else {
+        const path = `${userId ?? 'anon'}/${input.lead_id}/${Date.now()}_${file.name}`;
+        const { error: upErr } = await ensureSb()
+          .storage.from('lead-update-files')
+          .upload(path, file, { upsert: true });
+        if (upErr) throw upErr;
+        const { data: urlData } = ensureSb()
+          .storage.from('lead-update-files')
+          .getPublicUrl(path);
+        attachment_url = urlData.publicUrl;
+      }
+    }
+
+    const full = { ...input, attachment_url, attachment_name };
+    if (isDemoMode) return demoLeadUpdates.create(full);
     const { data, error } = await ensureSb()
       .from('lead_updates')
-      .insert(input)
+      .insert(full)
       .select()
       .single();
     if (error) throw error;
