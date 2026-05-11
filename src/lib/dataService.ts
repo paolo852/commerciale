@@ -11,6 +11,8 @@ import {
   demoConceptDeadlines,
   demoLeadCandidates,
   demoLeadUpdates,
+  demoNotifications,
+  demoNotificationPrefs,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -34,6 +36,9 @@ import type {
   LeadUpdate,
   CreateLeadCandidateForm,
   UpdateLeadCandidateForm,
+  AppNotification,
+  NotificationPreferences,
+  NotificationType,
 } from '../types';
 
 // ============================================================
@@ -877,5 +882,88 @@ export const leadUpdatesService = {
     if (isDemoMode) { demoLeadUpdates.remove(id); return; }
     const { error } = await ensureSb().from('lead_updates').delete().eq('id', id);
     if (error) throw error;
+  },
+};
+
+// ================================================================
+// Notifications
+// ================================================================
+
+export const notificationsService = {
+  async list(userId: string): Promise<AppNotification[]> {
+    if (isDemoMode) return demoNotifications.list(userId);
+    const { data, error } = await ensureSb()
+      .from('notifications').select('*')
+      .eq('user_id', userId).order('created_at', { ascending: false }).limit(50);
+    if (error) throw error;
+    return (data ?? []) as AppNotification[];
+  },
+
+  async create(input: Omit<AppNotification, 'id' | 'created_at'>): Promise<AppNotification> {
+    if (isDemoMode) return demoNotifications.create(input);
+    const { data, error } = await ensureSb()
+      .from('notifications').insert(input).select().single();
+    if (error) throw error;
+    return data as AppNotification;
+  },
+
+  async has(userId: string, type: NotificationType, entityId: string): Promise<boolean> {
+    if (isDemoMode) return demoNotifications.has(userId, type, entityId);
+    const { data } = await ensureSb()
+      .from('notifications').select('id')
+      .eq('user_id', userId).eq('type', type).eq('entity_id', entityId)
+      .limit(1).maybeSingle();
+    return !!data;
+  },
+
+  async markRead(id: string): Promise<void> {
+    if (isDemoMode) { demoNotifications.markRead(id); return; }
+    const { error } = await ensureSb().from('notifications').update({ read: true }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async markAllRead(userId: string): Promise<void> {
+    if (isDemoMode) { demoNotifications.markAllRead(userId); return; }
+    const { error } = await ensureSb()
+      .from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
+    if (error) throw error;
+  },
+};
+
+// ================================================================
+// Notification Preferences
+// ================================================================
+
+const DEFAULT_PREFS = (userId: string): NotificationPreferences => ({
+  user_id: userId,
+  in_app_lead_promoted: true, in_app_lead_archived: true,
+  in_app_offer_deadline: true, in_app_concept_status: true,
+  email_lead_promoted: false, email_lead_archived: false,
+  email_offer_deadline: false, email_concept_status: false,
+  deadline_days_before: 7,
+});
+
+export const notificationPrefsService = {
+  async get(userId: string): Promise<NotificationPreferences> {
+    if (isDemoMode) return demoNotificationPrefs.get(userId);
+    const { data } = await ensureSb()
+      .from('notification_preferences').select('*').eq('user_id', userId).maybeSingle();
+    if (!data) {
+      const { data: created, error } = await ensureSb()
+        .from('notification_preferences').insert(DEFAULT_PREFS(userId)).select().single();
+      if (error) throw error;
+      return created as NotificationPreferences;
+    }
+    return data as NotificationPreferences;
+  },
+
+  async update(userId: string, patch: Partial<NotificationPreferences>): Promise<NotificationPreferences> {
+    if (isDemoMode) return demoNotificationPrefs.update(userId, patch);
+    const { data, error } = await ensureSb()
+      .from('notification_preferences')
+      .upsert({ ...DEFAULT_PREFS(userId), ...patch, user_id: userId })
+      .select().single();
+    if (error) throw error;
+    return data as NotificationPreferences;
   },
 };

@@ -4,6 +4,7 @@ import {
   Archive, ArrowLeft, CheckCircle2, Clock, Edit3, FlaskConical, Paperclip, Plus, Send, Trash2, X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationsContext';
 import { useOffersData } from '../hooks/useOffersData';
 import { leadCandidatesService, leadUpdatesService, conceptsService } from '../lib/dataService';
 import { formatDate } from '../lib/format';
@@ -21,6 +22,7 @@ export default function LeadCandidateDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { notify } = useNotifications();
   const { fundingCalls, projectManagers } = useOffersData();
 
   const [lead, setLead] = useState<LeadCandidate | null>(null);
@@ -106,6 +108,13 @@ export default function LeadCandidateDetail() {
       await leadCandidatesService.update(lead.id, {
         status: 'promosso',
         promoted_concept_id: concept.id,
+      });
+      void notify({
+        type: 'lead_promoted',
+        title: `Lead promosso: ${lead.researcher_name}`,
+        body: `Promosso a concept development`,
+        entity_id: lead.id,
+        entity_type: 'lead',
       });
       navigate(`/concepts/${concept.id}`);
     } catch (e) {

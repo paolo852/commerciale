@@ -2,6 +2,7 @@ import type {
   AllowedUser, Offer, ProjectManager, FundingCall,
   Concept, ConceptAssignee, ConceptVersion, ConceptVersionComment, ConceptRevisionDeadline,
   LeadCandidate, LeadUpdate,
+  AppNotification, NotificationPreferences, NotificationType,
 } from '../types';
 
 // ============================================================
@@ -22,6 +23,8 @@ const KEYS = {
   conceptVersions: 'commerciale.demo.conceptVersions',
   conceptComments: 'commerciale.demo.conceptComments',
   conceptDeadlines: 'commerciale.demo.conceptDeadlines',
+  notifications: 'commerciale.demo.notifications',
+  notificationPrefs: 'commerciale.demo.notificationPrefs',
 } as const;
 
 export interface DemoUser {
@@ -377,5 +380,62 @@ export const demoLeadUpdates = {
   },
   remove(id: string): void {
     write(KEYS.leadUpdates, read<LeadUpdate[]>(KEYS.leadUpdates, []).filter((u) => u.id !== id));
+  },
+};
+
+// ============================================================
+// Notifications
+// ============================================================
+
+export const demoNotifications = {
+  list(userId: string): AppNotification[] {
+    return read<AppNotification[]>(KEYS.notifications, [])
+      .filter((n) => n.user_id === userId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  create(input: Omit<AppNotification, 'id' | 'created_at'>): AppNotification {
+    const all = read<AppNotification[]>(KEYS.notifications, []);
+    const item: AppNotification = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    write(KEYS.notifications, [item, ...all]);
+    return item;
+  },
+  markRead(id: string): void {
+    write(KEYS.notifications,
+      read<AppNotification[]>(KEYS.notifications, []).map((n) => n.id === id ? { ...n, read: true } : n));
+  },
+  markAllRead(userId: string): void {
+    write(KEYS.notifications,
+      read<AppNotification[]>(KEYS.notifications, []).map((n) => n.user_id === userId ? { ...n, read: true } : n));
+  },
+  has(userId: string, type: NotificationType, entityId: string): boolean {
+    return read<AppNotification[]>(KEYS.notifications, []).some(
+      (n) => n.user_id === userId && n.type === type && n.entity_id === entityId,
+    );
+  },
+};
+
+const DEFAULT_PREFS: Omit<NotificationPreferences, 'user_id'> = {
+  in_app_lead_promoted: true,
+  in_app_lead_archived: true,
+  in_app_offer_deadline: true,
+  in_app_concept_status: true,
+  email_lead_promoted: false,
+  email_lead_archived: false,
+  email_offer_deadline: false,
+  email_concept_status: false,
+  deadline_days_before: 7,
+};
+
+export const demoNotificationPrefs = {
+  get(userId: string): NotificationPreferences {
+    const all = read<Record<string, NotificationPreferences>>(KEYS.notificationPrefs, {});
+    return all[userId] ?? { user_id: userId, ...DEFAULT_PREFS };
+  },
+  update(userId: string, patch: Partial<NotificationPreferences>): NotificationPreferences {
+    const all = read<Record<string, NotificationPreferences>>(KEYS.notificationPrefs, {});
+    const current = all[userId] ?? { user_id: userId, ...DEFAULT_PREFS };
+    const updated = { ...current, ...patch, user_id: userId };
+    write(KEYS.notificationPrefs, { ...all, [userId]: updated });
+    return updated;
   },
 };

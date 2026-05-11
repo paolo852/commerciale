@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -89,13 +90,13 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-slate-900 truncate">{user?.email}</p>
           </div>
-          <button
-            onClick={signOut}
-            title="Esci"
-            className="text-slate-300 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+            <NotificationBell />
+            <button onClick={signOut} title="Esci"
+              className="text-slate-300 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition">
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -135,7 +136,8 @@ export default function Layout() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-sm font-semibold text-slate-900">Offerte commerciali</span>
+          <span className="text-sm font-semibold text-slate-900 flex-1">Offerte commerciali</span>
+          <NotificationBell />
         </header>
 
         <main className="flex-1 px-6 py-8 max-w-7xl w-full mx-auto">

@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Clock, Euro, TrendingUp } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
+import { useNotifications } from '../contexts/NotificationsContext';
+import { notificationsService } from '../lib/dataService';
+import { useAuth } from '../contexts/AuthContext';
 import { computeKPIs, filterByYear } from '../lib/analytics';
 import { formatEUR } from '../lib/format';
 import KpiCard from '../components/dashboard/KpiCard';
@@ -12,7 +15,36 @@ import YearSelector from '../components/YearSelector';
 
 export default function Dashboard() {
   const { offers, projectManagers, fundingCalls, loading, error } = useOffersData();
+  const { notify, prefs } = useNotifications();
+  const { user } = useAuth();
   const [year, setYear] = useState<number | 'all'>('all');
+
+  // Fire deadline notifications once when offers load
+  useEffect(() => {
+    if (loading || !offers.length || !prefs || !user) return;
+    const daysAhead = prefs.deadline_days_before ?? 7;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() + daysAhead);
+    const today = new Date().toISOString().slice(0, 10);
+
+    void (async () => {
+      for (const offer of offers) {
+        if (!offer.deadline) continue;
+        if (offer.outcome === 'approvato' || offer.outcome === 'rifiutato') continue;
+        if (offer.deadline < today || offer.deadline > cutoff.toISOString().slice(0, 10)) continue;
+        const alreadySent = await notificationsService.has(user.id, 'offer_deadline', offer.id);
+        if (alreadySent) continue;
+        await notify({
+          type: 'offer_deadline',
+          title: `Scadenza imminente: ${offer.name}`,
+          body: `Scadenza il ${offer.deadline}`,
+          entity_id: offer.id,
+          entity_type: 'offer',
+        });
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   const filteredOffers = useMemo(() => filterByYear(offers, year), [offers, year]);
   const kpis = useMemo(() => computeKPIs(filteredOffers), [filteredOffers]);

@@ -249,6 +249,41 @@ export type CreateLeadCandidateForm = Pick<
 >;
 export type UpdateLeadCandidateForm = Partial<CreateLeadCandidateForm & Pick<LeadCandidate, 'promoted_concept_id'>>;
 
+// ============================================================
+// Notifications
+// ============================================================
+
+export type NotificationType =
+  | 'lead_promoted'
+  | 'lead_archived'
+  | 'offer_deadline'
+  | 'concept_status_changed';
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  entity_id: string | null;
+  entity_type: 'lead' | 'concept' | 'offer' | null;
+  read: boolean;
+  created_at: string;
+}
+
+export interface NotificationPreferences {
+  user_id: string;
+  in_app_lead_promoted: boolean;
+  in_app_lead_archived: boolean;
+  in_app_offer_deadline: boolean;
+  in_app_concept_status: boolean;
+  email_lead_promoted: boolean;
+  email_lead_archived: boolean;
+  email_offer_deadline: boolean;
+  email_concept_status: boolean;
+  deadline_days_before: number;
+}
+
 export interface LeadUpdate {
   id: string;
   lead_id: string;

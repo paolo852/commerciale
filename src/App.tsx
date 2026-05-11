@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -21,7 +22,9 @@ export default function App() {
           <Route
             element={
               <ProtectedRoute>
-                <Layout />
+                <NotificationsProvider>
+                  <Layout />
+                </NotificationsProvider>
               </ProtectedRoute>
             }
           >
