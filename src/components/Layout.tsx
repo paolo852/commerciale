@@ -90,13 +90,10 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-slate-900 truncate">{user?.email}</p>
           </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-            <NotificationBell />
-            <button onClick={signOut} title="Esci"
-              className="text-slate-300 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition">
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button onClick={signOut} title="Esci"
+            className="opacity-0 group-hover:opacity-100 transition text-slate-300 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100">
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>
@@ -128,15 +125,16 @@ export default function Layout() {
 
       {/* Main */}
       <div className="flex-1 lg:pl-60 flex flex-col min-h-screen">
-        {/* Mobile topbar */}
-        <header className="lg:hidden h-14 bg-white border-b border-slate-200/80 flex items-center px-4 gap-3">
+        {/* Topbar — always visible on all screen sizes */}
+        <header className="h-14 bg-white border-b border-slate-200/80 flex items-center px-4 gap-3 sticky top-0 z-30">
           <button
             onClick={() => setMobileOpen(true)}
-            className="text-slate-500 hover:text-slate-700"
+            className="lg:hidden text-slate-500 hover:text-slate-700"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-sm font-semibold text-slate-900 flex-1">Offerte commerciali</span>
+          <span className="text-sm font-semibold text-slate-900 lg:hidden flex-1">Offerte commerciali</span>
+          <div className="hidden lg:flex flex-1" />
           <NotificationBell />
         </header>
 

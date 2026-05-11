@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, BellRing, CheckCheck, Clock, FileText, FlaskConical, Settings, UserSearch, X,
@@ -15,11 +15,12 @@ const TYPE_CONFIG: Record<NotificationType, { Icon: typeof Bell; color: string }
   concept_status_changed: { Icon: FlaskConical,  color: 'bg-indigo-100 text-indigo-600' },
 };
 
-function NotifRow({ n, onRead }: { n: AppNotification; onRead: (id: string) => void }) {
+function NotifRow({ n, onRead, onClose }: { n: AppNotification; onRead: (id: string) => void; onClose: () => void }) {
   const navigate = useNavigate();
   const cfg = TYPE_CONFIG[n.type] ?? { Icon: Clock, color: 'bg-slate-100 text-slate-500' };
 
   function handleClick() {
+    onClose();
     if (!n.read) onRead(n.id);
     if (n.entity_id && n.entity_type) {
       const path =
@@ -55,32 +56,31 @@ export default function NotificationBell() {
   const [showSettings, setShowSettings] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  const close = () => setOpen(false);
 
   return (
     <>
-      <div ref={panelRef} className="relative">
+      {/* Click-outside overlay */}
+      {open && (
+        <div className="fixed inset-0 z-40" onClick={close} />
+      )}
+
+      <div ref={panelRef} className="relative z-50">
         <button
           onClick={() => setOpen((o) => !o)}
           title="Notifiche"
-          className="relative w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+          className="relative w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition"
         >
-          {unreadCount > 0 ? <BellRing className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+          {unreadCount > 0 ? <BellRing className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-indigo-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] bg-indigo-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </button>
 
         {open && (
-          <div className="absolute right-0 top-10 w-80 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
+          <div className="absolute right-0 top-11 w-80 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
               <span className="text-sm font-semibold text-slate-900">
@@ -96,14 +96,14 @@ export default function NotificationBell() {
                   </button>
                 )}
                 <button
-                  onClick={() => { setOpen(false); setShowSettings(true); }}
+                  onClick={() => { close(); setShowSettings(true); }}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
                   title="Impostazioni notifiche"
                 >
                   <Settings className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => setOpen(false)}
+                  onClick={close}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -112,7 +112,7 @@ export default function NotificationBell() {
             </div>
 
             {/* List */}
-            <div className="max-h-96 overflow-y-auto divide-y divide-slate-50">
+            <div className="max-h-[28rem] overflow-y-auto divide-y divide-slate-50">
               {notifications.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
@@ -120,7 +120,7 @@ export default function NotificationBell() {
                 </div>
               ) : (
                 notifications.slice(0, 30).map((n) => (
-                  <NotifRow key={n.id} n={n} onRead={markRead} />
+                  <NotifRow key={n.id} n={n} onRead={markRead} onClose={close} />
                 ))
               )}
             </div>
