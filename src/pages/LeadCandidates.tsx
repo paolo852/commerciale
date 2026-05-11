@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Archive, CheckCircle2, ChevronRight, Clock, FileText, FlaskConical,
+  Archive, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, FlaskConical,
   Percent, Plus, Search, TrendingUp, UserSearch, X,
 } from 'lucide-react';
 import { leadCandidatesService } from '../lib/dataService';
@@ -60,6 +60,7 @@ export default function LeadCandidates() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
   const [toDelete, setToDelete] = useState<LeadCandidate | null>(null);
 
@@ -231,38 +232,53 @@ export default function LeadCandidates() {
             const offerCount = fc
               ? offers.filter((o) => o.funding_call && o.funding_call.includes(fc.code)).length
               : 0;
+            const groupKey = fcId ?? '__no_call__';
+            const isCollapsed = collapsed.has(groupKey);
+            const toggle = () => setCollapsed((prev) => {
+              const next = new Set(prev);
+              next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
+              return next;
+            });
 
             return (
               <div key={`${label}-${sub ?? ''}`}>
-                <div className="flex items-start justify-between gap-3 mb-3">
+                <button
+                  onClick={toggle}
+                  className="w-full flex items-start justify-between gap-3 mb-3 text-left group"
+                >
                   <div className="min-w-0 flex-1">
                     {sub && (
                       <p className="text-sm font-semibold text-indigo-600 tracking-wide font-mono mb-0.5">{sub}</p>
                     )}
                     <h2 className="text-lg font-bold text-slate-900 leading-tight">{label}</h2>
                     {(conceptCount > 0 || offerCount > 0) && (
-                      <div className="flex gap-2 mt-1.5">
-                        {conceptCount > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            <FlaskConical className="w-3 h-3" />
-                            {conceptCount} concept
-                          </span>
-                        )}
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                        <span className="font-medium text-slate-600">Stato attuale:</span>
                         {offerCount > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                          <span className="inline-flex items-center gap-1 text-indigo-600">
                             <FileText className="w-3 h-3" />
                             {offerCount} {offerCount === 1 ? 'offerta' : 'offerte'}
                           </span>
                         )}
-                      </div>
+                        {offerCount > 0 && conceptCount > 0 && <span className="text-slate-300">·</span>}
+                        {conceptCount > 0 && (
+                          <span className="inline-flex items-center gap-1 text-emerald-600">
+                            <FlaskConical className="w-3 h-3" />
+                            {conceptCount} {conceptCount === 1 ? 'concept' : 'concept'}
+                          </span>
+                        )}
+                      </p>
                     )}
                   </div>
-                  <span className="mt-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 tabular-nums shrink-0">
-                    {groupLeads.length}
-                  </span>
-                </div>
+                  <div className="flex items-center gap-2 mt-1 shrink-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 tabular-nums">
+                      {groupLeads.length}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+                  </div>
+                </button>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {!isCollapsed && <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {groupLeads.map((lead) => {
                     const leadFc = lead.funding_call_id ? fcById.get(lead.funding_call_id) : null;
                     return (
@@ -306,7 +322,7 @@ export default function LeadCandidates() {
                       </button>
                     );
                   })}
-                </div>
+                </div>}
               </div>
             );
           })}
