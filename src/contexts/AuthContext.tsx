@@ -43,8 +43,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    supabase!.auth.getSession().then(({ data }) => {
-      setUser(toAuthUser(data.session?.user ?? null));
+    supabase!.auth.getSession().then(async ({ data }) => {
+      const sessionUser = data.session?.user ?? null;
+      if (sessionUser?.email) {
+        const allowed = await allowedUsersService.isAllowed(sessionUser.email);
+        if (!allowed) {
+          await supabase!.auth.signOut();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      }
+      setUser(toAuthUser(sessionUser));
       setLoading(false);
     }).catch(() => {
       setUser(null);
@@ -79,6 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = demoAuth.signIn(email);
       setUser(toAuthUser(u));
       return;
+    }
+    const allowed = await allowedUsersService.isAllowed(email);
+    if (!allowed) {
+      throw new Error('Accesso non autorizzato. Contatta l\'amministratore per essere aggiunto al registro utenti.');
     }
     const { error } = await supabase!.auth.signUp({ email, password });
     if (error) throw error;

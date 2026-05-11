@@ -4,9 +4,8 @@ import { FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
-  const { signIn, signUp, isDemoMode } = useAuth();
+  const { signIn, isDemoMode } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -17,11 +16,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      if (mode === 'signin') {
-        await signIn(email, password);
-      } else {
-        await signUp(email, password);
-      }
+      await signIn(email, password);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore di autenticazione');
@@ -69,14 +64,8 @@ export default function Login() {
             <span className="font-semibold text-slate-900">Offerte commerciali</span>
           </div>
 
-          <h1 className="text-2xl font-semibold text-slate-900 mb-1">
-            {mode === 'signin' ? 'Bentornato' : 'Crea account'}
-          </h1>
-          <p className="text-sm text-slate-500 mb-8">
-            {mode === 'signin'
-              ? 'Inserisci le tue credenziali per accedere'
-              : 'Registra un nuovo account'}
-          </p>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-1">Bentornato</h1>
+          <p className="text-sm text-slate-500 mb-8">Inserisci le tue credenziali per accedere</p>
 
           {isDemoMode && (
             <div className="mb-6 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200/70">
@@ -126,23 +115,12 @@ export default function Login() {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition shadow-sm shadow-indigo-200"
             >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                mode === 'signin' ? 'Accedi' : 'Registrati'
-              )}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Accedi'}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
-            {mode === 'signin' ? 'Non hai un account?' : 'Hai già un account?'}{' '}
-            <button
-              type="button"
-              onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-              className="font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              {mode === 'signin' ? 'Registrati' : 'Accedi'}
-            </button>
+          <p className="mt-6 text-center text-xs text-slate-400">
+            Per richiedere l'accesso contatta l'amministratore.
           </p>
         </div>
       </div>
