@@ -178,6 +178,7 @@ export default function ConceptDetail() {
         onClose={() => setEditOpen(false)}
         onSaved={() => { setEditOpen(false); void reload(); }}
         concept={concept}
+        projectManagers={projectManagers}
       />
 
       <OfferFormModal

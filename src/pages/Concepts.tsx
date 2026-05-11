@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Clock, FlaskConical, Plus, Users, XCircle } from 'lucide-react';
 import { useConceptsData } from '../hooks/useConceptsData';
+import { useOffersData } from '../hooks/useOffersData';
 import { conceptsService } from '../lib/dataService';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
@@ -49,6 +50,7 @@ function StatusBadge({ value }: { value: ConceptStatus }) {
 export default function Concepts() {
   const navigate = useNavigate();
   const { concepts, loading, error, reload } = useConceptsData();
+  const { projectManagers } = useOffersData();
 
   const [view, setView] = useState<ViewTab>('all');
   const [formOpen, setFormOpen] = useState(false);
@@ -258,6 +260,7 @@ export default function Concepts() {
           if (created) navigate(`/concepts/${created.id}`);
         }}
         concept={null}
+        projectManagers={projectManagers}
       />
 
       <ConfirmDialog open={!!toDelete} title="Eliminare il concept?"

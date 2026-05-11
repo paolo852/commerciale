@@ -1,14 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import Modal from '../Modal';
 import { useAuth } from '../../contexts/AuthContext';
-import { conceptsService } from '../../lib/dataService';
-import type { Concept, ConceptStatus } from '../../types';
+import { conceptsService, conceptAssigneesService } from '../../lib/dataService';
+import type { Concept, ConceptStatus, ProjectManager } from '../../types';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onSaved: (created: Concept | null) => void;
   concept: Concept | null;
+  projectManagers?: ProjectManager[];
 }
 
 interface FormState {
@@ -44,20 +45,33 @@ const STATUS_OPTIONS: { value: ConceptStatus; label: string }[] = [
   { value: 'rifiutato', label: 'Rifiutato' },
 ];
 
-export default function ConceptFormModal({ open, onClose, onSaved, concept }: Props) {
+export default function ConceptFormModal({ open, onClose, onSaved, concept, projectManagers = [] }: Props) {
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [selectedPms, setSelectedPms] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isNew = !concept;
+  const activePms = projectManagers.filter((p) => p.active);
 
   useEffect(() => {
     if (!open) return;
     setForm(concept ? fromConcept(concept) : emptyForm);
+    setSelectedPms(new Set());
     setError(null);
   }, [open, concept]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function togglePm(id: string) {
+    setSelectedPms((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -76,8 +90,12 @@ export default function ConceptFormModal({ open, onClose, onSaved, concept }: Pr
         notes: form.notes.trim() || null,
       };
       let saved: Concept;
-      if (concept) saved = await conceptsService.update(concept.id, payload);
-      else saved = await conceptsService.create(payload, user.id);
+      if (concept) {
+        saved = await conceptsService.update(concept.id, payload);
+      } else {
+        saved = await conceptsService.create(payload, user.id);
+        await Promise.all([...selectedPms].map((pmId) => conceptAssigneesService.add(saved.id, pmId)));
+      }
       onSaved(saved);
       onClose();
     } catch (e) {
@@ -107,6 +125,32 @@ export default function ConceptFormModal({ open, onClose, onSaved, concept }: Pr
             <input type="text" value={form.ente} onChange={(e) => update('ente', e.target.value)} className={inputClass} />
           </div>
         </div>
+
+        {isNew && activePms.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Project Manager responsabili
+              <span className="ml-1.5 text-xs font-normal text-slate-400">(opzionale, modificabile dopo)</span>
+            </label>
+            <div className="border border-slate-300 rounded-xl divide-y divide-slate-100 max-h-40 overflow-y-auto">
+              {activePms.map((pm) => (
+                <label key={pm.id} className="flex items-center gap-3 px-3.5 py-2 cursor-pointer hover:bg-slate-50 transition">
+                  <input
+                    type="checkbox"
+                    checked={selectedPms.has(pm.id)}
+                    onChange={() => togglePm(pm.id)}
+                    className="rounded accent-indigo-600"
+                  />
+                  <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0">
+                    {pm.name[0]?.toUpperCase()}
+                  </span>
+                  <span className="text-sm text-slate-700 flex-1">{pm.name}</span>
+                  {pm.email && <span className="text-xs text-slate-400 truncate max-w-[140px]">{pm.email}</span>}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Descrizione sintetica</label>
