@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Archive, CheckCircle2, ChevronRight, Clock, Plus, UserSearch } from 'lucide-react';
+import {
+  Archive, CheckCircle2, ChevronRight, Clock, FlaskConical, Percent, Plus, TrendingUp, UserSearch,
+} from 'lucide-react';
 import { leadCandidatesService } from '../lib/dataService';
 import { useOffersData } from '../hooks/useOffersData';
 import { formatDate } from '../lib/format';
@@ -9,9 +11,9 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import type { LeadCandidate, LeadCandidateStatus } from '../types';
 
 const STATUS_MAP: Record<LeadCandidateStatus, { label: string; cls: string; Icon: typeof Clock }> = {
-  attivo:    { label: 'Attivo',           cls: 'bg-sky-50 text-sky-700 border-sky-200',       Icon: Clock },
-  promosso:  { label: 'Promosso',         cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', Icon: CheckCircle2 },
-  archiviato:{ label: 'Archiviato',       cls: 'bg-slate-50 text-slate-500 border-slate-200', Icon: Archive },
+  attivo:    { label: 'Attivo',     cls: 'bg-sky-50 text-sky-700 border-sky-200',            Icon: Clock },
+  promosso:  { label: 'Promosso',   cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', Icon: CheckCircle2 },
+  archiviato:{ label: 'Archiviato', cls: 'bg-slate-50 text-slate-500 border-slate-200',       Icon: Archive },
 };
 
 function StatusBadge({ value }: { value: LeadCandidateStatus }) {
@@ -30,6 +32,23 @@ const TABS: { id: FilterTab; label: string }[] = [
   { id: 'promosso', label: 'Promossi' },
   { id: 'archiviato', label: 'Archiviati' },
 ];
+
+function StatCard({
+  label, value, sub, Icon, color,
+}: { label: string; value: string | number; sub?: string; Icon: React.ElementType; color: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex items-center gap-4">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-xl font-bold text-slate-900 tabular-nums leading-tight">{value}</p>
+        {sub && <p className="text-xs text-slate-400">{sub}</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function LeadCandidates() {
   const navigate = useNavigate();
@@ -65,16 +84,34 @@ export default function LeadCandidates() {
     archiviato: leads.filter((l) => l.status === 'archiviato').length,
   }), [leads]);
 
-  // Raggruppa per call_type
+  const promotionRate = useMemo(() => {
+    const concluded = counts.promosso + counts.archiviato;
+    if (concluded === 0) return null;
+    return Math.round((counts.promosso / concluded) * 100);
+  }, [counts]);
+
+  // Raggruppa per bando (funding_call_id → code+name), fallback su call_type
   const groups = useMemo(() => {
-    const map = new Map<string, LeadCandidate[]>();
+    const map = new Map<string, { label: string; sub?: string; leads: LeadCandidate[] }>();
     visible.forEach((l) => {
-      const grp = map.get(l.call_type) ?? [];
-      grp.push(l);
-      map.set(l.call_type, grp);
+      let key: string;
+      let label: string;
+      let sub: string | undefined;
+      if (l.funding_call_id) {
+        const fc = fcById.get(l.funding_call_id);
+        key = l.funding_call_id;
+        label = fc ? fc.name : (l.call_type || 'Non classificato');
+        sub = fc?.code;
+      } else {
+        key = `type:${l.call_type || 'none'}`;
+        label = l.call_type || 'Non classificato';
+      }
+      const grp = map.get(key) ?? { label, sub, leads: [] };
+      grp.leads.push(l);
+      map.set(key, grp);
     });
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'it'));
-  }, [visible]);
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'it'));
+  }, [visible, fcById]);
 
   async function handleDelete() {
     if (!toDelete) return;
@@ -103,6 +140,38 @@ export default function LeadCandidates() {
 
       {error && (
         <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
+      )}
+
+      {/* Analytics */}
+      {leads.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard
+            label="Attivi"
+            value={counts.attivo}
+            sub={`${leads.length} totali`}
+            Icon={Clock}
+            color="bg-sky-50 text-sky-600"
+          />
+          <StatCard
+            label="Promossi a concept"
+            value={counts.promosso}
+            Icon={FlaskConical}
+            color="bg-emerald-50 text-emerald-600"
+          />
+          <StatCard
+            label="Archiviati"
+            value={counts.archiviato}
+            Icon={Archive}
+            color="bg-slate-100 text-slate-500"
+          />
+          <StatCard
+            label="Tasso di promozione"
+            value={promotionRate !== null ? `${promotionRate}%` : '—'}
+            sub={promotionRate !== null ? 'su lead conclusi' : 'nessun lead concluso'}
+            Icon={promotionRate !== null && promotionRate >= 50 ? TrendingUp : Percent}
+            color={promotionRate !== null && promotionRate >= 50 ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}
+          />
+        </div>
       )}
 
       {/* Tab filter */}
@@ -135,11 +204,16 @@ export default function LeadCandidates() {
         </div>
       ) : (
         <div className="space-y-6">
-          {groups.map(([callType, groupLeads]) => (
-            <div key={callType}>
+          {groups.map(({ label, sub, leads: groupLeads }) => (
+            <div key={`${label}-${sub ?? ''}`}>
               <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-sm font-semibold text-slate-700">{callType}</h2>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 tabular-nums">
+                <div className="min-w-0">
+                  {sub && (
+                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-0.5">{sub}</p>
+                  )}
+                  <h2 className="text-sm font-semibold text-slate-700 leading-tight">{label}</h2>
+                </div>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 tabular-nums shrink-0">
                   {groupLeads.length}
                 </span>
               </div>
