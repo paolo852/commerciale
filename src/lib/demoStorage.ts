@@ -1,6 +1,7 @@
 import type {
   AllowedUser, Offer, ProjectManager, FundingCall,
   Concept, ConceptAssignee, ConceptVersion, ConceptVersionComment, ConceptRevisionDeadline,
+  LeadCandidate, LeadUpdate,
 } from '../types';
 
 // ============================================================
@@ -16,6 +17,8 @@ const KEYS = {
   allowedUsers: 'commerciale.demo.allowedUsers',
   concepts: 'commerciale.demo.concepts',
   conceptAssignees: 'commerciale.demo.conceptAssignees',
+  leadCandidates: 'commerciale.demo.leadCandidates',
+  leadUpdates: 'commerciale.demo.leadUpdates',
   conceptVersions: 'commerciale.demo.conceptVersions',
   conceptComments: 'commerciale.demo.conceptComments',
   conceptDeadlines: 'commerciale.demo.conceptDeadlines',
@@ -328,5 +331,51 @@ export const demoFundingCalls = {
   },
   remove(id: string): void {
     write(KEYS.fundingCalls, this.list().filter((i) => i.id !== id));
+  },
+};
+
+// ============================================================
+// Lead Candidates
+// ============================================================
+
+export const demoLeadCandidates = {
+  list(): LeadCandidate[] {
+    return read<LeadCandidate[]>(KEYS.leadCandidates, []);
+  },
+  create(input: Omit<LeadCandidate, 'id' | 'user_id' | 'created_at'>): LeadCandidate {
+    const items = this.list();
+    const item: LeadCandidate = { ...input, id: uuid(), user_id: 'demo-user', created_at: new Date().toISOString() };
+    items.push(item);
+    write(KEYS.leadCandidates, items);
+    return item;
+  },
+  update(id: string, patch: Partial<LeadCandidate>): LeadCandidate | null {
+    const items = this.list();
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx < 0) return null;
+    items[idx] = { ...items[idx], ...patch };
+    write(KEYS.leadCandidates, items);
+    return items[idx];
+  },
+  remove(id: string): void {
+    write(KEYS.leadCandidates, this.list().filter((i) => i.id !== id));
+  },
+};
+
+export const demoLeadUpdates = {
+  list(leadId: string): LeadUpdate[] {
+    return read<LeadUpdate[]>(KEYS.leadUpdates, [])
+      .filter((u) => u.lead_id === leadId)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  },
+  create(input: Omit<LeadUpdate, 'id' | 'created_at'>): LeadUpdate {
+    const all = read<LeadUpdate[]>(KEYS.leadUpdates, []);
+    const item: LeadUpdate = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    all.push(item);
+    write(KEYS.leadUpdates, all);
+    return item;
+  },
+  remove(id: string): void {
+    write(KEYS.leadUpdates, read<LeadUpdate[]>(KEYS.leadUpdates, []).filter((u) => u.id !== id));
   },
 };

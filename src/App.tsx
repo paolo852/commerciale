@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import LeadCandidates from './pages/LeadCandidates';
+import LeadCandidateDetail from './pages/LeadCandidateDetail';
 import Concepts from './pages/Concepts';
 import ConceptDetail from './pages/ConceptDetail';
 import Offerte from './pages/Offerte';
@@ -24,6 +26,8 @@ export default function App() {
             }
           >
             <Route path="/" element={<Dashboard />} />
+            <Route path="/leads" element={<LeadCandidates />} />
+            <Route path="/leads/:id" element={<LeadCandidateDetail />} />
             <Route path="/concepts" element={<Concepts />} />
             <Route path="/concepts/:id" element={<ConceptDetail />} />
             <Route path="/offerte" element={<Offerte />} />

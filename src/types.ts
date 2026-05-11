@@ -223,3 +223,37 @@ export interface ProjectManagerStats {
   tassoSuccesso: number | null;
   tempoMedioDecisione: number | null; // giorni medi
 }
+
+// ============================================================
+// Lead Candidates — fase pre-concept
+// ============================================================
+
+export type LeadCandidateStatus = 'attivo' | 'promosso' | 'archiviato';
+
+export interface LeadCandidate {
+  id: string;
+  user_id: string;
+  researcher_name: string;
+  institution: string | null;
+  call_type: string;
+  funding_call_id: string | null;
+  potential_project: string | null;
+  status: LeadCandidateStatus;
+  promoted_concept_id: string | null;
+  created_at: string;
+}
+
+export type CreateLeadCandidateForm = Pick<
+  LeadCandidate,
+  'researcher_name' | 'institution' | 'call_type' | 'funding_call_id' | 'potential_project' | 'status'
+>;
+export type UpdateLeadCandidateForm = Partial<CreateLeadCandidateForm & Pick<LeadCandidate, 'promoted_concept_id'>>;
+
+export interface LeadUpdate {
+  id: string;
+  lead_id: string;
+  body: string;
+  author_id: string | null;
+  author_name: string;
+  created_at: string;
+}

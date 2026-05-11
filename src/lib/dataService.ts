@@ -9,6 +9,8 @@ import {
   demoConceptVersions,
   demoConceptComments,
   demoConceptDeadlines,
+  demoLeadCandidates,
+  demoLeadUpdates,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -28,6 +30,10 @@ import type {
   UpdateProjectManagerForm,
   CreateFundingCallForm,
   UpdateFundingCallForm,
+  LeadCandidate,
+  LeadUpdate,
+  CreateLeadCandidateForm,
+  UpdateLeadCandidateForm,
 } from '../types';
 
 // ============================================================
@@ -733,6 +739,113 @@ export const offersService = {
       return;
     }
     const { error } = await ensureSb().from('offers').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Lead Candidates
+// ----------------------------------------------------------------
+
+export const leadCandidatesService = {
+  async list(): Promise<LeadCandidate[]> {
+    if (isDemoMode) return [...demoLeadCandidates.list()].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const { data, error } = await ensureSb()
+      .from('lead_candidates')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as LeadCandidate[];
+  },
+
+  async get(id: string): Promise<LeadCandidate | null> {
+    if (isDemoMode) return demoLeadCandidates.list().find((l) => l.id === id) ?? null;
+    const { data, error } = await ensureSb()
+      .from('lead_candidates')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data as LeadCandidate | null;
+  },
+
+  async create(input: CreateLeadCandidateForm, userId: string): Promise<LeadCandidate> {
+    if (isDemoMode) return demoLeadCandidates.create({ ...input, promoted_concept_id: null });
+    const { data, error } = await ensureSb()
+      .from('lead_candidates')
+      .insert({ ...input, user_id: userId })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as LeadCandidate;
+  },
+
+  async update(id: string, patch: UpdateLeadCandidateForm): Promise<LeadCandidate> {
+    if (isDemoMode) {
+      const u = demoLeadCandidates.update(id, patch);
+      if (!u) throw new Error('Lead non trovato');
+      return u;
+    }
+    const { data, error } = await ensureSb()
+      .from('lead_candidates')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as LeadCandidate;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoLeadCandidates.remove(id); return; }
+    const { error } = await ensureSb().from('lead_candidates').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async callTypes(): Promise<string[]> {
+    if (isDemoMode) {
+      const types = [...new Set(demoLeadCandidates.list().map((l) => l.call_type))];
+      return types.sort();
+    }
+    const { data, error } = await ensureSb()
+      .from('lead_candidates')
+      .select('call_type');
+    if (error) throw error;
+    const types = [...new Set((data ?? []).map((r: { call_type: string }) => r.call_type))];
+    return types.sort();
+  },
+};
+
+// ----------------------------------------------------------------
+// Lead Updates (storico interazioni)
+// ----------------------------------------------------------------
+
+export const leadUpdatesService = {
+  async list(leadId: string): Promise<LeadUpdate[]> {
+    if (isDemoMode) return demoLeadUpdates.list(leadId);
+    const { data, error } = await ensureSb()
+      .from('lead_updates')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as LeadUpdate[];
+  },
+
+  async create(input: Omit<LeadUpdate, 'id' | 'created_at'>): Promise<LeadUpdate> {
+    if (isDemoMode) return demoLeadUpdates.create(input);
+    const { data, error } = await ensureSb()
+      .from('lead_updates')
+      .insert(input)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as LeadUpdate;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoLeadUpdates.remove(id); return; }
+    const { error } = await ensureSb().from('lead_updates').delete().eq('id', id);
     if (error) throw error;
   },
 };
