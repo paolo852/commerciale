@@ -44,7 +44,7 @@ const defaultFilters: Filters = {
 function matchesView(o: Offer, view: ViewTab): boolean {
   switch (view) {
     case 'all': return true;
-    case 'in_corso': return o.outcome === 'nessuno' && o.status !== 'ferma';
+    case 'in_corso': return o.outcome === 'nessuno';
     case 'approvate': return o.outcome === 'approvato';
     case 'respinte': return o.outcome === 'rifiutato';
   }
