@@ -4,7 +4,10 @@
 -- Idempotente: può essere rieseguito senza errori.
 -- ============================================================
 
--- 1. Drop tabelle precedenti (e bucket storage)
+-- 1. Drop tabelle precedenti (e policy dello storage)
+-- NOTA: il bucket 'lead-files' e i file devono essere eliminati manualmente dal
+-- dashboard Supabase (Storage → lead-files → Delete bucket). Supabase non
+-- permette DELETE diretti su storage.objects/buckets via SQL.
 DROP TABLE IF EXISTS lead_matches CASCADE;
 DROP TABLE IF EXISTS lead_files   CASCADE;
 DROP TABLE IF EXISTS leads        CASCADE;
@@ -12,9 +15,6 @@ DROP TABLE IF EXISTS leads        CASCADE;
 DROP POLICY IF EXISTS "lead-files: select allowed" ON storage.objects;
 DROP POLICY IF EXISTS "lead-files: insert allowed" ON storage.objects;
 DROP POLICY IF EXISTS "lead-files: delete allowed" ON storage.objects;
-
-DELETE FROM storage.objects WHERE bucket_id = 'lead-files';
-DELETE FROM storage.buckets WHERE id = 'lead-files';
 
 -- 2. Tabella concepts
 CREATE TABLE IF NOT EXISTS concepts (
