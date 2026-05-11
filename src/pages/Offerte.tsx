@@ -386,7 +386,7 @@ export default function Offerte() {
       </div>
 
       <OfferFormModal open={formOpen} onClose={() => setFormOpen(false)} onSaved={reload}
-        offer={editing} projectManagers={projectManagers} fundingCalls={fundingCalls} />
+        offer={editing} projectManagers={projectManagers} fundingCalls={fundingCalls} offers={offers} />
       <ConfirmDialog open={!!toDelete} title="Eliminare l'offerta?"
         message={toDelete ? `"${toDelete.name}" verrà rimossa definitivamente.` : ''}
         confirmLabel="Elimina" variant="danger"

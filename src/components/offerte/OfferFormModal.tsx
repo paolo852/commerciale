@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import Modal from '../Modal';
 import { useAuth } from '../../contexts/AuthContext';
 import { offersService } from '../../lib/dataService';
@@ -16,6 +16,7 @@ interface OfferFormModalProps {
   initial?: { name?: string; pi?: string; ente?: string; notes?: string };
   projectManagers: ProjectManager[];
   fundingCalls: FundingCall[];
+  offers?: Offer[];
 }
 
 interface FormState {
@@ -75,12 +76,20 @@ const inputClass =
 const selectClass = `${inputClass} bg-white`;
 
 export default function OfferFormModal({
-  open, onClose, onSaved, offer, initial, projectManagers, fundingCalls,
+  open, onClose, onSaved, offer, initial, projectManagers, fundingCalls, offers = [],
 }: OfferFormModalProps) {
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const duplicateName = useMemo(() => {
+    const trimmed = form.name.trim().toLowerCase();
+    if (!trimmed) return null;
+    return offers.find(
+      (o) => o.id !== offer?.id && o.name.trim().toLowerCase() === trimmed,
+    ) ?? null;
+  }, [form.name, offers, offer?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -182,6 +191,11 @@ export default function OfferFormModal({
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome progetto *</label>
           <input type="text" required value={form.name} onChange={(e) => update('name', e.target.value)} className={inputClass} />
+          {duplicateName && (
+            <p className="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              ⚠ Esiste già un'offerta con questo nome: <strong>{duplicateName.name}</strong>. Puoi comunque salvare se è intenzionale.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">

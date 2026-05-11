@@ -36,7 +36,7 @@ export default function ConceptDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { projectManagers, fundingCalls, reload: reloadOffers } = useOffersData();
+  const { projectManagers, fundingCalls, offers, reload: reloadOffers } = useOffersData();
 
   const [concept, setConcept] = useState<Concept | null>(null);
   const [loading, setLoading] = useState(true);
@@ -194,6 +194,7 @@ export default function ConceptDetail() {
         }}
         projectManagers={projectManagers}
         fundingCalls={fundingCalls}
+        offers={offers}
       />
 
       <ConfirmDialog open={toDelete} title="Eliminare il concept?"
