@@ -106,12 +106,12 @@ export default function LeadCandidates() {
       let label: string;
       let sub: string | undefined;
       let fcId: string | undefined;
-      if (l.funding_call_id) {
-        const fc = fcById.get(l.funding_call_id);
-        key = l.funding_call_id;
-        label = fc ? fc.name : 'Bando non trovato';
-        sub = fc?.code;
-        fcId = l.funding_call_id;
+      const fc = l.funding_call_id ? fcById.get(l.funding_call_id) : undefined;
+      if (fc) {
+        key = l.funding_call_id!;
+        label = fc.name;
+        sub = fc.code;
+        fcId = l.funding_call_id!;
       } else {
         key = '__no_call__';
         label = 'Senza bando specifico';
