@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Offer, ProjectManager } from '../../types';
+import type { FundingCall, Offer, ProjectManager } from '../../types';
 import { daysUntil, getUpcomingDeadlines } from '../../lib/analytics';
 import { formatDate, formatEUR } from '../../lib/format';
 import { TypeBadge } from '../Badges';
@@ -7,6 +7,7 @@ import { TypeBadge } from '../Badges';
 interface UpcomingDeadlinesProps {
   offers: Offer[];
   projectManagers: ProjectManager[];
+  fundingCalls?: FundingCall[];
   days?: number;
 }
 
@@ -22,12 +23,17 @@ function deadlineBadge(d: number): { label: string; cls: string } {
 export default function UpcomingDeadlines({
   offers,
   projectManagers,
+  fundingCalls = [],
   days = 365,
 }: UpcomingDeadlinesProps) {
   const upcoming = useMemo(() => getUpcomingDeadlines(offers, days), [offers, days]);
   const pmById = useMemo(
     () => new Map(projectManagers.map((p) => [p.id, p.name])),
     [projectManagers],
+  );
+  const fcByCode = useMemo(
+    () => new Map(fundingCalls.map((fc) => [fc.code, fc])),
+    [fundingCalls],
   );
 
   return (
@@ -58,7 +64,20 @@ export default function UpcomingDeadlines({
                 const badge = deadlineBadge(d);
                 return (
                   <tr key={o.id} className="border-t border-slate-100">
-                    <td className="px-4 py-2.5 font-medium text-slate-900">{o.name}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="font-medium text-slate-900 block leading-tight">{o.name}</span>
+                      {o.type === 'financed' && o.funding_call && (() => {
+                        const fc = fcByCode.get(o.funding_call);
+                        return (
+                          <span className="text-xs text-slate-400 block leading-tight mt-0.5 truncate max-w-[220px]" title={fc ? `${fc.code} — ${fc.name}` : o.funding_call}>
+                            {fc ? `${fc.code} — ${fc.name}` : o.funding_call}
+                          </span>
+                        );
+                      })()}
+                      {o.type === 'consulting' && o.client && (
+                        <span className="text-xs text-slate-400 block leading-tight mt-0.5">{o.client}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5"><TypeBadge value={o.type} /></td>
                     <td className="px-4 py-2.5 text-slate-700">
                       {o.project_manager_id ? pmById.get(o.project_manager_id) ?? '—' : '—'}

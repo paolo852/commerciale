@@ -11,7 +11,7 @@ import ProbabilisticRevenue from '../components/dashboard/ProbabilisticRevenue';
 import YearSelector from '../components/YearSelector';
 
 export default function Dashboard() {
-  const { offers, projectManagers, loading, error } = useOffersData();
+  const { offers, projectManagers, fundingCalls, loading, error } = useOffersData();
   const [year, setYear] = useState<number | 'all'>('all');
 
   const filteredOffers = useMemo(() => filterByYear(offers, year), [offers, year]);
@@ -74,7 +74,7 @@ export default function Dashboard() {
       <ProbabilisticRevenue offers={filteredOffers} />
 
       {/* Le scadenze prossime sono sempre "prossimi 30 giorni" indipendentemente dall'anno */}
-      <UpcomingDeadlines offers={offers} projectManagers={projectManagers} />
+      <UpcomingDeadlines offers={offers} projectManagers={projectManagers} fundingCalls={fundingCalls} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2">
