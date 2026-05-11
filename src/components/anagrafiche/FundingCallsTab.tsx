@@ -225,7 +225,7 @@ export default function FundingCallsTab() {
               </span>
             </div>
             <input
-              type="range" min="0" max="100" step="5"
+              type="range" min="0" max="100" step="1"
               value={form.probability}
               onChange={(e) => setForm({ ...form, probability: Number(e.target.value) })}
               className="w-full h-2 rounded-full cursor-pointer"

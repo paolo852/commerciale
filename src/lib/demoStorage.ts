@@ -1,4 +1,7 @@
-import type { AllowedUser, Lead, LeadFile, Offer, ProjectManager, FundingCall } from '../types';
+import type {
+  AllowedUser, Offer, ProjectManager, FundingCall,
+  Concept, ConceptAssignee, ConceptVersion, ConceptVersionComment, ConceptRevisionDeadline,
+} from '../types';
 
 // ============================================================
 // Demo storage: emula Supabase usando localStorage.
@@ -11,8 +14,11 @@ const KEYS = {
   projectManagers: 'commerciale.demo.projectManagers',
   fundingCalls: 'commerciale.demo.fundingCalls',
   allowedUsers: 'commerciale.demo.allowedUsers',
-  leads: 'commerciale.demo.leads',
-  leadFiles: 'commerciale.demo.leadFiles',
+  concepts: 'commerciale.demo.concepts',
+  conceptAssignees: 'commerciale.demo.conceptAssignees',
+  conceptVersions: 'commerciale.demo.conceptVersions',
+  conceptComments: 'commerciale.demo.conceptComments',
+  conceptDeadlines: 'commerciale.demo.conceptDeadlines',
 } as const;
 
 export interface DemoUser {
@@ -153,55 +159,142 @@ export const demoAllowedUsers = {
 };
 
 // ============================================================
-// Leads
+// Concepts
 // ============================================================
 
-export const demoLeads = {
-  list(): Lead[] {
-    return read<Lead[]>(KEYS.leads, []);
+export const demoConcepts = {
+  list(): Concept[] {
+    return read<Concept[]>(KEYS.concepts, []);
   },
-  create(input: Omit<Lead, 'id' | 'user_id' | 'created_at'>): Lead {
+  create(input: Omit<Concept, 'id' | 'user_id' | 'created_at'>): Concept {
     const items = this.list();
-    const item: Lead = {
+    const item: Concept = {
       ...input,
       id: uuid(),
       user_id: 'demo-user',
       created_at: new Date().toISOString(),
     };
     items.push(item);
-    write(KEYS.leads, items);
+    write(KEYS.concepts, items);
     return item;
   },
-  update(id: string, patch: Partial<Lead>): Lead | null {
+  update(id: string, patch: Partial<Concept>): Concept | null {
     const items = this.list();
     const idx = items.findIndex((i) => i.id === id);
     if (idx < 0) return null;
     items[idx] = { ...items[idx], ...patch };
-    write(KEYS.leads, items);
+    write(KEYS.concepts, items);
     return items[idx];
   },
   remove(id: string): void {
-    write(KEYS.leads, this.list().filter((i) => i.id !== id));
+    write(KEYS.concepts, this.list().filter((i) => i.id !== id));
   },
 };
 
-export const demoLeadFiles = {
-  list(leadId: string): LeadFile[] {
-    return read<LeadFile[]>(KEYS.leadFiles, []).filter((f) => f.lead_id === leadId);
+export const demoConceptAssignees = {
+  list(conceptId: string): ConceptAssignee[] {
+    return read<ConceptAssignee[]>(KEYS.conceptAssignees, []).filter((a) => a.concept_id === conceptId);
   },
-  create(input: Omit<LeadFile, 'id' | 'uploaded_at'>): LeadFile {
-    const all = read<LeadFile[]>(KEYS.leadFiles, []);
-    const item: LeadFile = {
+  add(conceptId: string, pmId: string): ConceptAssignee {
+    const all = read<ConceptAssignee[]>(KEYS.conceptAssignees, []);
+    if (all.some((a) => a.concept_id === conceptId && a.project_manager_id === pmId)) {
+      return all.find((a) => a.concept_id === conceptId && a.project_manager_id === pmId)!;
+    }
+    const item: ConceptAssignee = {
+      concept_id: conceptId,
+      project_manager_id: pmId,
+      added_at: new Date().toISOString(),
+    };
+    all.push(item);
+    write(KEYS.conceptAssignees, all);
+    return item;
+  },
+  remove(conceptId: string, pmId: string): void {
+    write(
+      KEYS.conceptAssignees,
+      read<ConceptAssignee[]>(KEYS.conceptAssignees, []).filter(
+        (a) => !(a.concept_id === conceptId && a.project_manager_id === pmId),
+      ),
+    );
+  },
+};
+
+export const demoConceptVersions = {
+  list(conceptId: string): ConceptVersion[] {
+    return read<ConceptVersion[]>(KEYS.conceptVersions, [])
+      .filter((v) => v.concept_id === conceptId)
+      .sort((a, b) => b.version_number - a.version_number);
+  },
+  create(input: Omit<ConceptVersion, 'id' | 'uploaded_at' | 'version_number'>): ConceptVersion {
+    const all = read<ConceptVersion[]>(KEYS.conceptVersions, []);
+    const existingForConcept = all.filter((v) => v.concept_id === input.concept_id);
+    const nextVersion = existingForConcept.length === 0
+      ? 1
+      : Math.max(...existingForConcept.map((v) => v.version_number)) + 1;
+    const item: ConceptVersion = {
       ...input,
       id: uuid(),
+      version_number: nextVersion,
       uploaded_at: new Date().toISOString(),
     };
     all.push(item);
-    write(KEYS.leadFiles, all);
+    write(KEYS.conceptVersions, all);
     return item;
   },
   remove(id: string): void {
-    write(KEYS.leadFiles, read<LeadFile[]>(KEYS.leadFiles, []).filter((f) => f.id !== id));
+    write(KEYS.conceptVersions, read<ConceptVersion[]>(KEYS.conceptVersions, []).filter((v) => v.id !== id));
+  },
+};
+
+export const demoConceptComments = {
+  list(versionId: string): ConceptVersionComment[] {
+    return read<ConceptVersionComment[]>(KEYS.conceptComments, [])
+      .filter((c) => c.version_id === versionId)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  },
+  create(input: Omit<ConceptVersionComment, 'id' | 'created_at'>): ConceptVersionComment {
+    const all = read<ConceptVersionComment[]>(KEYS.conceptComments, []);
+    const item: ConceptVersionComment = {
+      ...input,
+      id: uuid(),
+      created_at: new Date().toISOString(),
+    };
+    all.push(item);
+    write(KEYS.conceptComments, all);
+    return item;
+  },
+  remove(id: string): void {
+    write(KEYS.conceptComments, read<ConceptVersionComment[]>(KEYS.conceptComments, []).filter((c) => c.id !== id));
+  },
+};
+
+export const demoConceptDeadlines = {
+  list(conceptId: string): ConceptRevisionDeadline[] {
+    return read<ConceptRevisionDeadline[]>(KEYS.conceptDeadlines, [])
+      .filter((d) => d.concept_id === conceptId)
+      .sort((a, b) => a.due_date.localeCompare(b.due_date));
+  },
+  create(input: Omit<ConceptRevisionDeadline, 'id' | 'created_at'>): ConceptRevisionDeadline {
+    const all = read<ConceptRevisionDeadline[]>(KEYS.conceptDeadlines, []);
+    const item: ConceptRevisionDeadline = {
+      ...input,
+      id: uuid(),
+      created_at: new Date().toISOString(),
+    };
+    all.push(item);
+    write(KEYS.conceptDeadlines, all);
+    return item;
+  },
+  update(id: string, patch: Partial<ConceptRevisionDeadline>): ConceptRevisionDeadline | null {
+    const all = read<ConceptRevisionDeadline[]>(KEYS.conceptDeadlines, []);
+    const idx = all.findIndex((d) => d.id === id);
+    if (idx < 0) return null;
+    all[idx] = { ...all[idx], ...patch };
+    write(KEYS.conceptDeadlines, all);
+    return all[idx];
+  },
+  remove(id: string): void {
+    write(KEYS.conceptDeadlines, read<ConceptRevisionDeadline[]>(KEYS.conceptDeadlines, []).filter((d) => d.id !== id));
   },
 };
 

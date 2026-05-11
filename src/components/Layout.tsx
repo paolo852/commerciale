@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/leads', label: 'Lead', icon: FlaskConical },
+  { to: '/concepts', label: 'Concept Development', icon: FlaskConical },
   { to: '/offerte', label: 'Offerte', icon: FileText },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/anagrafiche', label: 'Anagrafiche', icon: BookOpen },

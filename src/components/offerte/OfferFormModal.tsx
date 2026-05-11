@@ -254,7 +254,7 @@ export default function OfferFormModal({
           </div>
           <input
             type="range"
-            min="0" max="100" step="5"
+            min="0" max="100" step="1"
             value={form.probability}
             onChange={(e) => update('probability', Number(e.target.value))}
             className={`w-full h-2 rounded-full cursor-pointer ${sliderTrack(form.probability)}`}

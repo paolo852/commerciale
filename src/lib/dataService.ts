@@ -4,8 +4,11 @@ import {
   demoProjectManagers,
   demoFundingCalls,
   demoAllowedUsers,
-  demoLeads,
-  demoLeadFiles,
+  demoConcepts,
+  demoConceptAssignees,
+  demoConceptVersions,
+  demoConceptComments,
+  demoConceptDeadlines,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -13,11 +16,14 @@ import type {
   Offer,
   ProjectManager,
   FundingCall,
-  Lead,
-  LeadFile,
-  LeadMatch,
-  CreateLeadForm,
-  UpdateLeadForm,
+  Concept,
+  ConceptAssignee,
+  ConceptVersion,
+  ConceptVersionComment,
+  ConceptRevisionDeadline,
+  ConceptMatch,
+  CreateConceptForm,
+  UpdateConceptForm,
   CreateProjectManagerForm,
   UpdateProjectManagerForm,
   CreateFundingCallForm,
@@ -275,27 +281,40 @@ export const fundingCallPdfService = {
 };
 
 // ----------------------------------------------------------------
-// Leads
+// Concepts
 // ----------------------------------------------------------------
 
-export const leadsService = {
-  async list(): Promise<Lead[]> {
+export const conceptsService = {
+  async list(): Promise<Concept[]> {
     if (isDemoMode) {
-      return [...demoLeads.list()].sort((a, b) =>
+      return [...demoConcepts.list()].sort((a, b) =>
         b.created_at.localeCompare(a.created_at),
       );
     }
     const { data, error } = await ensureSb()
-      .from('leads')
+      .from('concepts')
       .select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data ?? []) as Lead[];
+    return (data ?? []) as Concept[];
   },
 
-  async create(input: CreateLeadForm, userId: string): Promise<Lead> {
+  async get(id: string): Promise<Concept | null> {
     if (isDemoMode) {
-      return demoLeads.create({
+      return demoConcepts.list().find((c) => c.id === id) ?? null;
+    }
+    const { data, error } = await ensureSb()
+      .from('concepts')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data as Concept | null;
+  },
+
+  async create(input: CreateConceptForm, userId: string): Promise<Concept> {
+    if (isDemoMode) {
+      return demoConcepts.create({
         name: input.name,
         pi: input.pi ?? null,
         ente: input.ente ?? null,
@@ -306,146 +325,285 @@ export const leadsService = {
       });
     }
     const { data, error } = await ensureSb()
-      .from('leads')
+      .from('concepts')
       .insert({ ...input, user_id: userId })
       .select()
       .single();
     if (error) throw error;
-    return data as Lead;
+    return data as Concept;
   },
 
-  async update(id: string, patch: UpdateLeadForm): Promise<Lead> {
+  async update(id: string, patch: UpdateConceptForm): Promise<Concept> {
     if (isDemoMode) {
-      const updated = demoLeads.update(id, patch);
-      if (!updated) throw new Error('Lead non trovato');
+      const updated = demoConcepts.update(id, patch);
+      if (!updated) throw new Error('Concept non trovato');
       return updated;
     }
     const { data, error } = await ensureSb()
-      .from('leads')
+      .from('concepts')
       .update(patch)
       .eq('id', id)
       .select()
       .single();
     if (error) throw error;
-    return data as Lead;
+    return data as Concept;
   },
 
   async remove(id: string): Promise<void> {
-    if (isDemoMode) { demoLeads.remove(id); return; }
-    const { error } = await ensureSb().from('leads').delete().eq('id', id);
+    if (isDemoMode) { demoConcepts.remove(id); return; }
+    const { error } = await ensureSb().from('concepts').delete().eq('id', id);
     if (error) throw error;
   },
 };
 
 // ----------------------------------------------------------------
-// Lead Files (Supabase Storage + tabella metadati)
+// Concept Assignees (PM responsabili)
 // ----------------------------------------------------------------
 
-const LEAD_BUCKET = 'lead-files';
-
-export const leadFilesService = {
-  async list(leadId: string): Promise<LeadFile[]> {
-    if (isDemoMode) return demoLeadFiles.list(leadId);
+export const conceptAssigneesService = {
+  async list(conceptId: string): Promise<ConceptAssignee[]> {
+    if (isDemoMode) {
+      const all = demoConceptAssignees.list(conceptId);
+      const pms = demoProjectManagers.list();
+      return all.map((a) => ({ ...a, project_manager: pms.find((p) => p.id === a.project_manager_id) ?? null }));
+    }
     const { data, error } = await ensureSb()
-      .from('lead_files')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('uploaded_at', { ascending: false });
+      .from('concept_assignees')
+      .select('*, project_manager:project_managers(*)')
+      .eq('concept_id', conceptId);
     if (error) throw error;
-    return (data ?? []) as LeadFile[];
+    return (data ?? []) as ConceptAssignee[];
   },
 
-  async upload(leadId: string, file: File): Promise<LeadFile> {
+  async add(conceptId: string, projectManagerId: string): Promise<void> {
+    if (isDemoMode) { demoConceptAssignees.add(conceptId, projectManagerId); return; }
+    const { error } = await ensureSb()
+      .from('concept_assignees')
+      .insert({ concept_id: conceptId, project_manager_id: projectManagerId });
+    if (error && error.code !== '23505') throw error; // 23505 = unique violation
+  },
+
+  async remove(conceptId: string, projectManagerId: string): Promise<void> {
+    if (isDemoMode) { demoConceptAssignees.remove(conceptId, projectManagerId); return; }
+    const { error } = await ensureSb()
+      .from('concept_assignees')
+      .delete()
+      .eq('concept_id', conceptId)
+      .eq('project_manager_id', projectManagerId);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Concept Versions (file caricati con versioning)
+// ----------------------------------------------------------------
+
+const CONCEPT_BUCKET = 'concept-files';
+
+export const conceptVersionsService = {
+  async list(conceptId: string): Promise<ConceptVersion[]> {
     if (isDemoMode) {
-      // In demo mode salviamo solo metadati (no upload reale)
-      return demoLeadFiles.create({
-        lead_id: leadId,
+      const all = demoConceptVersions.list(conceptId);
+      const pms = demoProjectManagers.list();
+      return all.map((v) => ({ ...v, uploader: pms.find((p) => p.id === v.uploaded_by) ?? null }));
+    }
+    const { data, error } = await ensureSb()
+      .from('concept_versions')
+      .select('*, uploader:project_managers!uploaded_by(*)')
+      .eq('concept_id', conceptId)
+      .order('version_number', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as ConceptVersion[];
+  },
+
+  async upload(conceptId: string, file: File, uploadedBy: string | null, note: string | null): Promise<ConceptVersion> {
+    if (isDemoMode) {
+      return demoConceptVersions.create({
+        concept_id: conceptId,
         filename: file.name,
         storage_path: `demo/${file.name}`,
         size: file.size,
         mime_type: file.type || null,
+        uploaded_by: uploadedBy,
+        note,
       });
     }
     const sb = ensureSb();
+    // Trova il prossimo version_number (max + 1)
+    const { data: existing } = await sb
+      .from('concept_versions')
+      .select('version_number')
+      .eq('concept_id', conceptId)
+      .order('version_number', { ascending: false })
+      .limit(1);
+    const nextVersion = (existing?.[0]?.version_number ?? 0) + 1;
+
     const safeName = file.name.replace(/[^\w.\-]/g, '_');
-    const path = `${leadId}/${Date.now()}-${safeName}`;
-    const { error: upErr } = await sb.storage.from(LEAD_BUCKET).upload(path, file, {
+    const path = `${conceptId}/v${nextVersion}-${Date.now()}-${safeName}`;
+    const { error: upErr } = await sb.storage.from(CONCEPT_BUCKET).upload(path, file, {
       cacheControl: '3600',
       upsert: false,
       contentType: file.type || undefined,
     });
     if (upErr) throw upErr;
     const { data, error } = await sb
-      .from('lead_files')
+      .from('concept_versions')
       .insert({
-        lead_id: leadId,
+        concept_id: conceptId,
+        version_number: nextVersion,
         filename: file.name,
         storage_path: path,
         size: file.size,
         mime_type: file.type || null,
+        uploaded_by: uploadedBy,
+        note,
       })
-      .select()
+      .select('*, uploader:project_managers!uploaded_by(*)')
       .single();
     if (error) {
-      await sb.storage.from(LEAD_BUCKET).remove([path]);
+      await sb.storage.from(CONCEPT_BUCKET).remove([path]);
       throw error;
     }
-    return data as LeadFile;
+    return data as ConceptVersion;
   },
 
   async signedUrl(path: string): Promise<string | null> {
     if (isDemoMode) return null;
     const { data, error } = await ensureSb()
-      .storage.from(LEAD_BUCKET)
+      .storage.from(CONCEPT_BUCKET)
       .createSignedUrl(path, 60 * 10);
     if (error) return null;
     return data?.signedUrl ?? null;
   },
 
-  async remove(file: LeadFile): Promise<void> {
-    if (isDemoMode) { demoLeadFiles.remove(file.id); return; }
+  async remove(version: ConceptVersion): Promise<void> {
+    if (isDemoMode) { demoConceptVersions.remove(version.id); return; }
     const sb = ensureSb();
-    await sb.storage.from(LEAD_BUCKET).remove([file.storage_path]);
-    const { error } = await sb.from('lead_files').delete().eq('id', file.id);
+    await sb.storage.from(CONCEPT_BUCKET).remove([version.storage_path]);
+    const { error } = await sb.from('concept_versions').delete().eq('id', version.id);
     if (error) throw error;
   },
 };
 
 // ----------------------------------------------------------------
-// Lead Matches (cache risultati AI matching)
+// Concept Version Comments (con @mention)
 // ----------------------------------------------------------------
 
-const matchKey = 'commerciale.demo.leadMatches';
+export const conceptCommentsService = {
+  async list(versionId: string): Promise<ConceptVersionComment[]> {
+    if (isDemoMode) return demoConceptComments.list(versionId);
+    const { data, error } = await ensureSb()
+      .from('concept_version_comments')
+      .select('*')
+      .eq('version_id', versionId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as ConceptVersionComment[];
+  },
 
-function readDemoMatches(): LeadMatch[] {
+  async create(input: Omit<ConceptVersionComment, 'id' | 'created_at'>): Promise<ConceptVersionComment> {
+    if (isDemoMode) return demoConceptComments.create(input);
+    const { data, error } = await ensureSb()
+      .from('concept_version_comments')
+      .insert(input)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ConceptVersionComment;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoConceptComments.remove(id); return; }
+    const { error } = await ensureSb().from('concept_version_comments').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Concept Revision Deadlines
+// ----------------------------------------------------------------
+
+export const conceptDeadlinesService = {
+  async list(conceptId: string): Promise<ConceptRevisionDeadline[]> {
+    if (isDemoMode) return demoConceptDeadlines.list(conceptId);
+    const { data, error } = await ensureSb()
+      .from('concept_revision_deadlines')
+      .select('*')
+      .eq('concept_id', conceptId)
+      .order('due_date', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as ConceptRevisionDeadline[];
+  },
+
+  async create(input: Omit<ConceptRevisionDeadline, 'id' | 'created_at'>): Promise<ConceptRevisionDeadline> {
+    if (isDemoMode) return demoConceptDeadlines.create(input);
+    const { data, error } = await ensureSb()
+      .from('concept_revision_deadlines')
+      .insert(input)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ConceptRevisionDeadline;
+  },
+
+  async update(id: string, patch: Partial<ConceptRevisionDeadline>): Promise<ConceptRevisionDeadline> {
+    if (isDemoMode) {
+      const updated = demoConceptDeadlines.update(id, patch);
+      if (!updated) throw new Error('Deadline non trovata');
+      return updated;
+    }
+    const { data, error } = await ensureSb()
+      .from('concept_revision_deadlines')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ConceptRevisionDeadline;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoConceptDeadlines.remove(id); return; }
+    const { error } = await ensureSb().from('concept_revision_deadlines').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Concept Matches (AI matching → ex lead_matches)
+// ----------------------------------------------------------------
+
+const matchKey = 'commerciale.demo.conceptMatches';
+
+function readDemoMatches(): ConceptMatch[] {
   try { return JSON.parse(localStorage.getItem(matchKey) ?? '[]'); }
   catch { return []; }
 }
-function writeDemoMatches(arr: LeadMatch[]) {
+function writeDemoMatches(arr: ConceptMatch[]) {
   localStorage.setItem(matchKey, JSON.stringify(arr));
 }
 
-export const leadMatchesService = {
-  async list(leadId: string): Promise<LeadMatch[]> {
+export const conceptMatchesService = {
+  async list(conceptId: string): Promise<ConceptMatch[]> {
     if (isDemoMode) {
-      return readDemoMatches().filter((m) => m.lead_id === leadId).sort((a, b) => b.score - a.score);
+      return readDemoMatches().filter((m) => m.concept_id === conceptId).sort((a, b) => b.score - a.score);
     }
     const { data, error } = await ensureSb()
-      .from('lead_matches')
+      .from('concept_matches')
       .select('*')
-      .eq('lead_id', leadId)
+      .eq('concept_id', conceptId)
       .order('score', { ascending: false });
     if (error) throw error;
-    return (data ?? []) as LeadMatch[];
+    return (data ?? []) as ConceptMatch[];
   },
 
-  async replace(leadId: string, matches: { funding_call_id: string; score: number; rationale: string }[]): Promise<LeadMatch[]> {
+  async replace(conceptId: string, matches: { funding_call_id: string; score: number; rationale: string }[]): Promise<ConceptMatch[]> {
     if (isDemoMode) {
-      const all = readDemoMatches().filter((m) => m.lead_id !== leadId);
+      const all = readDemoMatches().filter((m) => m.concept_id !== conceptId);
       const now = new Date().toISOString();
-      const created: LeadMatch[] = matches.map((m) => ({
+      const created: ConceptMatch[] = matches.map((m) => ({
         id: crypto.randomUUID(),
-        lead_id: leadId,
+        concept_id: conceptId,
         funding_call_id: m.funding_call_id,
         score: m.score,
         rationale: m.rationale,
@@ -455,27 +613,24 @@ export const leadMatchesService = {
       return created.sort((a, b) => b.score - a.score);
     }
     const sb = ensureSb();
-    // Cancella i match esistenti per il lead
-    await sb.from('lead_matches').delete().eq('lead_id', leadId);
+    await sb.from('concept_matches').delete().eq('concept_id', conceptId);
     if (matches.length === 0) return [];
     const { data, error } = await sb
-      .from('lead_matches')
-      .insert(matches.map((m) => ({ ...m, lead_id: leadId })))
+      .from('concept_matches')
+      .insert(matches.map((m) => ({ ...m, concept_id: conceptId })))
       .select();
     if (error) throw error;
-    return ((data ?? []) as LeadMatch[]).sort((a, b) => b.score - a.score);
+    return ((data ?? []) as ConceptMatch[]).sort((a, b) => b.score - a.score);
   },
 
-  async analyze(lead: Lead, fundingCalls: FundingCall[]): Promise<{ matches: LeadMatch[]; model?: string }> {
-    // Filtra bandi non scaduti
+  async analyze(concept: Concept, fundingCalls: FundingCall[]): Promise<{ matches: ConceptMatch[]; model?: string }> {
     const today = new Date().toISOString().slice(0, 10);
     const active = fundingCalls.filter((fc) => !fc.deadline || fc.deadline >= today);
 
-    if (!lead.description?.trim()) {
-      throw new Error('Inserisci una descrizione della tecnologia prima di lanciare il match AI.');
+    if (!concept.description?.trim()) {
+      throw new Error('Inserisci una descrizione del concept prima di lanciare il match AI.');
     }
 
-    // Per i bandi con PDF allegato, scarica e codifica in base64
     const callsWithPdf = await Promise.all(
       active.map(async (fc) => {
         if (!fc.pdf_path) {
@@ -497,10 +652,10 @@ export const leadMatchesService = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        leadName: lead.name,
-        leadDescription: lead.description,
-        leadPi: lead.pi,
-        leadEnte: lead.ente,
+        leadName: concept.name,
+        leadDescription: concept.description,
+        leadPi: concept.pi,
+        leadEnte: concept.ente,
         fundingCalls: callsWithPdf,
       }),
     });
@@ -512,7 +667,7 @@ export const leadMatchesService = {
       matches: { funding_call_id: string; score: number; rationale: string }[];
       model?: string;
     };
-    const stored = await this.replace(lead.id, json.matches);
+    const stored = await this.replace(concept.id, json.matches);
     return { matches: stored, model: json.model };
   },
 };

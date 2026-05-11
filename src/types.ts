@@ -119,40 +119,71 @@ export interface AllowedUser {
 export type CreateAllowedUserForm = Pick<AllowedUser, 'email' | 'name'>;
 
 // ============================================================
-// Lead — tecnologie in valutazione (pre-offerta)
+// Concept — Concept Development (ex Lead)
 // ============================================================
 
-export type LeadStatus = 'in_valutazione' | 'promosso' | 'rifiutato';
+export type ConceptStatus = 'in_valutazione' | 'promosso' | 'rifiutato';
 
-export interface Lead {
+export interface Concept {
   id: string;
   user_id: string;
   name: string;
   pi: string | null;
   ente: string | null;
   description: string | null;
-  status: LeadStatus;
+  status: ConceptStatus;
   notes: string | null;
   promoted_offer_id: string | null;
   created_at: string;
 }
 
-export interface LeadFile {
+export type CreateConceptForm = Pick<Concept, 'name' | 'pi' | 'ente' | 'description' | 'status' | 'notes'>;
+export type UpdateConceptForm = Partial<CreateConceptForm & Pick<Concept, 'promoted_offer_id'>>;
+
+export interface ConceptAssignee {
+  concept_id: string;
+  project_manager_id: string;
+  added_at: string;
+  project_manager?: ProjectManager | null;
+}
+
+export interface ConceptVersion {
   id: string;
-  lead_id: string;
+  concept_id: string;
+  version_number: number;
   filename: string;
   storage_path: string;
   size: number;
   mime_type: string | null;
+  uploaded_by: string | null;
   uploaded_at: string;
+  note: string | null;
+  uploader?: ProjectManager | null;
 }
 
-export type CreateLeadForm = Pick<Lead, 'name' | 'pi' | 'ente' | 'description' | 'status' | 'notes'>;
-export type UpdateLeadForm = Partial<CreateLeadForm & Pick<Lead, 'promoted_offer_id'>>;
-
-export interface LeadMatch {
+export interface ConceptVersionComment {
   id: string;
-  lead_id: string;
+  version_id: string;
+  author_id: string | null;
+  author_name: string;
+  body: string;
+  mentions: string[]; // array di project_manager IDs
+  created_at: string;
+}
+
+export interface ConceptRevisionDeadline {
+  id: string;
+  concept_id: string;
+  label: string;
+  due_date: string; // ISO date
+  completed: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ConceptMatch {
+  id: string;
+  concept_id: string;
   funding_call_id: string;
   score: number; // 0-100
   rationale: string | null;

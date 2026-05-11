@@ -4,7 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Leads from './pages/Leads';
+import Concepts from './pages/Concepts';
+import ConceptDetail from './pages/ConceptDetail';
 import Offerte from './pages/Offerte';
 import Analytics from './pages/Analytics';
 import Anagrafiche from './pages/Anagrafiche';
@@ -23,7 +24,8 @@ export default function App() {
             }
           >
             <Route path="/" element={<Dashboard />} />
-            <Route path="/leads" element={<Leads />} />
+            <Route path="/concepts" element={<Concepts />} />
+            <Route path="/concepts/:id" element={<ConceptDetail />} />
             <Route path="/offerte" element={<Offerte />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/anagrafiche" element={<Anagrafiche />} />

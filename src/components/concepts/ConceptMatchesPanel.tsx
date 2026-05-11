@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, Target } from 'lucide-react';
-import { leadMatchesService } from '../../lib/dataService';
+import { conceptMatchesService } from '../../lib/dataService';
 import { formatDate } from '../../lib/format';
-import type { FundingCall, Lead, LeadMatch } from '../../types';
+import type { Concept, ConceptMatch, FundingCall } from '../../types';
 
 interface Props {
-  lead: Lead;
+  concept: Concept;
   fundingCalls: FundingCall[];
 }
 
@@ -15,8 +15,8 @@ function scoreColor(s: number): string {
   return 'bg-slate-100 text-slate-600 border-slate-200';
 }
 
-export default function LeadMatchesPanel({ lead, fundingCalls }: Props) {
-  const [matches, setMatches] = useState<LeadMatch[]>([]);
+export default function ConceptMatchesPanel({ concept, fundingCalls }: Props) {
+  const [matches, setMatches] = useState<ConceptMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,16 +26,16 @@ export default function LeadMatchesPanel({ lead, fundingCalls }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    leadMatchesService.list(lead.id)
+    conceptMatchesService.list(concept.id)
       .then(setMatches)
       .catch(() => setMatches([]))
       .finally(() => setLoading(false));
-  }, [lead.id]);
+  }, [concept.id]);
 
   async function runAnalysis() {
     setAnalyzing(true); setError(null);
     try {
-      const { matches: result, model: m } = await leadMatchesService.analyze(lead, fundingCalls);
+      const { matches: result, model: m } = await conceptMatchesService.analyze(concept, fundingCalls);
       setMatches(result);
       if (m) setModel(m);
     } catch (e) {
@@ -62,7 +62,7 @@ export default function LeadMatchesPanel({ lead, fundingCalls }: Props) {
         <button
           type="button"
           onClick={runAnalysis}
-          disabled={analyzing || activeCount === 0 || !lead.description}
+          disabled={analyzing || activeCount === 0 || !concept.description}
           className="px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition"
         >
           <Sparkles className="w-3.5 h-3.5" />
@@ -70,9 +70,9 @@ export default function LeadMatchesPanel({ lead, fundingCalls }: Props) {
         </button>
       </div>
 
-      {!lead.description && (
+      {!concept.description && (
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-          Inserisci una descrizione della tecnologia per poter eseguire il match.
+          Inserisci una descrizione del concept per poter eseguire il match.
         </p>
       )}
 

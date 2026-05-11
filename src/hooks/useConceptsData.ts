@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { leadsService } from '../lib/dataService';
-import type { Lead } from '../types';
+import { conceptsService } from '../lib/dataService';
+import type { Concept } from '../types';
 
-export interface LeadsData {
-  leads: Lead[];
+export interface ConceptsData {
+  concepts: Concept[];
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
 }
 
-export function useLeadsData(): LeadsData {
-  const [leads, setLeads] = useState<Lead[]>([]);
+export function useConceptsData(): ConceptsData {
+  const [concepts, setConcepts] = useState<Concept[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +18,7 @@ export function useLeadsData(): LeadsData {
     setLoading(true);
     setError(null);
     try {
-      setLeads(await leadsService.list());
+      setConcepts(await conceptsService.list());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore nel caricamento');
     } finally {
@@ -28,5 +28,5 @@ export function useLeadsData(): LeadsData {
 
   useEffect(() => { void reload(); }, [reload]);
 
-  return { leads, loading, error, reload };
+  return { concepts, loading, error, reload };
 }
