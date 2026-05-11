@@ -22,6 +22,7 @@ interface AuthContextValue {
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
+  requestAccess: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -98,6 +99,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }, []);
 
+  const requestAccess = useCallback(async (email: string) => {
+    if (isDemoMode) return;
+    const allowed = await allowedUsersService.isAllowed(email);
+    if (!allowed) {
+      throw new Error('Accesso non autorizzato. Contatta l\'amministratore per essere aggiunto al registro utenti.');
+    }
+    const { error } = await supabase!.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
+    if (error) throw error;
+  }, []);
+
   const signOut = useCallback(async () => {
     if (isDemoMode) {
       demoAuth.signOut();
@@ -109,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, isDemoMode, signIn, signUp, signOut }),
-    [user, loading, signIn, signUp, signOut],
+    () => ({ user, loading, isDemoMode, signIn, signUp, requestAccess, signOut }),
+    [user, loading, signIn, signUp, requestAccess, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

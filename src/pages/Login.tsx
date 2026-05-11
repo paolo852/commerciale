@@ -4,20 +4,29 @@ import { FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
-  const { signIn, isDemoMode } = useAuth();
+  const { signIn, requestAccess, isDemoMode } = useAuth();
   const navigate = useNavigate();
+  const [mode, setMode] = useState<'signin' | 'request'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
     try {
-      await signIn(email, password);
-      navigate('/');
+      if (mode === 'signin') {
+        await signIn(email, password);
+        navigate('/');
+      } else {
+        await requestAccess(email);
+        setSuccess('Controlla la tua email: ti abbiamo inviato un link per accedere e impostare la password.');
+        setEmail('');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore di autenticazione');
     } finally {
@@ -64,8 +73,14 @@ export default function Login() {
             <span className="font-semibold text-slate-900">Offerte commerciali</span>
           </div>
 
-          <h1 className="text-2xl font-semibold text-slate-900 mb-1">Bentornato</h1>
-          <p className="text-sm text-slate-500 mb-8">Inserisci le tue credenziali per accedere</p>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-1">
+            {mode === 'signin' ? 'Bentornato' : 'Primo accesso'}
+          </h1>
+          <p className="text-sm text-slate-500 mb-8">
+            {mode === 'signin'
+              ? 'Inserisci le tue credenziali per accedere'
+              : 'Se sei in lista, riceverai un link via email per impostare la password'}
+          </p>
 
           {isDemoMode && (
             <div className="mb-6 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200/70">
@@ -78,9 +93,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
               <input
                 type="email"
                 required
@@ -90,23 +103,29 @@ export default function Login() {
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Password
-              </label>
-              <input
-                type="password"
-                required={!isDemoMode}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={isDemoMode ? 'Non richiesta in demo mode' : '••••••••'}
-                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-              />
-            </div>
+
+            {mode === 'signin' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+                <input
+                  type="password"
+                  required={!isDemoMode}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={isDemoMode ? 'Non richiesta in demo mode' : '••••••••'}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                />
+              </div>
+            )}
 
             {error && (
               <div className="px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
                 {error}
+              </div>
+            )}
+            {success && (
+              <div className="px-3.5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">
+                {success}
               </div>
             )}
 
@@ -115,12 +134,21 @@ export default function Login() {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition shadow-sm shadow-indigo-200"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Accedi'}
+              {loading
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : mode === 'signin' ? 'Accedi' : 'Invia link di accesso'}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-slate-400">
-            Per richiedere l'accesso contatta l'amministratore.
+          <p className="mt-6 text-center text-sm text-slate-500">
+            {mode === 'signin' ? 'Primo accesso?' : 'Hai già una password?'}{' '}
+            <button
+              type="button"
+              onClick={() => { setMode(mode === 'signin' ? 'request' : 'signin'); setError(null); setSuccess(null); }}
+              className="font-medium text-indigo-600 hover:text-indigo-700"
+            >
+              {mode === 'signin' ? 'Richiedi accesso' : 'Accedi'}
+            </button>
           </p>
         </div>
       </div>
