@@ -206,14 +206,14 @@ export default function LeadCandidates() {
         <div className="space-y-6">
           {groups.map(({ label, sub, leads: groupLeads }) => (
             <div key={`${label}-${sub ?? ''}`}>
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="min-w-0">
                   {sub && (
-                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-0.5">{sub}</p>
+                    <p className="text-sm font-semibold text-indigo-600 tracking-wide font-mono mb-0.5">{sub}</p>
                   )}
-                  <h2 className="text-sm font-semibold text-slate-700 leading-tight">{label}</h2>
+                  <h2 className="text-lg font-bold text-slate-900 leading-tight">{label}</h2>
                 </div>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 tabular-nums shrink-0">
+                <span className="mt-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 tabular-nums shrink-0">
                   {groupLeads.length}
                 </span>
               </div>
