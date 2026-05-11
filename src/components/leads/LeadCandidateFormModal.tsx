@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Plus } from 'lucide-react';
 import Modal from '../Modal';
 import { useAuth } from '../../contexts/AuthContext';
-import { leadCandidatesService } from '../../lib/dataService';
+import { leadCandidatesService, fundingCallsService } from '../../lib/dataService';
 import type { FundingCall, LeadCandidate, LeadCandidateStatus } from '../../types';
 
 interface Props {
@@ -10,17 +11,22 @@ interface Props {
   onSaved: (lead: LeadCandidate) => void;
   lead: LeadCandidate | null;
   fundingCalls: FundingCall[];
-  existingCallTypes: string[];
 }
 
 interface FormState {
   researcher_name: string;
   institution: string;
   call_type: string;
-  call_type_custom: string;
   funding_call_id: string;
   potential_project: string;
   status: LeadCandidateStatus;
+}
+
+interface NewCallDraft {
+  code: string;
+  name: string;
+  body: string;
+  deadline: string;
 }
 
 const STATUS_OPTIONS: { value: LeadCandidateStatus; label: string }[] = [
@@ -33,38 +39,49 @@ const inputClass =
   'w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
 
 export default function LeadCandidateFormModal({
-  open, onClose, onSaved, lead, fundingCalls, existingCallTypes,
+  open, onClose, onSaved, lead, fundingCalls,
 }: Props) {
   const { user } = useAuth();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Non-expired calls from props + any newly created inline
+  const [extraCalls, setExtraCalls] = useState<FundingCall[]>([]);
+  const activeCalls = useMemo(() => {
+    const all = [...fundingCalls, ...extraCalls];
+    return all.filter((fc) => !fc.deadline || fc.deadline >= today);
+  }, [fundingCalls, extraCalls, today]);
+
   const [form, setForm] = useState<FormState>({
-    researcher_name: '', institution: '', call_type: '', call_type_custom: '',
+    researcher_name: '', institution: '', call_type: '',
     funding_call_id: '', potential_project: '', status: 'attivo',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Tutti i tipi disponibili (esistenti + "Nuovo…")
-  const allCallTypes = [...new Set([...existingCallTypes])];
+  // Inline new-call creation
+  const [showNewCall, setShowNewCall] = useState(false);
+  const [newCall, setNewCall] = useState<NewCallDraft>({ code: '', name: '', body: '', deadline: '' });
+  const [creatingCall, setCreatingCall] = useState(false);
+  const [newCallError, setNewCallError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setShowNewCall(false);
+    setNewCall({ code: '', name: '', body: '', deadline: '' });
+    setExtraCalls([]);
     if (lead) {
-      const known = existingCallTypes.includes(lead.call_type);
       setForm({
         researcher_name: lead.researcher_name,
         institution: lead.institution ?? '',
-        call_type: known ? lead.call_type : '__custom__',
-        call_type_custom: known ? '' : lead.call_type,
+        call_type: lead.call_type,
         funding_call_id: lead.funding_call_id ?? '',
         potential_project: lead.potential_project ?? '',
         status: lead.status,
       });
     } else {
       setForm({
-        researcher_name: '', institution: '',
-        call_type: allCallTypes[0] ?? '__custom__',
-        call_type_custom: '',
+        researcher_name: '', institution: '', call_type: '',
         funding_call_id: '', potential_project: '', status: 'attivo',
       });
     }
@@ -75,9 +92,45 @@ export default function LeadCandidateFormModal({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function resolvedCallType(): string {
-    if (form.call_type === '__custom__') return form.call_type_custom.trim() || 'Non classificato';
-    return form.call_type || 'Non classificato';
+  function handleCallSelect(value: string) {
+    if (value === '__new__') {
+      setShowNewCall(true);
+      return;
+    }
+    setShowNewCall(false);
+    update('funding_call_id', value);
+    if (value) {
+      const fc = activeCalls.find((c) => c.id === value);
+      if (fc) update('call_type', fc.body ?? fc.name);
+    }
+  }
+
+  async function handleCreateCall() {
+    if (!user) return;
+    if (!newCall.code.trim() || !newCall.name.trim()) {
+      setNewCallError('Codice e nome sono obbligatori.');
+      return;
+    }
+    setCreatingCall(true); setNewCallError(null);
+    try {
+      const created = await fundingCallsService.create({
+        code: newCall.code.trim(),
+        name: newCall.name.trim(),
+        body: newCall.body.trim() || null,
+        deadline: newCall.deadline || null,
+        description: null,
+        notes: null,
+        probability: 50,
+        source_url: null,
+      }, user.id);
+      setExtraCalls((prev) => [...prev, created]);
+      update('funding_call_id', created.id);
+      update('call_type', created.body ?? created.name);
+      setShowNewCall(false);
+      setNewCall({ code: '', name: '', body: '', deadline: '' });
+    } catch (e) {
+      setNewCallError((e as { message?: string })?.message ?? 'Errore creazione bando');
+    } finally { setCreatingCall(false); }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -90,7 +143,7 @@ export default function LeadCandidateFormModal({
       const payload = {
         researcher_name: form.researcher_name.trim(),
         institution: form.institution.trim() || null,
-        call_type: resolvedCallType(),
+        call_type: form.call_type.trim() || 'Non classificato',
         funding_call_id: form.funding_call_id || null,
         potential_project: form.potential_project.trim() || null,
         status: form.status,
@@ -126,44 +179,101 @@ export default function LeadCandidateFormModal({
           </div>
         </div>
 
+        {/* Bando di riferimento */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Tipologia di bando</label>
-          <div className="flex gap-2">
-            <select
-              value={form.call_type}
-              onChange={(e) => update('call_type', e.target.value)}
-              className={`${inputClass} flex-1`}
-            >
-              {allCallTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-              <option value="__custom__">+ Nuova tipologia…</option>
-            </select>
-            {form.call_type === '__custom__' && (
-              <input
-                type="text"
-                value={form.call_type_custom}
-                onChange={(e) => update('call_type_custom', e.target.value)}
-                placeholder="Nome tipologia (es. HORIZON Europe)"
-                className={`${inputClass} flex-1`}
-              />
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Call specifica
-            <span className="ml-1.5 text-xs font-normal text-slate-400">(opzionale)</span>
-          </label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Bando di riferimento</label>
           <select
-            value={form.funding_call_id}
-            onChange={(e) => update('funding_call_id', e.target.value)}
+            value={showNewCall ? '__new__' : (form.funding_call_id || '')}
+            onChange={(e) => handleCallSelect(e.target.value)}
             className={inputClass}
           >
-            <option value="">— Nessuna call specifica —</option>
-            {fundingCalls.map((fc) => (
-              <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
+            <option value="">— Nessun bando specifico —</option>
+            {activeCalls.map((fc) => (
+              <option key={fc.id} value={fc.id}>
+                {fc.code} — {fc.name}{fc.deadline ? ` (scad. ${fc.deadline})` : ''}
+              </option>
             ))}
+            <option value="__new__">+ Crea nuovo bando in anagrafica…</option>
           </select>
+
+          {/* Inline new-call mini-form */}
+          {showNewCall && (
+            <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Nuovo bando</p>
+              {newCallError && (
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{newCallError}</p>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Codice *</label>
+                  <input
+                    type="text" value={newCall.code}
+                    onChange={(e) => setNewCall((n) => ({ ...n, code: e.target.value }))}
+                    placeholder="es. HORIZON-MSCA-2025"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Nome *</label>
+                  <input
+                    type="text" value={newCall.name}
+                    onChange={(e) => setNewCall((n) => ({ ...n, name: e.target.value }))}
+                    placeholder="es. Marie Skłodowska-Curie Postdoctoral"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Tipologia</label>
+                  <input
+                    type="text" value={newCall.body}
+                    onChange={(e) => setNewCall((n) => ({ ...n, body: e.target.value }))}
+                    placeholder="es. HORIZON Europe, PNRR, Regionale…"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza</label>
+                  <input
+                    type="date" value={newCall.deadline}
+                    onChange={(e) => setNewCall((n) => ({ ...n, deadline: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCreateCall}
+                  disabled={creatingCall || !newCall.code.trim() || !newCall.name.trim()}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {creatingCall ? 'Creazione…' : 'Crea bando'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowNewCall(false); setNewCall({ code: '', name: '', body: '', deadline: '' }); }}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+                >
+                  Annulla
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tipologia (used for grouping in list view) */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            Tipologia di bando
+            <span className="ml-1.5 text-xs font-normal text-slate-400">(per raggruppamento nella lista)</span>
+          </label>
+          <input
+            type="text" value={form.call_type}
+            onChange={(e) => update('call_type', e.target.value)}
+            placeholder="es. HORIZON Europe, PNRR, Regionale…"
+            className={inputClass}
+          />
         </div>
 
         <div>

@@ -53,11 +53,6 @@ export default function LeadCandidates() {
 
   useEffect(() => { void reload(); }, [reload]);
 
-  const existingCallTypes = useMemo(
-    () => [...new Set(leads.map((l) => l.call_type))].sort(),
-    [leads],
-  );
-
   const visible = useMemo(
     () => tab === 'all' ? leads : leads.filter((l) => l.status === tab),
     [leads, tab],
@@ -204,7 +199,6 @@ export default function LeadCandidates() {
         onSaved={(created) => { setFormOpen(false); void reload(); navigate(`/leads/${created.id}`); }}
         lead={null}
         fundingCalls={fundingCalls}
-        existingCallTypes={existingCallTypes}
       />
 
       <ConfirmDialog

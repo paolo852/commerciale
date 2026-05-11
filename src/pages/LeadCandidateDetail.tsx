@@ -265,7 +265,6 @@ export default function LeadCandidateDetail() {
         onSaved={() => { setEditOpen(false); void reload(); }}
         lead={lead}
         fundingCalls={fundingCalls}
-        existingCallTypes={[lead.call_type]}
       />
 
       <ConfirmDialog
