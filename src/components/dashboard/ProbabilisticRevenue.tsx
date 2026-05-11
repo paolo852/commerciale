@@ -62,7 +62,7 @@ export default function ProbabilisticRevenue({ offers }: { offers: Offer[] }) {
       border: 'border-amber-200',
     },
     {
-      label: 'Atteso',
+      label: 'Mediano',
       sublabel: 'P50 — mediana della distribuzione',
       value: rev.p50,
       color: 'text-emerald-700',
