@@ -70,7 +70,7 @@ export default function LeadCandidateDetail() {
         lead_id: lead.id,
         body: newBody.trim(),
         author_id: currentPm?.id ?? null,
-        author_name: currentPm?.name ?? user?.email ?? 'Anonimo',
+        author_name: user?.email ?? currentPm?.name ?? 'Anonimo',
       });
       setNewBody('');
       await reload();
