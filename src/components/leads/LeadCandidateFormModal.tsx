@@ -262,20 +262,6 @@ export default function LeadCandidateFormModal({
           )}
         </div>
 
-        {/* Tipologia (used for grouping in list view) */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Tipologia di bando
-            <span className="ml-1.5 text-xs font-normal text-slate-400">(per raggruppamento nella lista)</span>
-          </label>
-          <input
-            type="text" value={form.call_type}
-            onChange={(e) => update('call_type', e.target.value)}
-            placeholder="es. HORIZON Europe, PNRR, Regionale…"
-            className={inputClass}
-          />
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Dati di massima sul progetto potenziale</label>
           <textarea
