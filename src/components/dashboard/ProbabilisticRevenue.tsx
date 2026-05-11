@@ -124,10 +124,20 @@ export default function ProbabilisticRevenue({ offers }: { offers: Offer[] }) {
           </div>
 
           <p className="mt-4 text-[11px] text-slate-400 leading-relaxed">
-            Distribuzione esatta del fatturato come convoluzione di {rev.pipelineCount} eventi
-            indipendenti (ogni offerta vale "budget" se vinta, "0" se persa).
-            I percentili sono calcolati direttamente sulla CDF —
-            mai superiori al massimo teorico ({formatEUR(rev.maxPossible)}).
+            {rev.method === 'exact'
+              ? <>
+                  Distribuzione esatta del fatturato come convoluzione di {rev.pipelineCount} variabili
+                  di Bernoulli indipendenti (ogni offerta vale "budget" se vinta, "0" se persa).
+                  I percentili sono calcolati direttamente sulla CDF —
+                  mai superiori al massimo teorico ({formatEUR(rev.maxPossible)}).
+                </>
+              : <>
+                  Simulazione Monte Carlo con 50.000 campioni su {rev.pipelineCount} variabili
+                  di Bernoulli indipendenti (ogni offerta vale "budget" se vinta, "0" se persa).
+                  I percentili sono estratti dai campioni ordinati —
+                  mai superiori al massimo teorico ({formatEUR(rev.maxPossible)}).
+                </>
+            }
           </p>
         </div>
       )}
