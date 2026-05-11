@@ -135,6 +135,7 @@ export interface Concept {
   notes: string | null;
   promoted_offer_id: string | null;
   created_at: string;
+  assignees?: ConceptAssignee[];
 }
 
 export type CreateConceptForm = Pick<Concept, 'name' | 'pi' | 'ente' | 'description' | 'status' | 'notes'>;

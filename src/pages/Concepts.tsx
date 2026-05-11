@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Clock, FlaskConical, Plus, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, FlaskConical, Plus, Users, XCircle } from 'lucide-react';
 import { useConceptsData } from '../hooks/useConceptsData';
 import { conceptsService } from '../lib/dataService';
 import { formatDate } from '../lib/format';
@@ -16,6 +16,20 @@ const tabs: { id: ViewTab; label: string }[] = [
   { id: 'promosso', label: 'Promossi' },
   { id: 'rifiutato', label: 'Rifiutati' },
 ];
+
+function StatCard({ label, value, cls, Icon }: {
+  label: string; value: number; cls: string; Icon: typeof Clock;
+}) {
+  return (
+    <div className={`rounded-2xl border px-3 py-3 ${cls}`}>
+      <div className="flex items-center gap-1.5 text-xs font-medium opacity-80">
+        <Icon className="w-3.5 h-3.5" />
+        {label}
+      </div>
+      <div className="text-2xl font-semibold tabular-nums mt-1">{value}</div>
+    </div>
+  );
+}
 
 function StatusBadge({ value }: { value: ConceptStatus }) {
   const map = {
@@ -46,6 +60,23 @@ export default function Concepts() {
     promosso: concepts.filter((c) => c.status === 'promosso').length,
     rifiutato: concepts.filter((c) => c.status === 'rifiutato').length,
   }), [concepts]);
+
+  // Carico per PM: conta concept attivi (non rifiutati) per ogni PM assegnato
+  const pmWorkload = useMemo(() => {
+    const map = new Map<string, { name: string; total: number; in_valutazione: number; promosso: number }>();
+    concepts.forEach((c) => {
+      (c.assignees ?? []).forEach((a) => {
+        if (!a.project_manager) return;
+        const key = a.project_manager.id;
+        const entry = map.get(key) ?? { name: a.project_manager.name, total: 0, in_valutazione: 0, promosso: 0 };
+        entry.total += 1;
+        if (c.status === 'in_valutazione') entry.in_valutazione += 1;
+        if (c.status === 'promosso') entry.promosso += 1;
+        map.set(key, entry);
+      });
+    });
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [concepts]);
 
   const visible = useMemo(
     () => view === 'all' ? concepts : concepts.filter((c) => c.status === view),
@@ -79,6 +110,50 @@ export default function Concepts() {
 
       {error && (
         <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
+      )}
+
+      {/* Analytics: stato + carico per PM */}
+      {!loading && concepts.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-1 grid grid-cols-3 gap-2">
+            <StatCard label="In valutazione" value={counts.in_valutazione} cls="bg-amber-50 text-amber-700 border-amber-200" Icon={Clock} />
+            <StatCard label="Promossi" value={counts.promosso} cls="bg-emerald-50 text-emerald-700 border-emerald-200" Icon={CheckCircle2} />
+            <StatCard label="Rifiutati" value={counts.rifiutato} cls="bg-slate-50 text-slate-600 border-slate-200" Icon={XCircle} />
+          </div>
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
+              <Users className="w-4 h-4 text-indigo-500" />
+              Carico per Project Manager
+            </h3>
+            {pmWorkload.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">Nessun concept assegnato a un PM.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {pmWorkload.map((pm) => (
+                  <li key={pm.name} className="flex items-center gap-2 text-sm">
+                    <span className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0">
+                      {pm.name[0]?.toUpperCase()}
+                    </span>
+                    <span className="flex-1 truncate text-slate-700">{pm.name}</span>
+                    <span className="text-xs text-slate-500 tabular-nums flex items-center gap-2">
+                      {pm.in_valutazione > 0 && (
+                        <span className="bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                          {pm.in_valutazione} in valutazione
+                        </span>
+                      )}
+                      {pm.promosso > 0 && (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-md">
+                          {pm.promosso} promossi
+                        </span>
+                      )}
+                      <span className="text-slate-900 font-semibold">{pm.total} tot.</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
 
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit flex-wrap">
@@ -135,6 +210,30 @@ export default function Concepts() {
               )}
               {c.description && (
                 <p className="text-sm text-slate-600 line-clamp-3">{c.description}</p>
+              )}
+              {c.assignees && c.assignees.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <div className="flex -space-x-1.5">
+                    {c.assignees.slice(0, 4).map((a) => (
+                      <span
+                        key={a.project_manager_id}
+                        title={a.project_manager?.name ?? ''}
+                        className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center ring-2 ring-white"
+                      >
+                        {a.project_manager?.name[0]?.toUpperCase() ?? '?'}
+                      </span>
+                    ))}
+                    {c.assignees.length > 4 && (
+                      <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
+                        +{c.assignees.length - 4}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-500 truncate">
+                    {c.assignees.map((a) => a.project_manager?.name).filter(Boolean).join(', ')}
+                  </span>
+                </div>
               )}
               <div className="flex items-center justify-between text-xs text-slate-400 mt-auto pt-2">
                 <span>Creato {formatDate(c.created_at)}</span>

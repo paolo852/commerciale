@@ -287,13 +287,20 @@ export const fundingCallPdfService = {
 export const conceptsService = {
   async list(): Promise<Concept[]> {
     if (isDemoMode) {
-      return [...demoConcepts.list()].sort((a, b) =>
-        b.created_at.localeCompare(a.created_at),
-      );
+      const pms = demoProjectManagers.list();
+      return [...demoConcepts.list()]
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .map((c) => ({
+          ...c,
+          assignees: demoConceptAssignees.list(c.id).map((a) => ({
+            ...a,
+            project_manager: pms.find((p) => p.id === a.project_manager_id) ?? null,
+          })),
+        }));
     }
     const { data, error } = await ensureSb()
       .from('concepts')
-      .select('*')
+      .select('*, assignees:concept_assignees(*, project_manager:project_managers(*))')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data ?? []) as Concept[];
