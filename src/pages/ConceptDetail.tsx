@@ -12,7 +12,6 @@ import {
 } from '../lib/dataService';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
-import ConceptMatchesPanel from '../components/concepts/ConceptMatchesPanel';
 import OfferFormModal from '../components/offerte/OfferFormModal';
 import MentionInput, { CommentBody } from '../components/concepts/MentionInput';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -173,8 +172,6 @@ export default function ConceptDetail() {
         currentUserId={user?.id ?? null}
         onChange={reload}
       />
-
-      <ConceptMatchesPanel concept={concept} fundingCalls={fundingCalls} />
 
       <ConceptFormModal
         open={editOpen}
