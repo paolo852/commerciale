@@ -24,6 +24,7 @@ interface FormState {
   type: OfferType;
   funding_call: string;
   client: string;
+  consulting_call_id: string;
   deadline: string;
   budget: string;
   probability: number;
@@ -38,7 +39,7 @@ interface FormState {
 }
 
 const emptyForm: FormState = {
-  name: '', type: 'financed', funding_call: '', client: '',
+  name: '', type: 'financed', funding_call: '', client: '', consulting_call_id: '',
   deadline: '', budget: '', probability: 50,
   project_manager_id: '', pi: '', ente: '',
   status: 'in_lavorazione',
@@ -49,6 +50,7 @@ function fromOffer(o: Offer): FormState {
   return {
     name: o.name, type: o.type,
     funding_call: o.funding_call ?? '', client: o.client ?? '',
+    consulting_call_id: o.consulting_call_id ?? '',
     deadline: toDateInputValue(o.deadline), budget: String(o.budget),
     probability: o.probability ?? 50,
     project_manager_id: o.project_manager_id ?? '',
@@ -121,6 +123,15 @@ export default function OfferFormModal({
     }));
   }
 
+  function handleConsultingCallChange(id: string) {
+    const fc = fundingCalls.find((f) => f.id === id);
+    setForm((f) => ({
+      ...f,
+      consulting_call_id: id,
+      ...(fc?.deadline && !f.deadline ? { deadline: toDateInputValue(fc.deadline) } : {}),
+    }));
+  }
+
   function handleStatusChange(status: OfferStatus) {
     setForm((f) => ({
       ...f,
@@ -155,6 +166,7 @@ export default function OfferFormModal({
         name: form.name.trim(), type: form.type,
         funding_call: form.type === 'financed' ? form.funding_call : null,
         client: form.type === 'consulting' ? form.client.trim() : null,
+        consulting_call_id: form.type === 'consulting' ? (form.consulting_call_id || null) : null,
         deadline: form.deadline, budget,
         probability: form.probability,
         project_manager_id: form.project_manager_id || null,
@@ -226,6 +238,25 @@ export default function OfferFormModal({
             </div>
           )}
         </div>
+
+        {form.type === 'consulting' && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Bando di riferimento
+              <span className="ml-1.5 text-xs font-normal text-slate-400">(opzionale — per includere nel conteggio del bando)</span>
+            </label>
+            <select
+              value={form.consulting_call_id}
+              onChange={(e) => handleConsultingCallChange(e.target.value)}
+              className={selectClass}
+            >
+              <option value="">— Nessuno —</option>
+              {fundingCalls.map((fc) => (
+                <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-4">
           <div>

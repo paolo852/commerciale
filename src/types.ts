@@ -42,8 +42,9 @@ export interface Offer {
   user_id: string;
   name: string;
   type: OfferType;
-  funding_call: string | null;  // solo se type = 'financed'
+  funding_call: string | null;  // solo se type = 'financed' (codice bando)
   client: string | null;        // solo se type = 'consulting'
+  consulting_call_id: string | null; // opzionale per consulenze legate a un bando
   deadline: string;             // ISO date string
   budget: number;
   probability: number; // 0-100, probabilità di successo stimata
@@ -99,6 +100,7 @@ export interface ConsultingOfferForm extends OfferFormBase {
   type: 'consulting';
   client: string;
   funding_call?: null;
+  consulting_call_id?: string | null;
 }
 
 export type CreateOfferForm = FinancedOfferForm | ConsultingOfferForm;

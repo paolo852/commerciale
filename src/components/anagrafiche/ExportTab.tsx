@@ -175,7 +175,7 @@ export default function ExportTab() {
       await Promise.all(newPMs.map((p) => projectManagersService.create({ name: p.name, email: p.email, active: p.active }, user.id)));
       await Promise.all(newFCs.map((f) => fundingCallsService.create({ code: f.code, name: f.name, body: f.body, deadline: f.deadline, description: (f as { description?: string | null }).description ?? null, notes: f.notes, probability: f.probability ?? 50, source_url: (f as { source_url?: string | null }).source_url ?? null }, user.id)));
       await Promise.all(newOffers.map((o) => offersService.create({
-        name: o.name, type: o.type, funding_call: o.funding_call, client: o.client,
+        name: o.name, type: o.type, funding_call: o.funding_call, client: o.client, consulting_call_id: o.consulting_call_id ?? null,
         deadline: o.deadline, budget: o.budget, probability: o.probability ?? 50,
         project_manager_id: o.project_manager_id, pi: o.pi ?? null, ente: o.ente ?? null,
         status: o.status, outcome: o.outcome,

@@ -231,7 +231,10 @@ export default function LeadCandidates() {
             const fc = fcId ? fcById.get(fcId) : null;
             const conceptCount = groupLeads.filter((l) => l.status === 'promosso' && l.promoted_concept_id).length;
             const offerCount = fc
-              ? offers.filter((o) => o.funding_call && o.funding_call.includes(fc.code)).length
+              ? offers.filter((o) =>
+                  (o.funding_call && o.funding_call.includes(fc.code)) ||
+                  (o.consulting_call_id === fc.id)
+                ).length
               : 0;
             const groupKey = fcId ?? '__no_call__';
             const isCollapsed = collapsed.has(groupKey);
