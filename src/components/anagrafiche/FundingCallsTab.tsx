@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ExternalLink, FileSearch, FileText, Globe, Plus, Trash2, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ChevronDown, ExternalLink, FileSearch, FileText, Globe, Plus, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { fundingCallPdfService, fundingCallsService } from '../../lib/dataService';
 import type { EUCall } from '../../../api/eu-calls';
@@ -21,6 +21,69 @@ function probColor(p: number): string {
 const inputClass =
   'w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
 
+function CallsTable({
+  rows, loading, onEdit, onDelete, emptyLabel = 'Nessun bando.', dimmed = false,
+}: {
+  rows: FundingCall[];
+  loading: boolean;
+  onEdit: (fc: FundingCall) => void;
+  onDelete: (fc: FundingCall) => void;
+  emptyLabel?: string;
+  dimmed?: boolean;
+}) {
+  return (
+    <div className={`bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden ${dimmed ? 'opacity-70' : ''}`}>
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50/70">
+            <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Codice</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Nome</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Ente</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Scadenza</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Prob.</th>
+            <th className="text-right px-4 py-3" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {loading ? (
+            <tr><td colSpan={6} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
+          ) : rows.length === 0 ? (
+            <tr><td colSpan={6} className="text-center py-12">
+              <FileSearch className="w-10 h-10 text-slate-200 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">{emptyLabel}</p>
+            </td></tr>
+          ) : rows.map((fc) => (
+            <tr key={fc.id} onClick={() => onEdit(fc)} className="cursor-pointer hover:bg-slate-50/80 transition-colors">
+              <td className="px-4 py-3.5">
+                <span className="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-lg">{fc.code}</span>
+              </td>
+              <td className="px-4 py-3.5 text-sm font-medium text-slate-900">{fc.name}</td>
+              <td className="px-4 py-3.5 text-sm text-slate-600">{fc.body ?? <span className="text-slate-300">—</span>}</td>
+              <td className="px-4 py-3.5 text-sm text-slate-700 tabular-nums">{formatDate(fc.deadline)}</td>
+              <td className="px-4 py-3.5 text-right">
+                <span className={`text-sm font-semibold tabular-nums ${probColor(fc.probability ?? 50)}`}>
+                  {fc.probability ?? 50}%
+                </span>
+              </td>
+              <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-end gap-2">
+                  {fc.source_url && (
+                    <a href={fc.source_url} target="_blank" rel="noopener noreferrer"
+                      className="text-slate-400 hover:text-indigo-500 transition" title="Apri nel portale">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                  <button onClick={() => onDelete(fc)} className="text-xs text-slate-400 hover:text-red-600 transition">Elimina</button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function FundingCallsTab() {
   const { user } = useAuth();
   const [items, setItems] = useState<FundingCall[]>([]);
@@ -34,7 +97,13 @@ export default function FundingCallsTab() {
   const [pdfUploading, setPdfUploading] = useState(false);
   const [pdfRemoving, setPdfRemoving] = useState(false);
   const [euModalOpen, setEuModalOpen] = useState(false);
+  const [pastOpen, setPastOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const activeCalls = useMemo(() => items.filter((fc) => !fc.deadline || fc.deadline >= today), [items, today]);
+  const pastCalls   = useMemo(() => items.filter((fc) => fc.deadline && fc.deadline < today)
+    .sort((a, b) => (b.deadline ?? '').localeCompare(a.deadline ?? '')), [items, today]);
 
   async function reload() {
     setLoading(true); setError(null);
@@ -130,7 +199,10 @@ export default function FundingCallsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-slate-500">{items.length} {items.length === 1 ? 'bando' : 'bandi'}</p>
+        <p className="text-sm text-slate-500">
+          {activeCalls.length} {activeCalls.length === 1 ? 'bando attivo' : 'bandi attivi'}
+          {pastCalls.length > 0 && <span className="text-slate-400"> · {pastCalls.length} scaduti</span>}
+        </p>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setEuModalOpen(true)}
@@ -147,55 +219,39 @@ export default function FundingCallsTab() {
 
       {error && <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
 
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/70">
-              <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Codice</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Nome</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Ente</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Scadenza</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Prob.</th>
-              <th className="text-right px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr><td colSpan={6} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
-            ) : items.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-12">
-                <FileSearch className="w-10 h-10 text-slate-200 mx-auto mb-2" />
-                <p className="text-sm text-slate-400">Nessun bando. Aggiungine uno.</p>
-              </td></tr>
-            ) : items.map((fc) => (
-              <tr key={fc.id} onClick={() => openEdit(fc)} className="cursor-pointer hover:bg-slate-50/80 transition-colors">
-                <td className="px-4 py-3.5">
-                  <span className="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-lg">{fc.code}</span>
-                </td>
-                <td className="px-4 py-3.5 text-sm font-medium text-slate-900">{fc.name}</td>
-                <td className="px-4 py-3.5 text-sm text-slate-600">{fc.body ?? <span className="text-slate-300">—</span>}</td>
-                <td className="px-4 py-3.5 text-sm text-slate-700 tabular-nums">{formatDate(fc.deadline)}</td>
-                <td className="px-4 py-3.5 text-right">
-                  <span className={`text-sm font-semibold tabular-nums ${probColor(fc.probability ?? 50)}`}>
-                    {fc.probability ?? 50}%
-                  </span>
-                </td>
-                <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-end gap-2">
-                    {fc.source_url && (
-                      <a href={fc.source_url} target="_blank" rel="noopener noreferrer"
-                        className="text-slate-400 hover:text-indigo-500 transition" title="Apri nel portale">
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    )}
-                    <button onClick={() => setToDelete(fc)} className="text-xs text-slate-400 hover:text-red-600 transition">Elimina</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Active calls table */}
+      <CallsTable
+        rows={activeCalls}
+        loading={loading}
+        onEdit={openEdit}
+        onDelete={setToDelete}
+        emptyLabel="Nessun bando attivo. Aggiungine uno."
+      />
+
+      {/* Past calls — collapsible */}
+      {!loading && pastCalls.length > 0 && (
+        <div className="rounded-2xl border border-slate-200/80 overflow-hidden">
+          <button
+            onClick={() => setPastOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition text-sm font-medium text-slate-600"
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-slate-300" />
+              Passati ({pastCalls.length})
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${pastOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {pastOpen && (
+            <CallsTable
+              rows={pastCalls}
+              loading={false}
+              onEdit={openEdit}
+              onDelete={setToDelete}
+              dimmed
+            />
+          )}
+        </div>
+      )}
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? 'Modifica bando' : 'Nuovo bando'}>
         <form onSubmit={handleSubmit} className="space-y-4">
