@@ -3,6 +3,7 @@ import type {
   Concept, ConceptAssignee, ConceptVersion, ConceptVersionComment, ConceptRevisionDeadline,
   LeadCandidate, LeadUpdate,
   AppNotification, NotificationPreferences, NotificationType,
+  Task,
 } from '../types';
 
 // ============================================================
@@ -25,6 +26,7 @@ const KEYS = {
   conceptDeadlines: 'commerciale.demo.conceptDeadlines',
   notifications: 'commerciale.demo.notifications',
   notificationPrefs: 'commerciale.demo.notificationPrefs',
+  tasks: 'commerciale.demo.tasks',
 } as const;
 
 export interface DemoUser {
@@ -437,5 +439,37 @@ export const demoNotificationPrefs = {
     const updated = { ...current, ...patch, user_id: userId };
     write(KEYS.notificationPrefs, { ...all, [userId]: updated });
     return updated;
+  },
+};
+
+// ============================================================
+// Tasks
+// ============================================================
+
+export const demoTasks = {
+  list(): Task[] {
+    return read<Task[]>(KEYS.tasks, []).sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return b.created_at.localeCompare(a.created_at);
+    });
+  },
+  create(input: Omit<Task, 'id' | 'user_id' | 'created_at'>, userId: string): Task {
+    const item: Task = { ...input, id: uuid(), user_id: userId, created_at: new Date().toISOString() };
+    write(KEYS.tasks, [item, ...read<Task[]>(KEYS.tasks, [])]);
+    return item;
+  },
+  setCompleted(id: string, completed: boolean): Task | null {
+    const all = read<Task[]>(KEYS.tasks, []);
+    const idx = all.findIndex((t) => t.id === id);
+    if (idx < 0) return null;
+    all[idx] = { ...all[idx], completed };
+    write(KEYS.tasks, all);
+    return all[idx];
+  },
+  remove(id: string): void {
+    write(KEYS.tasks, read<Task[]>(KEYS.tasks, []).filter((t) => t.id !== id));
   },
 };

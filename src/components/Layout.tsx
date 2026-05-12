@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   UserSearch,
+  Users,
   X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,6 +22,7 @@ const navItems = [
   { to: '/concepts', label: 'Concept Development', icon: FlaskConical },
   { to: '/offerte', label: 'Offerte', icon: FileText },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/team', label: 'Team', icon: Users },
   { to: '/anagrafiche', label: 'Anagrafiche', icon: BookOpen },
 ];
 

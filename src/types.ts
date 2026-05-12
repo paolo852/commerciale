@@ -251,6 +251,25 @@ export type CreateLeadCandidateForm = Pick<
 export type UpdateLeadCandidateForm = Partial<CreateLeadCandidateForm & Pick<LeadCandidate, 'promoted_concept_id'>>;
 
 // ============================================================
+// Tasks
+// ============================================================
+
+export interface Task {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string | null;
+  pm_id: string | null;
+  entity_id: string | null;
+  entity_type: 'lead' | 'concept' | 'offer' | null;
+  due_date: string | null;
+  completed: boolean;
+  created_at: string;
+}
+
+export type CreateTaskForm = Pick<Task, 'title' | 'body' | 'pm_id' | 'entity_id' | 'entity_type' | 'due_date'>;
+
+// ============================================================
 // Notifications
 // ============================================================
 

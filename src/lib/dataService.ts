@@ -13,6 +13,7 @@ import {
   demoLeadUpdates,
   demoNotifications,
   demoNotificationPrefs,
+  demoTasks,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -39,6 +40,8 @@ import type {
   AppNotification,
   NotificationPreferences,
   NotificationType,
+  Task,
+  CreateTaskForm,
 } from '../types';
 
 // ============================================================
@@ -965,5 +968,53 @@ export const notificationPrefsService = {
       .select().single();
     if (error) throw error;
     return data as NotificationPreferences;
+  },
+};
+
+// ----------------------------------------------------------------
+// Tasks
+// ----------------------------------------------------------------
+export const tasksService = {
+  async list(): Promise<Task[]> {
+    if (isDemoMode) return demoTasks.list();
+    const { data, error } = await ensureSb()
+      .from('tasks')
+      .select('*')
+      .order('completed', { ascending: true })
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Task[];
+  },
+
+  async create(input: CreateTaskForm, userId: string): Promise<Task> {
+    if (isDemoMode) return demoTasks.create({ ...input, completed: false }, userId);
+    const { data, error } = await ensureSb()
+      .from('tasks')
+      .insert({ ...input, user_id: userId, completed: false })
+      .select().single();
+    if (error) throw error;
+    return data as Task;
+  },
+
+  async setCompleted(id: string, completed: boolean): Promise<Task> {
+    if (isDemoMode) {
+      const t = demoTasks.setCompleted(id, completed);
+      if (!t) throw new Error('Task non trovato');
+      return t;
+    }
+    const { data, error } = await ensureSb()
+      .from('tasks')
+      .update({ completed })
+      .eq('id', id)
+      .select().single();
+    if (error) throw error;
+    return data as Task;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoTasks.remove(id); return; }
+    const { error } = await ensureSb().from('tasks').delete().eq('id', id);
+    if (error) throw error;
   },
 };
