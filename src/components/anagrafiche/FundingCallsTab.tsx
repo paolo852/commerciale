@@ -9,8 +9,8 @@ import Modal from '../Modal';
 import ConfirmDialog from '../ConfirmDialog';
 import EUCallsImportModal from './EUCallsImportModal';
 
-interface FormState { code: string; name: string; body: string; deadline: string; internal_deadline: string; description: string; notes: string; probability: number; }
-const emptyForm: FormState = { code: '', name: '', body: '', deadline: '', internal_deadline: '', description: '', notes: '', probability: 50 };
+interface FormState { code: string; name: string; body: string; deadline: string; lead_deadline: string; internal_deadline: string; description: string; notes: string; probability: number; }
+const emptyForm: FormState = { code: '', name: '', body: '', deadline: '', lead_deadline: '', internal_deadline: '', description: '', notes: '', probability: 50 };
 
 function probColor(p: number): string {
   if (p >= 70) return 'text-emerald-600';
@@ -117,7 +117,7 @@ export default function FundingCallsTab() {
   function openNew() { setEditing(null); setForm(emptyForm); setFormOpen(true); }
   function openEdit(fc: FundingCall) {
     setEditing(fc);
-    setForm({ code: fc.code, name: fc.name, body: fc.body ?? '', deadline: toDateInputValue(fc.deadline), internal_deadline: toDateInputValue(fc.internal_deadline), description: fc.description ?? '', notes: fc.notes ?? '', probability: fc.probability ?? 50 });
+    setForm({ code: fc.code, name: fc.name, body: fc.body ?? '', deadline: toDateInputValue(fc.deadline), lead_deadline: toDateInputValue(fc.lead_deadline), internal_deadline: toDateInputValue(fc.internal_deadline), description: fc.description ?? '', notes: fc.notes ?? '', probability: fc.probability ?? 50 });
     setFormOpen(true);
   }
 
@@ -125,7 +125,7 @@ export default function FundingCallsTab() {
     e.preventDefault(); if (!user) return;
     setSaving(true);
     try {
-      const p = { code: form.code.trim(), name: form.name.trim(), body: form.body.trim() || null, deadline: form.deadline || null, internal_deadline: form.internal_deadline || null, description: form.description.trim() || null, notes: form.notes.trim() || null, probability: form.probability, source_url: editing?.source_url ?? null };
+      const p = { code: form.code.trim(), name: form.name.trim(), body: form.body.trim() || null, deadline: form.deadline || null, lead_deadline: form.lead_deadline || null, internal_deadline: form.internal_deadline || null, description: form.description.trim() || null, notes: form.notes.trim() || null, probability: form.probability, source_url: editing?.source_url ?? null };
       if (editing) await fundingCallsService.update(editing.id, p);
       else await fundingCallsService.create(p, user.id);
       setFormOpen(false); await reload();
@@ -185,6 +185,7 @@ export default function FundingCallsTab() {
           name: c.title,
           body: c.programme || null,
           deadline: c.deadline,
+          lead_deadline: null,
           internal_deadline: null,
           description: c.description ?? null,
           notes: null,
@@ -270,10 +271,17 @@ export default function FundingCallsTab() {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome *</label>
             <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Scadenza bando</label>
               <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Scadenza interna lead
+                <span className="ml-1.5 text-xs font-normal text-slate-400">(raccolta candidati)</span>
+              </label>
+              <input type="date" value={form.lead_deadline} onChange={(e) => setForm({ ...form, lead_deadline: e.target.value })} className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">

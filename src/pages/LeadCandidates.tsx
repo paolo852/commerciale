@@ -255,15 +255,24 @@ export default function LeadCandidates() {
                       <p className="text-sm font-semibold text-indigo-600 tracking-wide font-mono mb-0.5">{sub}</p>
                     )}
                     <h2 className="text-lg font-bold text-slate-900 leading-tight">{label}</h2>
-                    {fc?.internal_deadline && (() => {
+                    {fc && (fc.lead_deadline || fc.internal_deadline) && (() => {
                       const today = new Date().toISOString().slice(0, 10);
-                      const isUrgent = fc.internal_deadline <= new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-                      const isPast = fc.internal_deadline < today;
+                      const urgent14 = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+                      const deadlineChip = (date: string, label: string) => {
+                        const isPast = date < today;
+                        const isUrgent = date <= urgent14;
+                        return (
+                          <span className={`inline-flex items-center gap-1 font-medium ${isPast ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-slate-500'}`}>
+                            <CalendarClock className="w-3 h-3" />
+                            {label}: {date}
+                            {isPast && <span className="font-semibold">(scaduta)</span>}
+                          </span>
+                        );
+                      };
                       return (
-                        <p className={`text-xs mt-1 flex items-center gap-1 font-medium ${isPast ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-slate-500'}`}>
-                          <CalendarClock className="w-3 h-3" />
-                          Scadenza interna concept: {fc.internal_deadline}
-                          {isPast && <span className="text-red-500 font-semibold">(scaduta)</span>}
+                        <p className="text-xs mt-1 flex items-center gap-3 flex-wrap">
+                          {fc.lead_deadline && deadlineChip(fc.lead_deadline, 'Lead')}
+                          {fc.internal_deadline && deadlineChip(fc.internal_deadline, 'Concept')}
                         </p>
                       );
                     })()}

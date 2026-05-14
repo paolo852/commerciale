@@ -28,6 +28,7 @@ export interface FundingCall {
   name: string;
   body: string | null;
   deadline: string | null;
+  lead_deadline: string | null;      // scadenza interna per raccolta lead candidates
   internal_deadline: string | null; // scadenza interna per definizione concept
   description: string | null;
   notes: string | null;
@@ -71,7 +72,7 @@ export type CreateProjectManagerForm = Pick<ProjectManager, 'name' | 'email' | '
 
 export type UpdateProjectManagerForm = Partial<CreateProjectManagerForm>;
 
-export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'internal_deadline' | 'description' | 'notes' | 'probability' | 'source_url'>;
+export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'lead_deadline' | 'internal_deadline' | 'description' | 'notes' | 'probability' | 'source_url'>;
 
 // ============================================================
 // Concept files (documenti tecnologia)

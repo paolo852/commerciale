@@ -201,6 +201,7 @@ export const fundingCallsService = {
         name: input.name,
         body: input.body ?? null,
         deadline: input.deadline ?? null,
+        lead_deadline: input.lead_deadline ?? null,
         internal_deadline: input.internal_deadline ?? null,
         description: input.description ?? null,
         notes: input.notes ?? null,

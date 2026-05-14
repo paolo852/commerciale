@@ -121,6 +121,7 @@ export default function LeadCandidateFormModal({
         name: newCall.name.trim(),
         body: newCall.body.trim() || null,
         deadline: newCall.deadline || null,
+        lead_deadline: null,
         internal_deadline: null,
         description: null,
         notes: null,
