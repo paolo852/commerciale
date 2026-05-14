@@ -1,0 +1,218 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Calendar, Edit3, Euro, Percent, Trash2, User } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useOffersData } from '../hooks/useOffersData';
+import { offersService } from '../lib/dataService';
+import { formatDate, formatEUR } from '../lib/format';
+import { StatusBadge, OutcomeBadge, TypeBadge } from '../components/Badges';
+import OfferFormModal from '../components/offerte/OfferFormModal';
+import ConfirmDialog from '../components/ConfirmDialog';
+import EntityTasks from '../components/EntityTasks';
+import type { Offer } from '../types';
+
+export default function OfferDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { projectManagers, fundingCalls, offers, reload: reloadList } = useOffersData();
+
+  const [offer, setOffer] = useState<Offer | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [toDelete, setToDelete] = useState(false);
+
+  const reload = useCallback(async () => {
+    if (!id) return;
+    setLoading(true); setError(null);
+    try {
+      const o = await offersService.get(id);
+      if (!o) setError('Offerta non trovata.');
+      else setOffer(o);
+    } catch (e) {
+      setError((e as { message?: string })?.message ?? 'Errore caricamento');
+    } finally { setLoading(false); }
+  }, [id]);
+
+  useEffect(() => { void reload(); }, [reload]);
+
+  async function handleDelete() {
+    if (!offer) return;
+    await offersService.remove(offer.id);
+    navigate('/offerte');
+  }
+
+  if (loading) return (
+    <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">
+      Caricamento…
+    </div>
+  );
+  if (error || !offer) return (
+    <div className="space-y-4">
+      <button onClick={() => navigate('/offerte')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1">
+        <ArrowLeft className="w-3.5 h-3.5" /> Torna alle offerte
+      </button>
+      <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error ?? 'Offerta non trovata.'}</div>
+    </div>
+  );
+
+  const pm = offer.project_manager_id ? projectManagers.find((p) => p.id === offer.project_manager_id) : null;
+  const linkedCall = offer.consulting_call_id
+    ? fundingCalls.find((f) => f.id === offer.consulting_call_id)
+    : null;
+
+  const prob = offer.probability ?? 50;
+  const probColor = prob >= 70 ? 'text-emerald-600' : prob >= 40 ? 'text-amber-600' : 'text-red-500';
+
+  return (
+    <div className="space-y-5">
+      <button onClick={() => navigate('/offerte')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1">
+        <ArrowLeft className="w-3.5 h-3.5" /> Torna alle offerte
+      </button>
+
+      {/* Header card */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h1 className="text-xl font-semibold text-slate-900">{offer.name}</h1>
+              <TypeBadge value={offer.type} />
+              <StatusBadge value={offer.status} />
+              <OutcomeBadge value={offer.outcome} />
+            </div>
+            {pm && (
+              <span className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
+                <span className="w-4 h-4 rounded-full bg-violet-200 text-violet-800 flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
+                  {pm.name[0]}
+                </span>
+                {pm.name}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setEditOpen(true)}
+              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition flex items-center gap-1.5"
+            >
+              <Edit3 className="w-3.5 h-3.5" /> Modifica
+            </button>
+            <button
+              onClick={() => setToDelete(true)}
+              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-slate-200 rounded-lg hover:bg-red-50 hover:border-red-200 transition flex items-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Elimina
+            </button>
+          </div>
+        </div>
+
+        {/* Key metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
+            <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Scadenza</p>
+              <p className="text-sm font-semibold text-slate-900 mt-0.5">{formatDate(offer.deadline)}</p>
+            </div>
+          </div>
+          <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
+            <Euro className="w-4 h-4 text-slate-400 shrink-0" />
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Importo</p>
+              <p className="text-sm font-semibold text-slate-900 mt-0.5">{formatEUR(offer.budget)}</p>
+            </div>
+          </div>
+          <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
+            <Percent className="w-4 h-4 text-slate-400 shrink-0" />
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Probabilità</p>
+              <p className={`text-sm font-semibold mt-0.5 ${probColor}`}>{prob}%</p>
+            </div>
+          </div>
+          <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
+            <User className="w-4 h-4 text-slate-400 shrink-0" />
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">
+                {offer.type === 'financed' ? 'Bando' : 'Cliente'}
+              </p>
+              <p className="text-sm font-semibold text-slate-900 mt-0.5 truncate max-w-[140px]">
+                {offer.type === 'financed' ? (offer.funding_call || '—') : (offer.client || '—')}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* PI / Ente */}
+        {(offer.pi || offer.ente) && (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {offer.pi && (
+              <div className="bg-slate-50 rounded-xl px-4 py-3">
+                <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide mb-0.5">PI</p>
+                <p className="text-sm text-slate-700">{offer.pi}</p>
+              </div>
+            )}
+            {offer.ente && (
+              <div className="bg-slate-50 rounded-xl px-4 py-3">
+                <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide mb-0.5">Ente</p>
+                <p className="text-sm text-slate-700">{offer.ente}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Linked consulting call */}
+        {linkedCall && (
+          <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3">
+            <p className="text-[11px] text-indigo-500 font-medium uppercase tracking-wide mb-0.5">Bando di riferimento</p>
+            <p className="text-sm font-medium text-indigo-800">{linkedCall.code} — {linkedCall.name}</p>
+          </div>
+        )}
+
+        {/* Notes */}
+        {offer.notes && (
+          <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+            <p className="text-[11px] text-amber-600 font-medium uppercase tracking-wide mb-1">Note</p>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{offer.notes}</p>
+          </div>
+        )}
+
+        {/* Dates */}
+        {(offer.submitted_at || offer.decided_at) && (
+          <div className="mt-3 flex gap-4 flex-wrap text-xs text-slate-500">
+            {offer.submitted_at && <span>Presentata: <strong>{formatDate(offer.submitted_at)}</strong></span>}
+            {offer.decided_at && <span>Decisa: <strong>{formatDate(offer.decided_at)}</strong></span>}
+          </div>
+        )}
+      </div>
+
+      {/* Tasks */}
+      {user && (
+        <EntityTasks
+          entityId={offer.id}
+          entityType="offer"
+          projectManagers={projectManagers}
+          userId={user.id}
+        />
+      )}
+
+      <OfferFormModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={async () => { setEditOpen(false); await reload(); void reloadList(); }}
+        offer={offer}
+        projectManagers={projectManagers}
+        fundingCalls={fundingCalls}
+        offers={offers}
+      />
+
+      <ConfirmDialog
+        open={toDelete}
+        title="Eliminare l'offerta?"
+        message={`"${offer.name}" verrà rimossa definitivamente.`}
+        confirmLabel="Elimina" variant="danger"
+        onConfirm={handleDelete} onCancel={() => setToDelete(false)}
+      />
+    </div>
+  );
+}

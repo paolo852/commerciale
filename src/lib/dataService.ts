@@ -715,6 +715,19 @@ export const offersService = {
     return (data ?? []) as Offer[];
   },
 
+  async get(id: string): Promise<Offer | null> {
+    if (isDemoMode) {
+      return demoOffers.list().find((o) => o.id === id) ?? null;
+    }
+    const { data, error } = await ensureSb()
+      .from('offers')
+      .select('*, project_manager:project_managers(*)')
+      .eq('id', id)
+      .single();
+    if (error) return null;
+    return data as Offer;
+  },
+
   async create(input: Omit<Offer, 'id' | 'user_id' | 'created_at'>, userId: string): Promise<Offer> {
     if (isDemoMode) {
       return demoOffers.create(input);

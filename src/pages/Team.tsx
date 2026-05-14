@@ -48,7 +48,7 @@ function WorkloadCard({
       count: offers.length,
       icon: FileText,
       color: 'text-amber-600 bg-amber-50',
-      items: offers.map((o) => ({ id: o.id, name: o.name, sub: null, path: '/offerte' })),
+      items: offers.map((o) => ({ id: o.id, name: o.name, sub: null, path: `/offerte/${o.id}` })),
     },
   ];
 
@@ -227,7 +227,7 @@ export default function Team() {
     const map = new Map<string, { name: string; path: string }>();
     leads.forEach((l) => map.set(l.id, { name: l.researcher_name, path: `/leads/${l.id}` }));
     concepts.forEach((c) => map.set(c.id, { name: c.name, path: `/concepts/${c.id}` }));
-    offers.forEach((o) => map.set(o.id, { name: o.name, path: '/offerte' }));
+    offers.forEach((o) => map.set(o.id, { name: o.name, path: `/offerte/${o.id}` }));
     return map;
   }, [leads, concepts, offers]);
 

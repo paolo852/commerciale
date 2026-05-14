@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowUpDown, ChevronDown, ChevronUp, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
@@ -55,6 +56,7 @@ const selectClass =
   'px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
 
 export default function Offerte() {
+  const navigate = useNavigate();
   const { offers, projectManagers, fundingCalls, loading, error, reload } = useOffersData();
 
   const [view, setView] = useState<ViewTab>('in_corso');
@@ -133,7 +135,6 @@ export default function Offerte() {
   }
 
   function openNew() { setEditing(null); setFormOpen(true); }
-  function openEdit(o: Offer) { setEditing(o); setFormOpen(true); }
 
   async function handleDelete() {
     if (!toDelete) return;
@@ -347,7 +348,7 @@ export default function Offerte() {
                 const pm = o.project_manager_id ? pmById.get(o.project_manager_id) : undefined;
                 const sel = selected.has(o.id);
                 return (
-                  <tr key={o.id} onClick={() => openEdit(o)}
+                  <tr key={o.id} onClick={() => navigate(`/offerte/${o.id}`)}
                     className={`cursor-pointer transition-colors ${sel ? 'bg-indigo-50/50' : 'hover:bg-slate-50/80'}`}>
                     <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={sel} onChange={() => toggleOne(o.id)}
