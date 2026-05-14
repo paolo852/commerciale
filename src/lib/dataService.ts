@@ -14,6 +14,7 @@ import {
   demoNotifications,
   demoNotificationPrefs,
   demoTasks,
+  demoConceptFiles,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -42,6 +43,7 @@ import type {
   NotificationType,
   Task,
   CreateTaskForm,
+  ConceptFile,
 } from '../types';
 
 // ============================================================
@@ -199,6 +201,7 @@ export const fundingCallsService = {
         name: input.name,
         body: input.body ?? null,
         deadline: input.deadline ?? null,
+        internal_deadline: input.internal_deadline ?? null,
         description: input.description ?? null,
         notes: input.notes ?? null,
         probability: input.probability ?? 50,
@@ -1012,9 +1015,71 @@ export const tasksService = {
     return data as Task;
   },
 
+  async listByEntity(entityId: string): Promise<Task[]> {
+    if (isDemoMode) return demoTasks.list().filter((t) => t.entity_id === entityId);
+    const { data, error } = await ensureSb()
+      .from('tasks')
+      .select('*')
+      .eq('entity_id', entityId)
+      .order('completed', { ascending: true })
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Task[];
+  },
+
   async remove(id: string): Promise<void> {
     if (isDemoMode) { demoTasks.remove(id); return; }
     const { error } = await ensureSb().from('tasks').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Concept Files
+// ----------------------------------------------------------------
+export const conceptFilesService = {
+  async list(conceptId: string): Promise<ConceptFile[]> {
+    if (isDemoMode) return demoConceptFiles.list(conceptId);
+    const { data, error } = await ensureSb()
+      .from('concept_files')
+      .select('*')
+      .eq('concept_id', conceptId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as ConceptFile[];
+  },
+
+  async upload(conceptId: string, file: File, userId: string): Promise<ConceptFile> {
+    if (isDemoMode) {
+      const url: string = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      return demoConceptFiles.create({
+        concept_id: conceptId, user_id: userId,
+        filename: file.name, file_path: url, file_url: url,
+      });
+    }
+    const sb = ensureSb();
+    const path = `${conceptId}/${Date.now()}-${file.name}`;
+    const { error: upErr } = await sb.storage.from('concept-files').upload(path, file);
+    if (upErr) throw upErr;
+    const { data: { publicUrl } } = sb.storage.from('concept-files').getPublicUrl(path);
+    const { data, error } = await sb
+      .from('concept_files')
+      .insert({ concept_id: conceptId, user_id: userId, filename: file.name, file_path: path, file_url: publicUrl })
+      .select().single();
+    if (error) throw error;
+    return data as ConceptFile;
+  },
+
+  async remove(id: string, filePath: string): Promise<void> {
+    if (isDemoMode) { demoConceptFiles.remove(id); return; }
+    const sb = ensureSb();
+    await sb.storage.from('concept-files').remove([filePath]);
+    const { error } = await sb.from('concept_files').delete().eq('id', id);
     if (error) throw error;
   },
 };

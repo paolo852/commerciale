@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Archive, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, FlaskConical,
+  Archive, CalendarClock, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, FlaskConical,
   Percent, Plus, Search, TrendingUp, User, UserSearch, X,
 } from 'lucide-react';
 import { leadCandidatesService } from '../lib/dataService';
@@ -255,6 +255,18 @@ export default function LeadCandidates() {
                       <p className="text-sm font-semibold text-indigo-600 tracking-wide font-mono mb-0.5">{sub}</p>
                     )}
                     <h2 className="text-lg font-bold text-slate-900 leading-tight">{label}</h2>
+                    {fc?.internal_deadline && (() => {
+                      const today = new Date().toISOString().slice(0, 10);
+                      const isUrgent = fc.internal_deadline <= new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+                      const isPast = fc.internal_deadline < today;
+                      return (
+                        <p className={`text-xs mt-1 flex items-center gap-1 font-medium ${isPast ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-slate-500'}`}>
+                          <CalendarClock className="w-3 h-3" />
+                          Scadenza interna concept: {fc.internal_deadline}
+                          {isPast && <span className="text-red-500 font-semibold">(scaduta)</span>}
+                        </p>
+                      );
+                    })()}
                     {(conceptCount > 0 || offerCount > 0) && (
                       <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                         <span className="font-medium text-slate-600">Stato attuale:</span>

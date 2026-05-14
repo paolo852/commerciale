@@ -10,6 +10,7 @@ import { leadCandidatesService, leadUpdatesService, conceptsService } from '../l
 import { formatDate } from '../lib/format';
 import LeadCandidateFormModal from '../components/leads/LeadCandidateFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import EntityTasks from '../components/EntityTasks';
 import type { LeadCandidate, LeadCandidateStatus, LeadUpdate, ProjectManager } from '../types';
 
 const STATUS_MAP: Record<LeadCandidateStatus, { label: string; cls: string; Icon: typeof Clock }> = {
@@ -219,6 +220,15 @@ export default function LeadCandidateDetail() {
           </div>
         )}
       </div>
+
+      {user && (
+        <EntityTasks
+          entityId={lead.id}
+          entityType="lead"
+          projectManagers={projectManagers}
+          userId={user.id}
+        />
+      )}
 
       {/* Updates / storico interazioni */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">

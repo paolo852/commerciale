@@ -27,13 +27,14 @@ export interface FundingCall {
   code: string;
   name: string;
   body: string | null;
-  deadline: string | null; // ISO date string
-  description: string | null; // testo del bando (usato da Gemini per il matching)
+  deadline: string | null;
+  internal_deadline: string | null; // scadenza interna per definizione concept
+  description: string | null;
   notes: string | null;
-  probability: number; // 0-100, tasso di successo stimato del bando
+  probability: number;
   pdf_path: string | null;
   pdf_filename: string | null;
-  source_url: string | null; // URL di origine (es. EU Participant Portal)
+  source_url: string | null;
   created_at: string;
 }
 
@@ -70,7 +71,21 @@ export type CreateProjectManagerForm = Pick<ProjectManager, 'name' | 'email' | '
 
 export type UpdateProjectManagerForm = Partial<CreateProjectManagerForm>;
 
-export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'description' | 'notes' | 'probability' | 'source_url'>;
+export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'internal_deadline' | 'description' | 'notes' | 'probability' | 'source_url'>;
+
+// ============================================================
+// Concept files (documenti tecnologia)
+// ============================================================
+
+export interface ConceptFile {
+  id: string;
+  concept_id: string;
+  user_id: string;
+  filename: string;
+  file_path: string;
+  file_url: string;
+  created_at: string;
+}
 
 export type UpdateFundingCallForm = Partial<CreateFundingCallForm>;
 

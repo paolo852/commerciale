@@ -111,14 +111,17 @@ function WorkloadCard({
 // ─── Task tab ───────────────────────────────────────────────────
 
 function TaskRow({
-  task, pms, onToggle, onDelete,
+  task, pms, entityNames, onToggle, onDelete,
 }: {
   task: Task;
   pms: Map<string, ProjectManager>;
+  entityNames: Map<string, { name: string; path: string }>;
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
 }) {
+  const nav = useNavigate();
   const pm = task.pm_id ? pms.get(task.pm_id) : null;
+  const entity = task.entity_id ? entityNames.get(task.entity_id) : null;
   const isOverdue = !task.completed && task.due_date && task.due_date < new Date().toISOString().slice(0, 10);
 
   return (
@@ -144,6 +147,15 @@ function TaskRow({
               <span className="w-3.5 h-3.5 rounded-full bg-violet-200 text-violet-800 flex items-center justify-center text-[9px] font-bold uppercase shrink-0">{pm.name[0]}</span>
               {pm.name}
             </span>
+          )}
+          {entity && (
+            <button
+              onClick={() => nav(entity.path)}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 transition truncate max-w-[140px]"
+            >
+              {task.entity_type === 'lead' ? <UserSearch className="w-3 h-3 shrink-0" /> : task.entity_type === 'concept' ? <FlaskConical className="w-3 h-3 shrink-0" /> : <FileText className="w-3 h-3 shrink-0" />}
+              <span className="truncate">{entity.name}</span>
+            </button>
           )}
           {task.due_date && (
             <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${
@@ -210,6 +222,14 @@ export default function Team() {
   // ── Workload data ──
   const activePms = useMemo(() => projectManagers.filter((p) => p.active), [projectManagers]);
   const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
+
+  const entityNames = useMemo(() => {
+    const map = new Map<string, { name: string; path: string }>();
+    leads.forEach((l) => map.set(l.id, { name: l.researcher_name, path: `/leads/${l.id}` }));
+    concepts.forEach((c) => map.set(c.id, { name: c.name, path: `/concepts/${c.id}` }));
+    offers.forEach((o) => map.set(o.id, { name: o.name, path: '/offerte' }));
+    return map;
+  }, [leads, concepts, offers]);
 
   const workload = useMemo(() => activePms.map((pm) => ({
     pm,
@@ -387,7 +407,7 @@ export default function Team() {
           ) : (
             <div className="space-y-2">
               {filteredTasks.map((t) => (
-                <TaskRow key={t.id} task={t} pms={pmById} onToggle={handleToggle} onDelete={handleDelete} />
+                <TaskRow key={t.id} task={t} pms={pmById} entityNames={entityNames} onToggle={handleToggle} onDelete={handleDelete} />
               ))}
             </div>
           )}

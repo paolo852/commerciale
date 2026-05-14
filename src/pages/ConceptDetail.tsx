@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Paperclip } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clock, Edit3, FileText,
@@ -8,8 +9,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
 import {
   conceptsService, conceptAssigneesService, conceptVersionsService,
-  conceptCommentsService, conceptDeadlinesService,
+  conceptCommentsService, conceptDeadlinesService, conceptFilesService,
 } from '../lib/dataService';
+import EntityTasks from '../components/EntityTasks';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
 import OfferFormModal from '../components/offerte/OfferFormModal';
@@ -17,7 +19,7 @@ import MentionInput, { CommentBody } from '../components/concepts/MentionInput';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type {
   Concept, ConceptAssignee, ConceptStatus, ConceptVersion,
-  ConceptVersionComment, ConceptRevisionDeadline, Offer, ProjectManager,
+  ConceptVersionComment, ConceptRevisionDeadline, ConceptFile, Offer, ProjectManager,
 } from '../types';
 
 const STATUS_MAP: Record<ConceptStatus, { label: string; cls: string; Icon: typeof Clock }> = {
@@ -46,6 +48,9 @@ export default function ConceptDetail() {
   const [assignees, setAssignees] = useState<ConceptAssignee[]>([]);
   const [versions, setVersions] = useState<ConceptVersion[]>([]);
   const [deadlines, setDeadlines] = useState<ConceptRevisionDeadline[]>([]);
+  const [conceptFiles, setConceptFiles] = useState<ConceptFile[]>([]);
+  const [fileUploading, setFileUploading] = useState(false);
+  const conceptFileInputRef = useRef<HTMLInputElement>(null);
 
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [toDelete, setToDelete] = useState(false);
@@ -54,11 +59,12 @@ export default function ConceptDetail() {
     if (!id) return;
     setLoading(true); setError(null);
     try {
-      const [c, a, v, d] = await Promise.all([
+      const [c, a, v, d, cf] = await Promise.all([
         conceptsService.get(id),
         conceptAssigneesService.list(id),
         conceptVersionsService.list(id),
         conceptDeadlinesService.list(id),
+        conceptFilesService.list(id),
       ]);
       if (!c) {
         setError('Concept non trovato.');
@@ -68,6 +74,7 @@ export default function ConceptDetail() {
       setAssignees(a);
       setVersions(v);
       setDeadlines(d);
+      setConceptFiles(cf);
     } catch (e) {
       setError((e as { message?: string })?.message ?? 'Errore caricamento');
     } finally {
@@ -76,6 +83,25 @@ export default function ConceptDetail() {
   }, [id]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!concept || !user) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileUploading(true);
+    try {
+      const created = await conceptFilesService.upload(concept.id, file, user.id);
+      setConceptFiles((prev) => [created, ...prev]);
+    } finally {
+      setFileUploading(false);
+      if (conceptFileInputRef.current) conceptFileInputRef.current.value = '';
+    }
+  }
+
+  async function handleFileRemove(id: string, filePath: string) {
+    await conceptFilesService.remove(id, filePath);
+    setConceptFiles((prev) => prev.filter((f) => f.id !== id));
+  }
 
   async function handleDelete() {
     if (!concept) return;
@@ -172,6 +198,56 @@ export default function ConceptDetail() {
         currentUserId={user?.id ?? null}
         onChange={reload}
       />
+
+      {/* Task panel */}
+      {user && (
+        <EntityTasks
+          entityId={concept.id}
+          entityType="concept"
+          projectManagers={projectManagers}
+          userId={user.id}
+        />
+      )}
+
+      {/* Documenti tecnologia */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <Paperclip className="w-4 h-4 text-indigo-500" />
+            Documenti tecnologia
+          </h3>
+          <button
+            type="button"
+            disabled={fileUploading}
+            onClick={() => conceptFileInputRef.current?.click()}
+            className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 transition"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            {fileUploading ? 'Upload…' : 'Carica file'}
+          </button>
+          <input ref={conceptFileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
+        </div>
+        {conceptFiles.length === 0 ? (
+          <p className="text-xs text-slate-400 italic text-center py-4">Nessun documento. Carica schede tecniche, brevetti o descrizioni.</p>
+        ) : (
+          <ul className="space-y-2">
+            {conceptFiles.map((f) => (
+              <li key={f.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50">
+                <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
+                <a href={f.file_url} target="_blank" rel="noreferrer"
+                  className="flex-1 text-sm text-indigo-600 hover:underline truncate min-w-0">
+                  {f.filename}
+                </a>
+                <span className="text-[11px] text-slate-400 shrink-0">{formatDate(f.created_at)}</span>
+                <button onClick={() => void handleFileRemove(f.id, f.file_path)}
+                  className="text-slate-300 hover:text-red-500 transition shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <ConceptFormModal
         open={editOpen}

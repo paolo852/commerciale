@@ -3,7 +3,7 @@ import type {
   Concept, ConceptAssignee, ConceptVersion, ConceptVersionComment, ConceptRevisionDeadline,
   LeadCandidate, LeadUpdate,
   AppNotification, NotificationPreferences, NotificationType,
-  Task,
+  Task, ConceptFile,
 } from '../types';
 
 // ============================================================
@@ -27,6 +27,7 @@ const KEYS = {
   notifications: 'commerciale.demo.notifications',
   notificationPrefs: 'commerciale.demo.notificationPrefs',
   tasks: 'commerciale.demo.tasks',
+  conceptFiles: 'commerciale.demo.conceptFiles',
 } as const;
 
 export interface DemoUser {
@@ -471,5 +472,26 @@ export const demoTasks = {
   },
   remove(id: string): void {
     write(KEYS.tasks, read<Task[]>(KEYS.tasks, []).filter((t) => t.id !== id));
+  },
+};
+
+// ============================================================
+// Concept Files
+// ============================================================
+
+export const demoConceptFiles = {
+  list(conceptId: string): ConceptFile[] {
+    return read<ConceptFile[]>(KEYS.conceptFiles, [])
+      .filter((f) => f.concept_id === conceptId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  create(input: Omit<ConceptFile, 'id' | 'created_at'>): ConceptFile {
+    const all = read<ConceptFile[]>(KEYS.conceptFiles, []);
+    const item: ConceptFile = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    write(KEYS.conceptFiles, [item, ...all]);
+    return item;
+  },
+  remove(id: string): void {
+    write(KEYS.conceptFiles, read<ConceptFile[]>(KEYS.conceptFiles, []).filter((f) => f.id !== id));
   },
 };
