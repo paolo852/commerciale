@@ -335,8 +335,8 @@ function FieldEditor({
         locked ? 'bg-emerald-50/70' : 'bg-slate-50/80'
       }`}>
         <div className="flex-1 min-w-0">
-          <p className={`text-[11px] font-bold uppercase tracking-widest ${
-            locked ? 'text-emerald-700' : 'text-slate-500'
+          <p className={`text-xs font-extrabold uppercase tracking-wider ${
+            locked ? 'text-emerald-800' : 'text-slate-700'
           }`}>
             {label}
           </p>
