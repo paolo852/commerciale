@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2, ChevronDown, ChevronRight,
-  Download, FileCheck, Loader2, MessageSquare, Save, Send, Trash2, Unlock, Upload,
+  Download, FileCheck, HelpCircle, Loader2, MessageSquare, Save, Send, Trash2, Unlock, Upload,
 } from 'lucide-react';
 import { parseConceptDocx } from '../../lib/conceptParser';
 import { conceptFieldCommentsService } from '../../lib/dataService';
@@ -22,14 +22,16 @@ const EMPTY: ConceptTemplateData = {
   roadmap: '',
   risk_assumptions: '',
   locked_fields: [],
+  validation_status: {},
+  validation_how: {},
 };
 
-type FieldKey = Exclude<keyof ConceptTemplateData, 'locked_fields'>;
+type FieldKey = Exclude<keyof ConceptTemplateData, 'locked_fields' | 'validation_status' | 'validation_how'>;
 
 type Section = {
   key: string;
   title: string;
-  fields: { key: FieldKey; label: string; hint?: string; rows?: number }[];
+  fields: { key: FieldKey; label: string; hint?: string; rows?: number; showValidation?: boolean }[];
 };
 
 const SECTIONS: Section[] = [
@@ -57,11 +59,11 @@ const SECTIONS: Section[] = [
     key: '2',
     title: '2. Problem and Value Proposition',
     fields: [
-      { key: 'problem_statement', label: '2.1 Problem statement', hint: 'Chi, contesto, quantificazione del pain (costo, tempo, gap di performance).', rows: 5 },
-      { key: 'value_functional', label: '2.2 Functional benefits', hint: 'Cosa fa il prodotto meglio degli incumbent.', rows: 3 },
-      { key: 'value_economic', label: '2.2 Economic benefits', hint: 'Risparmi, produttività, incremento ricavi.', rows: 3 },
-      { key: 'value_strategic', label: '2.2 Strategic benefits', hint: 'Compliance, sostenibilità, differenziazione.', rows: 3 },
-      { key: 'validation', label: '2.3 Validation', hint: 'Evidenze di validazione problema/soluzione.', rows: 3 },
+      { key: 'problem_statement', label: '2.1 Problem statement', hint: 'Chi, contesto, quantificazione del pain (costo, tempo, gap di performance).', rows: 5, showValidation: true },
+      { key: 'value_functional', label: '2.2 Functional benefits', hint: 'Cosa fa il prodotto meglio degli incumbent.', rows: 3, showValidation: true },
+      { key: 'value_economic', label: '2.2 Economic benefits', hint: 'Risparmi, produttività, incremento ricavi.', rows: 3, showValidation: true },
+      { key: 'value_strategic', label: '2.2 Strategic benefits', hint: 'Compliance, sostenibilità, differenziazione.', rows: 3, showValidation: true },
+      { key: 'validation', label: '2.3 Validation', hint: 'Evidenze di validazione problema/soluzione.', rows: 3, showValidation: true },
     ],
   },
   {
@@ -295,10 +297,71 @@ function FieldComments({
   );
 }
 
+// ── ValidationIndicator ──────────────────────────────────────────────────────
+
+function ValidationIndicator({
+  status, how, onStatusChange, onHowChange,
+}: {
+  status: 'ipotesi' | 'validato' | undefined;
+  how: string;
+  onStatusChange: (s: 'ipotesi' | 'validato') => void;
+  onHowChange: (v: string) => void;
+}) {
+  return (
+    <div className="mx-4 mb-3 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+      {/* Toggle bar */}
+      <div className="flex">
+        <button
+          type="button"
+          onClick={() => onStatusChange('ipotesi')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold transition ${
+            !status || status === 'ipotesi'
+              ? 'bg-amber-500 text-white'
+              : 'bg-white text-slate-400 hover:bg-amber-50 hover:text-amber-600'
+          }`}
+        >
+          <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+          Ipotesi
+        </button>
+        <div className="w-px bg-slate-200" />
+        <button
+          type="button"
+          onClick={() => onStatusChange('validato')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold transition ${
+            status === 'validato'
+              ? 'bg-emerald-500 text-white'
+              : 'bg-white text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+          }`}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          Validato
+        </button>
+      </div>
+
+      {/* "Come?" field, shown only when validato */}
+      {status === 'validato' && (
+        <div className="px-3 pb-3 pt-2 bg-emerald-50/60 border-t border-emerald-200">
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 mb-1.5">
+            Come è stato validato?
+          </p>
+          <textarea
+            rows={3}
+            value={how}
+            onChange={(e) => onHowChange(e.target.value)}
+            placeholder="Descrivi metodologia, esperimento, evidenze raccolte…"
+            className="w-full text-xs px-2.5 py-2 border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white resize-y placeholder-slate-300"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── FieldEditor ──────────────────────────────────────────────────────────────
 
 function FieldEditor({
   fieldKey, label, hint, rows, value, locked, onToggleLock, onChange,
+  showValidation, validationStatus, validationHow, onValidationStatusChange, onValidationHowChange,
   comments, authorName, setAuthorName, onAddComment, onDeleteComment,
 }: {
   fieldKey: string;
@@ -309,6 +372,11 @@ function FieldEditor({
   locked: boolean;
   onToggleLock: () => void;
   onChange: (val: string) => void;
+  showValidation?: boolean;
+  validationStatus: 'ipotesi' | 'validato' | undefined;
+  validationHow: string;
+  onValidationStatusChange: (s: 'ipotesi' | 'validato') => void;
+  onValidationHowChange: (v: string) => void;
   comments: ConceptFieldComment[];
   authorName: string;
   setAuthorName: (v: string) => void;
@@ -395,6 +463,16 @@ function FieldEditor({
         )}
       </div>
 
+      {/* Validation indicator (section 2 only) */}
+      {showValidation && (
+        <ValidationIndicator
+          status={validationStatus}
+          how={validationHow}
+          onStatusChange={onValidationStatusChange}
+          onHowChange={onValidationHowChange}
+        />
+      )}
+
       {/* Comments toggle */}
       <div className="border-t border-slate-100 bg-slate-50/40">
         <button
@@ -435,6 +513,7 @@ function FieldEditor({
 
 function SectionPanel({
   section, form, locked, onToggleLock, onChange,
+  validationStatus, validationHow, onValidationStatusChange, onValidationHowChange,
   comments, authorName, setAuthorName, onAddComment, onDeleteComment,
 }: {
   section: Section;
@@ -442,6 +521,10 @@ function SectionPanel({
   locked: Set<string>;
   onToggleLock: (key: string) => void;
   onChange: (key: FieldKey, val: string) => void;
+  validationStatus: Record<string, 'ipotesi' | 'validato'>;
+  validationHow: Record<string, string>;
+  onValidationStatusChange: (fieldKey: string, s: 'ipotesi' | 'validato') => void;
+  onValidationHowChange: (fieldKey: string, v: string) => void;
   comments: Record<string, ConceptFieldComment[]>;
   authorName: string;
   setAuthorName: (v: string) => void;
@@ -493,6 +576,11 @@ function SectionPanel({
               locked={locked.has(f.key)}
               onToggleLock={() => onToggleLock(f.key)}
               onChange={(val) => onChange(f.key, val)}
+              showValidation={f.showValidation}
+              validationStatus={validationStatus[f.key]}
+              validationHow={validationHow[f.key] ?? ''}
+              onValidationStatusChange={(s) => onValidationStatusChange(f.key, s)}
+              onValidationHowChange={(v) => onValidationHowChange(f.key, v)}
               comments={comments[f.key] ?? []}
               authorName={authorName}
               setAuthorName={setAuthorName}
@@ -509,7 +597,13 @@ function SectionPanel({
 // ── Main panel ───────────────────────────────────────────────────────────────
 
 export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props) {
-  const [form, setForm] = useState<ConceptTemplateData>({ ...EMPTY, ...data, locked_fields: data?.locked_fields ?? [] });
+  const [form, setForm] = useState<ConceptTemplateData>({
+    ...EMPTY,
+    ...data,
+    locked_fields: data?.locked_fields ?? [],
+    validation_status: data?.validation_status ?? {},
+    validation_how: data?.validation_how ?? {},
+  });
   const [locked, setLocked] = useState<Set<string>>(new Set(data?.locked_fields ?? []));
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -553,6 +647,20 @@ export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props)
 
   function update(key: FieldKey, val: string) {
     setForm((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function updateValidationStatus(fieldKey: string, s: 'ipotesi' | 'validato') {
+    setForm((prev) => ({
+      ...prev,
+      validation_status: { ...prev.validation_status, [fieldKey]: s },
+    }));
+  }
+
+  function updateValidationHow(fieldKey: string, v: string) {
+    setForm((prev) => ({
+      ...prev,
+      validation_how: { ...prev.validation_how, [fieldKey]: v },
+    }));
   }
 
   function toggleLock(key: string) {
@@ -666,6 +774,10 @@ export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props)
             locked={locked}
             onToggleLock={toggleLock}
             onChange={update}
+            validationStatus={form.validation_status}
+            validationHow={form.validation_how}
+            onValidationStatusChange={updateValidationStatus}
+            onValidationHowChange={updateValidationHow}
             comments={comments}
             authorName={authorName}
             setAuthorName={updateAuthorName}

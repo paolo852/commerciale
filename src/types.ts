@@ -175,6 +175,9 @@ export interface ConceptTemplateData {
   risk_assumptions: string;
   // Fields approved/locked by a reviewer
   locked_fields: string[];
+  // Section-2 validation status per field
+  validation_status: Record<string, 'ipotesi' | 'validato'>;
+  validation_how: Record<string, string>;
 }
 
 export interface Concept {
