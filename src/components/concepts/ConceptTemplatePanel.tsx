@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import {
-  ChevronDown, ChevronRight, Download, FileCheck, Loader2, Save, Upload,
+  CheckCircle2, ChevronDown, ChevronRight, Circle,
+  Download, FileCheck, Loader2, Lock, Save, Unlock, Upload,
 } from 'lucide-react';
 import { parseConceptDocx } from '../../lib/conceptParser';
 import type { ConceptTemplateData } from '../../types';
@@ -18,12 +19,15 @@ const EMPTY: ConceptTemplateData = {
   tam: '', sam: '', som: '',
   roadmap: '',
   risk_assumptions: '',
+  locked_fields: [],
 };
+
+type FieldKey = Exclude<keyof ConceptTemplateData, 'locked_fields'>;
 
 type Section = {
   key: string;
   title: string;
-  fields: { key: keyof ConceptTemplateData; label: string; hint?: string; rows?: number }[];
+  fields: { key: FieldKey; label: string; hint?: string; rows?: number }[];
 };
 
 const SECTIONS: Section[] = [
@@ -53,7 +57,7 @@ const SECTIONS: Section[] = [
     key: '2',
     title: '2. Problem and Value Proposition',
     fields: [
-      { key: 'problem_statement', label: '2.1 Problem statement', hint: 'Chi ha il problema, in quale contesto, quantificazione del pain (costo, tempo, gap di performance).', rows: 5 },
+      { key: 'problem_statement', label: '2.1 Problem statement', hint: 'Chi ha il problema, in quale contesto, quantificazione del pain.', rows: 5 },
       { key: 'value_functional', label: '2.2 Functional benefits', hint: 'Cosa fa il prodotto meglio degli incumbent.', rows: 3 },
       { key: 'value_economic', label: '2.2 Economic benefits', hint: 'Risparmi, produttività, incremento ricavi.', rows: 3 },
       { key: 'value_strategic', label: '2.2 Strategic benefits', hint: 'Compliance, sostenibilità, differenziazione.', rows: 3 },
@@ -85,12 +89,68 @@ const SECTIONS: Section[] = [
   },
 ];
 
-function SectionPanel({ section, form, onChange }: {
+function FieldEditor({
+  label, hint, rows, value, locked, onToggleLock, onChange,
+}: {
+  label: string;
+  hint?: string;
+  rows: number;
+  value: string;
+  locked: boolean;
+  onToggleLock: () => void;
+  onChange: (val: string) => void;
+}) {
+  return (
+    <div className={`rounded-xl border transition-all ${locked ? 'border-emerald-200 bg-emerald-50/40' : 'border-transparent bg-white'}`}>
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            {locked && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+            <label className={`block text-xs font-semibold uppercase tracking-wide ${locked ? 'text-emerald-700' : 'text-slate-600'}`}>
+              {label}
+            </label>
+          </div>
+          {hint && <p className="text-xs text-slate-400 mt-0.5 leading-snug">{hint}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={onToggleLock}
+          title={locked ? 'Campo approvato — clicca per sbloccare' : 'Approva questo campo'}
+          className={`shrink-0 mt-0.5 p-1 rounded-lg transition ${
+            locked
+              ? 'text-emerald-600 bg-emerald-100 hover:bg-emerald-200'
+              : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
+          }`}
+        >
+          {locked ? <Lock className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+      {locked ? (
+        <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed px-1 py-1 min-h-[2rem]">
+          {value || <span className="text-slate-300 italic">—</span>}
+        </p>
+      ) : (
+        <textarea
+          rows={rows}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-y bg-white"
+          placeholder="—"
+        />
+      )}
+    </div>
+  );
+}
+
+function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
   section: Section;
   form: ConceptTemplateData;
-  onChange: (key: keyof ConceptTemplateData, val: string) => void;
+  locked: Set<string>;
+  onToggleLock: (key: string) => void;
+  onChange: (key: FieldKey, val: string) => void;
 }) {
   const [open, setOpen] = useState(true);
+  const approvedCount = section.fields.filter((f) => locked.has(f.key)).length;
   const hasContent = section.fields.some((f) => form[f.key]);
 
   return (
@@ -105,22 +165,27 @@ function SectionPanel({ section, form, onChange }: {
           {section.title}
           {hasContent && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
         </span>
+        {approvedCount > 0 && (
+          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+            <CheckCircle2 className="w-3 h-3" />
+            {approvedCount}/{section.fields.length} approvati
+          </span>
+        )}
       </button>
 
       {open && (
         <div className="px-4 py-4 space-y-4 bg-white">
           {section.fields.map((f) => (
-            <div key={f.key}>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">{f.label}</label>
-              {f.hint && <p className="text-xs text-slate-400 mb-1.5 leading-snug">{f.hint}</p>}
-              <textarea
-                rows={f.rows ?? 3}
-                value={form[f.key] as string}
-                onChange={(e) => onChange(f.key, e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-y bg-white"
-                placeholder="—"
-              />
-            </div>
+            <FieldEditor
+              key={f.key}
+              label={f.label}
+              hint={f.hint}
+              rows={f.rows ?? 3}
+              value={form[f.key] as string}
+              locked={locked.has(f.key)}
+              onToggleLock={() => onToggleLock(f.key)}
+              onChange={(val) => onChange(f.key, val)}
+            />
           ))}
         </div>
       )}
@@ -129,14 +194,23 @@ function SectionPanel({ section, form, onChange }: {
 }
 
 export default function ConceptTemplatePanel({ data, onSave }: Props) {
-  const [form, setForm] = useState<ConceptTemplateData>(data ?? EMPTY);
+  const [form, setForm] = useState<ConceptTemplateData>({ ...EMPTY, ...data, locked_fields: data?.locked_fields ?? [] });
+  const [locked, setLocked] = useState<Set<string>>(new Set(data?.locked_fields ?? []));
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [parseMsg, setParseMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function update(key: keyof ConceptTemplateData, val: string) {
+  function update(key: FieldKey, val: string) {
     setForm((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function toggleLock(key: string) {
+    setLocked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -162,21 +236,42 @@ export default function ConceptTemplatePanel({ data, onSave }: Props) {
   async function handleSave() {
     setSaving(true);
     try {
-      await onSave(form);
+      await onSave({ ...form, locked_fields: Array.from(locked) });
     } finally {
       setSaving(false);
     }
   }
 
+  const totalFields = SECTIONS.reduce((n, s) => n + s.fields.length, 0);
+  const totalLocked = locked.size;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-          <FileCheck className="w-4 h-4 text-indigo-500" />
-          Product Concept Template
-        </h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <FileCheck className="w-4 h-4 text-indigo-500" />
+            Product Concept Template
+          </h3>
+          {totalLocked > 0 && (
+            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+              <Lock className="w-3 h-3" />
+              {totalLocked}/{totalFields} approvati
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
+          {totalLocked > 0 && (
+            <button
+              type="button"
+              onClick={() => setLocked(new Set())}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+            >
+              <Unlock className="w-3.5 h-3.5" />
+              Sblocca tutti
+            </button>
+          )}
           <a
             href="/Product_Concept_Template.docx"
             download
@@ -207,7 +302,14 @@ export default function ConceptTemplatePanel({ data, onSave }: Props) {
       {/* Sections */}
       <div className="space-y-3">
         {SECTIONS.map((s) => (
-          <SectionPanel key={s.key} section={s} form={form} onChange={update} />
+          <SectionPanel
+            key={s.key}
+            section={s}
+            form={form}
+            locked={locked}
+            onToggleLock={toggleLock}
+            onChange={update}
+          />
         ))}
       </div>
 

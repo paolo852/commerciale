@@ -2,25 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Paperclip } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clock, Edit3, FileText,
-  MessageSquare, Send, Trash2, Upload, UserPlus, Users, XCircle,
+  ArrowLeft, CheckCircle2, Clock, Edit3, FileText,
+  Trash2, Upload, UserPlus, Users, XCircle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
 import {
-  conceptsService, conceptAssigneesService, conceptVersionsService,
-  conceptCommentsService, conceptDeadlinesService, conceptFilesService,
+  conceptsService, conceptAssigneesService,
+  conceptDeadlinesService, conceptFilesService,
 } from '../lib/dataService';
 import EntityTasks from '../components/EntityTasks';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
 import ConceptTemplatePanel from '../components/concepts/ConceptTemplatePanel';
 import OfferFormModal from '../components/offerte/OfferFormModal';
-import MentionInput, { CommentBody } from '../components/concepts/MentionInput';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type {
-  Concept, ConceptAssignee, ConceptStatus, ConceptVersion,
-  ConceptVersionComment, ConceptRevisionDeadline, ConceptFile, Offer, ProjectManager,
+  Concept, ConceptAssignee, ConceptStatus,
+  ConceptRevisionDeadline, ConceptFile, Offer, ProjectManager,
 } from '../types';
 
 const STATUS_MAP: Record<ConceptStatus, { label: string; cls: string; Icon: typeof Clock }> = {
@@ -29,11 +28,6 @@ const STATUS_MAP: Record<ConceptStatus, { label: string; cls: string; Icon: type
   rifiutato:      { label: 'Rifiutato',      cls: 'bg-slate-50 text-slate-600 border-slate-200', Icon: XCircle },
 };
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 export default function ConceptDetail() {
   const { id } = useParams<{ id: string }>();
@@ -47,7 +41,6 @@ export default function ConceptDetail() {
   const [editOpen, setEditOpen] = useState(false);
 
   const [assignees, setAssignees] = useState<ConceptAssignee[]>([]);
-  const [versions, setVersions] = useState<ConceptVersion[]>([]);
   const [deadlines, setDeadlines] = useState<ConceptRevisionDeadline[]>([]);
   const [conceptFiles, setConceptFiles] = useState<ConceptFile[]>([]);
   const [fileUploading, setFileUploading] = useState(false);
@@ -60,10 +53,9 @@ export default function ConceptDetail() {
     if (!id) return;
     setLoading(true); setError(null);
     try {
-      const [c, a, v, d, cf] = await Promise.all([
+      const [c, a, d, cf] = await Promise.all([
         conceptsService.get(id),
         conceptAssigneesService.list(id),
-        conceptVersionsService.list(id),
         conceptDeadlinesService.list(id),
         conceptFilesService.list(id),
       ]);
@@ -73,7 +65,6 @@ export default function ConceptDetail() {
         setConcept(c);
       }
       setAssignees(a);
-      setVersions(v);
       setDeadlines(d);
       setConceptFiles(cf);
     } catch (e) {
@@ -191,14 +182,6 @@ export default function ConceptDetail() {
         <AssigneesSection conceptId={concept.id} assignees={assignees} projectManagers={projectManagers} onChange={reload} />
         <DeadlinesSection conceptId={concept.id} deadlines={deadlines} onChange={reload} />
       </div>
-
-      <VersionsSection
-        conceptId={concept.id}
-        versions={versions}
-        projectManagers={projectManagers}
-        currentUserId={user?.id ?? null}
-        onChange={reload}
-      />
 
       {/* Task panel */}
       {user && (
@@ -482,250 +465,6 @@ function DeadlinesSection({
           })}
         </ul>
       )}
-    </div>
-  );
-}
-
-// ============================================================
-// Versions + Comments
-// ============================================================
-
-function VersionsSection({
-  conceptId, versions, projectManagers, currentUserId, onChange,
-}: {
-  conceptId: string;
-  versions: ConceptVersion[];
-  projectManagers: ProjectManager[];
-  currentUserId: string | null;
-  onChange: () => Promise<void>;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadNote, setUploadNote] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  // Trova il PM corrispondente all'user loggato (per il tracking di upload/author)
-  const currentPm = projectManagers.find((p) => p.user_id === currentUserId) ?? null;
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true); setError(null);
-    try {
-      await conceptVersionsService.upload(conceptId, file, currentPm?.id ?? null, uploadNote.trim() || null);
-      setUploadNote('');
-      await onChange();
-    } catch (err) {
-      setError((err as { message?: string })?.message ?? 'Errore upload');
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
-  }
-
-  async function handleOpen(v: ConceptVersion) {
-    const url = await conceptVersionsService.signedUrl(v.storage_path);
-    if (url) window.open(url, '_blank');
-  }
-
-  async function handleRemove(v: ConceptVersion) {
-    await conceptVersionsService.remove(v);
-    await onChange();
-  }
-
-  function toggleExpanded(versionId: string) {
-    setExpanded((s) => {
-      const n = new Set(s);
-      if (n.has(versionId)) n.delete(versionId); else n.add(versionId);
-      return n;
-    });
-  }
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-indigo-500" />
-          Versioni del concept ({versions.length})
-        </h3>
-        <div className="flex items-center gap-2">
-          <input type="text" placeholder="Nota versione (opzionale)" value={uploadNote}
-            onChange={(e) => setUploadNote(e.target.value)}
-            className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48" />
-          <input ref={inputRef} type="file" onChange={handleUpload} className="hidden" />
-          <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-            <Upload className="w-3.5 h-3.5" />
-            {uploading ? 'Caricamento…' : 'Carica versione'}
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2">{error}</p>
-      )}
-
-      {versions.length === 0 ? (
-        <p className="text-xs text-slate-400 text-center py-6">Nessuna versione caricata. Carica il primo file per iniziare.</p>
-      ) : (
-        <ul className="divide-y divide-slate-100">
-          {versions.map((v) => {
-            const open = expanded.has(v.id);
-            return (
-              <li key={v.id} className="py-3">
-                <div className="flex items-start gap-3">
-                  <button onClick={() => toggleExpanded(v.id)}
-                    className="mt-0.5 text-slate-400 hover:text-slate-700 shrink-0">
-                    {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  </button>
-                  <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0">
-                    v{v.version_number}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <button onClick={() => handleOpen(v)}
-                      className="text-sm font-medium text-slate-900 hover:text-indigo-600 transition truncate">
-                      {v.filename}
-                    </button>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {formatBytes(v.size)} · {formatDate(v.uploaded_at)}
-                      {v.uploader && ` · ${v.uploader.name}`}
-                    </p>
-                    {v.note && (
-                      <p className="text-xs text-slate-600 mt-1 italic">"{v.note}"</p>
-                    )}
-                  </div>
-                  <button onClick={() => handleRemove(v)}
-                    className="text-slate-300 hover:text-red-500 transition shrink-0">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {open && (
-                  <VersionComments
-                    versionId={v.id}
-                    projectManagers={projectManagers}
-                    currentPm={currentPm}
-                  />
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// Comments per version
-// ============================================================
-
-function VersionComments({
-  versionId, projectManagers, currentPm,
-}: {
-  versionId: string;
-  projectManagers: ProjectManager[];
-  currentPm: ProjectManager | null;
-}) {
-  const [comments, setComments] = useState<ConceptVersionComment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [body, setBody] = useState('');
-  const [mentions, setMentions] = useState<string[]>([]);
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      setComments(await conceptCommentsService.list(versionId));
-    } finally {
-      setLoading(false);
-    }
-  }, [versionId]);
-
-  useEffect(() => { void reload(); }, [reload]);
-
-  async function postComment() {
-    if (!body.trim()) return;
-    setPosting(true); setError(null);
-    try {
-      await conceptCommentsService.create({
-        version_id: versionId,
-        author_id: currentPm?.id ?? null,
-        author_name: currentPm?.name ?? 'Anonimo',
-        body: body.trim(),
-        mentions,
-      });
-      setBody(''); setMentions([]);
-      await reload();
-    } catch (e) {
-      setError((e as { message?: string })?.message ?? 'Errore invio commento');
-    } finally {
-      setPosting(false);
-    }
-  }
-
-  async function remove(c: ConceptVersionComment) {
-    await conceptCommentsService.remove(c.id);
-    await reload();
-  }
-
-  return (
-    <div className="mt-3 ml-11 pl-3 border-l-2 border-slate-100 space-y-2">
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-        <MessageSquare className="w-3.5 h-3.5" />
-        Commenti ({comments.length})
-      </div>
-
-      {loading ? (
-        <p className="text-xs text-slate-400">Caricamento…</p>
-      ) : comments.length === 0 ? (
-        <p className="text-xs text-slate-400 italic">Nessun commento. Sii il primo a commentare.</p>
-      ) : (
-        <ul className="space-y-2">
-          {comments.map((c) => (
-            <li key={c.id} className="bg-slate-50 rounded-lg px-3 py-2">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">
-                    {c.author_name[0]?.toUpperCase()}
-                  </span>
-                  <span className="text-xs font-medium text-slate-700">{c.author_name}</span>
-                  <span className="text-[10px] text-slate-400">{formatDate(c.created_at)}</span>
-                </div>
-                <button onClick={() => remove(c)} className="text-slate-300 hover:text-red-500 transition">
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-              <div className="text-sm text-slate-700">
-                <CommentBody body={c.body} projectManagers={projectManagers} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {error && (
-        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">{error}</p>
-      )}
-
-      <div className="flex gap-2 items-end">
-        <div className="flex-1">
-          <MentionInput
-            value={body}
-            onChange={(t, ids) => { setBody(t); setMentions(ids); }}
-            projectManagers={projectManagers}
-            placeholder="Scrivi un commento… usa @ per menzionare un PM"
-            rows={2}
-            disabled={posting}
-          />
-        </div>
-        <button onClick={postComment} disabled={!body.trim() || posting}
-          className="px-3 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5 shrink-0">
-          <Send className="w-3.5 h-3.5" />
-          {posting ? 'Invio…' : 'Invia'}
-        </button>
-      </div>
     </div>
   );
 }

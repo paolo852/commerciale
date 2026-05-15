@@ -173,6 +173,8 @@ export interface ConceptTemplateData {
   roadmap: string;
   // 5. Risks
   risk_assumptions: string;
+  // Fields approved/locked by a reviewer
+  locked_fields: string[];
 }
 
 export interface Concept {
