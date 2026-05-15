@@ -191,21 +191,23 @@ function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
 
   return (
     <div className={`rounded-xl overflow-hidden border transition-colors ${
-      allApproved ? 'border-emerald-200' : 'border-slate-200'
+      allApproved ? 'border-emerald-400' : 'border-indigo-300'
     }`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={`w-full flex items-center justify-between px-5 py-3.5 transition text-left ${
-          allApproved ? 'bg-emerald-50/60 hover:bg-emerald-50' : 'bg-slate-50 hover:bg-slate-100'
+          allApproved
+            ? 'bg-emerald-600 hover:bg-emerald-700'
+            : 'bg-indigo-600 hover:bg-indigo-700'
         }`}
       >
         <span className="flex items-center gap-2">
           {open
-            ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            : <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            ? <ChevronDown className="w-4 h-4 text-white/70 shrink-0" />
+            : <ChevronRight className="w-4 h-4 text-white/70 shrink-0" />
           }
-          <span className={`text-sm font-semibold ${allApproved ? 'text-emerald-800' : 'text-slate-800'}`}>
+          <span className="text-sm font-semibold text-white">
             {section.title}
           </span>
         </span>
@@ -213,8 +215,8 @@ function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
         {approvedCount > 0 && (
           <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
             allApproved
-              ? 'bg-emerald-500 text-white'
-              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              ? 'bg-white/20 text-white'
+              : 'bg-white/20 text-white'
           }`}>
             <CheckCircle2 className="w-3 h-3" />
             {allApproved ? 'Completato' : `${approvedCount}/${total}`}
