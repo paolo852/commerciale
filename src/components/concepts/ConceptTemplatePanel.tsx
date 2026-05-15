@@ -38,8 +38,6 @@ const SECTIONS: Section[] = [
     title: 'Copertina',
     fields: [
       { key: 'lead_organisation', label: 'Lead organisation', rows: 1 },
-      { key: 'authors', label: 'Author(s)', rows: 1 },
-      { key: 'version', label: 'Version', rows: 1 },
       { key: 'trl_current', label: 'TRL corrente', rows: 1 },
     ],
   },
