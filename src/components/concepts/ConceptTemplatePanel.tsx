@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import {
-  CheckCircle2, ChevronDown, ChevronRight, Circle,
-  Download, FileCheck, Loader2, Lock, Save, Unlock, Upload,
+  CheckCircle2, ChevronDown, ChevronRight,
+  Download, FileCheck, Loader2, Save, Unlock, Upload,
 } from 'lucide-react';
 import { parseConceptDocx } from '../../lib/conceptParser';
 import type { ConceptTemplateData } from '../../types';
@@ -45,9 +45,9 @@ const SECTIONS: Section[] = [
     key: '1',
     title: '1. Technology Snapshot',
     fields: [
-      { key: 'tech_description', label: '1.1 Description and novelty', hint: 'Descrivi il principio scientifico, il meccanismo e la novità (max 10–15 righe).', rows: 6 },
-      { key: 'trl_justification', label: '1.2 TRL corrente — giustificazione', rows: 2 },
-      { key: 'trl_evidence', label: '1.2 Key evidence', hint: 'Pubblicazioni, prototipi, dati di laboratorio, validazioni terze.', rows: 3 },
+      { key: 'tech_description', label: '1.1 Description and novelty', hint: 'Principio scientifico, meccanismo e novità (max 10–15 righe).', rows: 6 },
+      { key: 'trl_justification', label: '1.2 TRL — giustificazione', rows: 2 },
+      { key: 'trl_evidence', label: '1.2 Key evidence', hint: 'Pubblicazioni, prototipi, dati lab, validazioni terze.', rows: 3 },
       { key: 'trl_gaps', label: '1.2 Maturity gaps', hint: 'Cosa resta ancora da dimostrare.', rows: 3 },
       { key: 'trl_next_milestone', label: '1.2 Next TRL milestone', rows: 2 },
       { key: 'ip', label: '1.3 Intellectual property', hint: 'Brevetti, applicazioni, know-how, segreti commerciali.', rows: 3 },
@@ -57,7 +57,7 @@ const SECTIONS: Section[] = [
     key: '2',
     title: '2. Problem and Value Proposition',
     fields: [
-      { key: 'problem_statement', label: '2.1 Problem statement', hint: 'Chi ha il problema, in quale contesto, quantificazione del pain.', rows: 5 },
+      { key: 'problem_statement', label: '2.1 Problem statement', hint: 'Chi, contesto, quantificazione del pain (costo, tempo, gap di performance).', rows: 5 },
       { key: 'value_functional', label: '2.2 Functional benefits', hint: 'Cosa fa il prodotto meglio degli incumbent.', rows: 3 },
       { key: 'value_economic', label: '2.2 Economic benefits', hint: 'Risparmi, produttività, incremento ricavi.', rows: 3 },
       { key: 'value_strategic', label: '2.2 Strategic benefits', hint: 'Compliance, sostenibilità, differenziazione.', rows: 3 },
@@ -77,14 +77,14 @@ const SECTIONS: Section[] = [
     key: '4',
     title: '4. Development Roadmap',
     fields: [
-      { key: 'roadmap', label: '4.1 From current TRL to market', hint: 'Fasi, milestone tecnici e di prodotto, decision gate, timeline.', rows: 7 },
+      { key: 'roadmap', label: '4.1 From current TRL to market', hint: 'Fasi, milestone tecnici, decision gate, timeline indicativa.', rows: 7 },
     ],
   },
   {
     key: '5',
     title: '5. Risks and Critical Assumptions',
     fields: [
-      { key: 'risk_assumptions', label: 'Assumptions to validate', hint: 'Lista delle 3–5 ipotesi più rischiose e gli esperimenti per testarle.', rows: 6 },
+      { key: 'risk_assumptions', label: 'Riskiest assumptions to validate', hint: 'Le 3–5 ipotesi più rischiose con esperimento associato e kill-criterion.', rows: 6 },
     ],
   },
 ];
@@ -100,44 +100,79 @@ function FieldEditor({
   onToggleLock: () => void;
   onChange: (val: string) => void;
 }) {
+  const [hoveringLock, setHoveringLock] = useState(false);
+
   return (
-    <div className={`rounded-xl border transition-all ${locked ? 'border-emerald-200 bg-emerald-50/40' : 'border-transparent bg-white'}`}>
-      <div className="flex items-start justify-between gap-2 mb-1">
+    <div className={`rounded-xl border transition-all duration-200 overflow-hidden ${
+      locked
+        ? 'border-emerald-200 shadow-sm shadow-emerald-100/60'
+        : 'border-slate-200 shadow-sm'
+    }`}>
+      {/* Field header */}
+      <div className={`flex items-start justify-between gap-3 px-4 pt-3 pb-2 ${
+        locked ? 'bg-emerald-50/70' : 'bg-slate-50/80'
+      }`}>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            {locked && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
-            <label className={`block text-xs font-semibold uppercase tracking-wide ${locked ? 'text-emerald-700' : 'text-slate-600'}`}>
-              {label}
-            </label>
-          </div>
-          {hint && <p className="text-xs text-slate-400 mt-0.5 leading-snug">{hint}</p>}
+          <p className={`text-[11px] font-bold uppercase tracking-widest ${
+            locked ? 'text-emerald-700' : 'text-slate-500'
+          }`}>
+            {label}
+          </p>
+          {hint && (
+            <p className="text-xs text-slate-400 mt-0.5 leading-snug">{hint}</p>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={onToggleLock}
-          title={locked ? 'Campo approvato — clicca per sbloccare' : 'Approva questo campo'}
-          className={`shrink-0 mt-0.5 p-1 rounded-lg transition ${
-            locked
-              ? 'text-emerald-600 bg-emerald-100 hover:bg-emerald-200'
-              : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
-          }`}
-        >
-          {locked ? <Lock className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
-        </button>
+
+        {/* Approve / approved button */}
+        {locked ? (
+          <button
+            type="button"
+            onClick={onToggleLock}
+            onMouseEnter={() => setHoveringLock(true)}
+            onMouseLeave={() => setHoveringLock(false)}
+            title="Campo approvato — clicca per sbloccare"
+            className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              hoveringLock
+                ? 'bg-slate-100 text-slate-500 border border-slate-200'
+                : 'bg-emerald-500 text-white border border-emerald-600'
+            }`}
+          >
+            {hoveringLock
+              ? <><Unlock className="w-3 h-3" /> Sblocca</>
+              : <><CheckCircle2 className="w-3 h-3" /> Approvato</>
+            }
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggleLock}
+            title="Approva questo campo"
+            className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 border border-dashed border-slate-300 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all duration-150"
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            Approva
+          </button>
+        )}
       </div>
-      {locked ? (
-        <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed px-1 py-1 min-h-[2rem]">
-          {value || <span className="text-slate-300 italic">—</span>}
-        </p>
-      ) : (
-        <textarea
-          rows={rows}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-y bg-white"
-          placeholder="—"
-        />
-      )}
+
+      {/* Field body */}
+      <div className={`px-4 pb-3 pt-2 ${locked ? 'bg-white' : 'bg-white'}`}>
+        {locked ? (
+          <div className="border-l-2 border-emerald-300 pl-3">
+            <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+              {value || <span className="text-slate-300 italic">—</span>}
+            </p>
+          </div>
+        ) : (
+          <textarea
+            rows={rows}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition bg-white resize-y placeholder-slate-300"
+            placeholder="Inserisci qui il contenuto…"
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -151,30 +186,44 @@ function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
 }) {
   const [open, setOpen] = useState(true);
   const approvedCount = section.fields.filter((f) => locked.has(f.key)).length;
-  const hasContent = section.fields.some((f) => form[f.key]);
+  const total = section.fields.length;
+  const allApproved = approvedCount === total && total > 0;
 
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <div className={`rounded-xl overflow-hidden border transition-colors ${
+      allApproved ? 'border-emerald-200' : 'border-slate-200'
+    }`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition text-left"
+        className={`w-full flex items-center justify-between px-5 py-3.5 transition text-left ${
+          allApproved ? 'bg-emerald-50/60 hover:bg-emerald-50' : 'bg-slate-50 hover:bg-slate-100'
+        }`}
       >
-        <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-          {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-          {section.title}
-          {hasContent && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
+        <span className="flex items-center gap-2">
+          {open
+            ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            : <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+          }
+          <span className={`text-sm font-semibold ${allApproved ? 'text-emerald-800' : 'text-slate-800'}`}>
+            {section.title}
+          </span>
         </span>
+
         {approvedCount > 0 && (
-          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+          <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+            allApproved
+              ? 'bg-emerald-500 text-white'
+              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}>
             <CheckCircle2 className="w-3 h-3" />
-            {approvedCount}/{section.fields.length} approvati
+            {allApproved ? 'Completato' : `${approvedCount}/${total}`}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="px-4 py-4 space-y-4 bg-white">
+        <div className="px-5 py-4 space-y-4 bg-white">
           {section.fields.map((f) => (
             <FieldEditor
               key={f.key}
@@ -244,24 +293,27 @@ export default function ConceptTemplatePanel({ data, onSave }: Props) {
 
   const totalFields = SECTIONS.reduce((n, s) => n + s.fields.length, 0);
   const totalLocked = locked.size;
+  const allDone = totalLocked === totalFields;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      {/* Panel header */}
+      <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <FileCheck className="w-4 h-4 text-indigo-500" />
-            Product Concept Template
-          </h3>
-          {totalLocked > 0 && (
-            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-              <Lock className="w-3 h-3" />
-              {totalLocked}/{totalFields} approvati
-            </span>
-          )}
+          <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+            <FileCheck className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Product Concept Template</h3>
+            {totalLocked > 0 && (
+              <p className={`text-xs mt-0.5 font-medium ${allDone ? 'text-emerald-600' : 'text-slate-500'}`}>
+                {allDone ? '✓ Tutti i campi approvati' : `${totalLocked} di ${totalFields} campi approvati`}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2 flex-wrap">
           {totalLocked > 0 && (
             <button
               type="button"
@@ -287,20 +339,24 @@ export default function ConceptTemplatePanel({ data, onSave }: Props) {
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-60 transition"
           >
             {parsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            {parsing ? 'Importazione…' : 'Importa documento compilato'}
+            {parsing ? 'Importazione…' : 'Importa documento'}
           </button>
           <input ref={fileInputRef} type="file" accept=".docx" className="hidden" onChange={handleUpload} />
         </div>
       </div>
 
       {parseMsg && (
-        <div className={`text-xs px-3 py-2 rounded-lg border ${parseMsg.type === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+        <div className={`mx-6 mt-4 text-xs px-3.5 py-2.5 rounded-lg border ${
+          parseMsg.type === 'ok'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            : 'bg-red-50 border-red-200 text-red-700'
+        }`}>
           {parseMsg.text}
         </div>
       )}
 
       {/* Sections */}
-      <div className="space-y-3">
+      <div className="p-6 space-y-3">
         {SECTIONS.map((s) => (
           <SectionPanel
             key={s.key}
@@ -313,13 +369,18 @@ export default function ConceptTemplatePanel({ data, onSave }: Props) {
         ))}
       </div>
 
-      {/* Save */}
-      <div className="flex justify-end pt-1">
+      {/* Footer / save */}
+      <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
+        <p className="text-xs text-slate-400">
+          {totalLocked > 0
+            ? `${totalLocked}/${totalFields} campi approvati`
+            : 'Approva i campi quando il contenuto è definitivo.'}
+        </p>
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition"
+          className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition shadow-sm shadow-indigo-200"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {saving ? 'Salvataggio…' : 'Salva modifiche'}
