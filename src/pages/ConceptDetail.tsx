@@ -195,6 +195,7 @@ export default function ConceptDetail() {
 
       {/* Product Concept Template */}
       <ConceptTemplatePanel
+        conceptId={concept.id}
         data={concept.concept_data ?? null}
         onSave={async (templateData) => {
           await conceptsService.update(concept.id, { concept_data: templateData });

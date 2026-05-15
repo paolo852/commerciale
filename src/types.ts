@@ -245,6 +245,21 @@ export interface ConceptMatch {
   analyzed_at: string;
 }
 
+export interface ConceptFieldComment {
+  id: string;
+  concept_id: string;
+  field_key: string;
+  parent_id: string | null;
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
+export type CreateConceptFieldCommentForm = Pick<
+  ConceptFieldComment,
+  'field_key' | 'parent_id' | 'author_name' | 'body'
+>;
+
 export interface DashboardKPIs {
   totalInOfferta: number;       // somma budget presentate non rifiutate
   inLavorazione: number;        // count offerte in_lavorazione

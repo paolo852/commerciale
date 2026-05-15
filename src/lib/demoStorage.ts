@@ -3,7 +3,7 @@ import type {
   Concept, ConceptAssignee, ConceptVersion, ConceptVersionComment, ConceptRevisionDeadline,
   LeadCandidate, LeadUpdate,
   AppNotification, NotificationPreferences, NotificationType,
-  Task, ConceptFile,
+  Task, ConceptFile, ConceptFieldComment,
 } from '../types';
 
 // ============================================================
@@ -28,6 +28,7 @@ const KEYS = {
   notificationPrefs: 'commerciale.demo.notificationPrefs',
   tasks: 'commerciale.demo.tasks',
   conceptFiles: 'commerciale.demo.conceptFiles',
+  conceptFieldComments: 'commerciale.demo.conceptFieldComments',
 } as const;
 
 export interface DemoUser {
@@ -493,5 +494,29 @@ export const demoConceptFiles = {
   },
   remove(id: string): void {
     write(KEYS.conceptFiles, read<ConceptFile[]>(KEYS.conceptFiles, []).filter((f) => f.id !== id));
+  },
+};
+
+// ============================================================
+// Concept Field Comments
+// ============================================================
+
+export const demoConceptFieldComments = {
+  list(conceptId: string): ConceptFieldComment[] {
+    return read<ConceptFieldComment[]>(KEYS.conceptFieldComments, [])
+      .filter((c) => c.concept_id === conceptId)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  },
+  create(input: Omit<ConceptFieldComment, 'id' | 'created_at'>): ConceptFieldComment {
+    const all = read<ConceptFieldComment[]>(KEYS.conceptFieldComments, []);
+    const item: ConceptFieldComment = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    write(KEYS.conceptFieldComments, [...all, item]);
+    return item;
+  },
+  remove(id: string): void {
+    const all = read<ConceptFieldComment[]>(KEYS.conceptFieldComments, []);
+    // also remove replies
+    const toRemove = new Set([id, ...all.filter((c) => c.parent_id === id).map((c) => c.id)]);
+    write(KEYS.conceptFieldComments, all.filter((c) => !toRemove.has(c.id)));
   },
 };

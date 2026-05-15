@@ -15,6 +15,7 @@ import {
   demoNotificationPrefs,
   demoTasks,
   demoConceptFiles,
+  demoConceptFieldComments,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -44,6 +45,8 @@ import type {
   Task,
   CreateTaskForm,
   ConceptFile,
+  ConceptFieldComment,
+  CreateConceptFieldCommentForm,
 } from '../types';
 
 // ============================================================
@@ -1095,6 +1098,44 @@ export const conceptFilesService = {
     const sb = ensureSb();
     await sb.storage.from('concept-files').remove([filePath]);
     const { error } = await sb.from('concept_files').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Concept Field Comments
+// ----------------------------------------------------------------
+
+export const conceptFieldCommentsService = {
+  async list(conceptId: string): Promise<ConceptFieldComment[]> {
+    if (isDemoMode) return demoConceptFieldComments.list(conceptId);
+    const { data, error } = await ensureSb()
+      .from('concept_field_comments')
+      .select('*')
+      .eq('concept_id', conceptId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as ConceptFieldComment[];
+  },
+
+  async create(conceptId: string, form: CreateConceptFieldCommentForm): Promise<ConceptFieldComment> {
+    if (isDemoMode) {
+      return demoConceptFieldComments.create({ concept_id: conceptId, ...form });
+    }
+    const sb = ensureSb();
+    const { data: { user } } = await sb.auth.getUser();
+    const { data, error } = await sb
+      .from('concept_field_comments')
+      .insert({ concept_id: conceptId, user_id: user!.id, ...form })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ConceptFieldComment;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoConceptFieldComments.remove(id); return; }
+    const { error } = await ensureSb().from('concept_field_comments').delete().eq('id', id);
     if (error) throw error;
   },
 };

@@ -1,12 +1,14 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2, ChevronDown, ChevronRight,
-  Download, FileCheck, Loader2, Save, Unlock, Upload,
+  Download, FileCheck, Loader2, MessageSquare, Save, Send, Trash2, Unlock, Upload,
 } from 'lucide-react';
 import { parseConceptDocx } from '../../lib/conceptParser';
-import type { ConceptTemplateData } from '../../types';
+import { conceptFieldCommentsService } from '../../lib/dataService';
+import type { ConceptFieldComment, ConceptTemplateData } from '../../types';
 
 interface Props {
+  conceptId: string;
   data: ConceptTemplateData | null;
   onSave: (data: ConceptTemplateData) => Promise<void>;
 }
@@ -89,9 +91,219 @@ const SECTIONS: Section[] = [
   },
 ];
 
-function FieldEditor({
-  label, hint, rows, value, locked, onToggleLock, onChange,
+// ── Utilities ────────────────────────────────────────────────────────────────
+
+function initials(name: string): string {
+  return name.trim().split(/\s+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'ora';
+  if (mins < 60) return `${mins}m fa`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h fa`;
+  return `${Math.floor(hrs / 24)}g fa`;
+}
+
+// ── CommentForm ──────────────────────────────────────────────────────────────
+
+function CommentForm({
+  authorName, setAuthorName, placeholder, onSubmit, onCancel, submitting,
 }: {
+  authorName: string;
+  setAuthorName: (v: string) => void;
+  placeholder?: string;
+  onSubmit: (body: string) => Promise<void>;
+  onCancel?: () => void;
+  submitting: boolean;
+}) {
+  const [body, setBody] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!body.trim() || !authorName.trim()) return;
+    await onSubmit(body.trim());
+    setBody('');
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <input
+        type="text"
+        value={authorName}
+        onChange={(e) => setAuthorName(e.target.value)}
+        placeholder="Il tuo nome"
+        className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white placeholder-slate-300"
+      />
+      <textarea
+        rows={2}
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder={placeholder ?? 'Scrivi un commento…'}
+        className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white resize-none placeholder-slate-300"
+      />
+      <div className="flex items-center gap-2 justify-end">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-xs text-slate-400 hover:text-slate-600 transition"
+          >
+            Annulla
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={submitting || !body.trim() || !authorName.trim()}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+        >
+          {submitting
+            ? <Loader2 className="w-3 h-3 animate-spin" />
+            : <Send className="w-3 h-3" />}
+          Invia
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── FieldComments ────────────────────────────────────────────────────────────
+
+function FieldComments({
+  comments, authorName, setAuthorName, onAdd, onDelete,
+}: {
+  comments: ConceptFieldComment[];
+  authorName: string;
+  setAuthorName: (v: string) => void;
+  onAdd: (parentId: string | null, body: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const topLevel = comments.filter((c) => c.parent_id === null);
+  const replies = (parentId: string) => comments.filter((c) => c.parent_id === parentId);
+
+  async function handleAdd(parentId: string | null, body: string) {
+    setSubmitting(true);
+    try {
+      await onAdd(parentId, body);
+      if (parentId) setReplyingTo(null);
+      else setShowNewForm(false);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function Avatar({ name, size = 'sm' }: { name: string; size?: 'sm' | 'xs' }) {
+    const sz = size === 'sm' ? 'w-6 h-6 text-[9px]' : 'w-5 h-5 text-[8px]';
+    const bg = size === 'sm' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500';
+    return (
+      <div className={`${sz} ${bg} rounded-full flex items-center justify-center shrink-0 font-bold mt-0.5`}>
+        {initials(name || '?')}
+      </div>
+    );
+  }
+
+  function CommentRow({
+    comment, isReply = false,
+  }: {
+    comment: ConceptFieldComment;
+    isReply?: boolean;
+  }) {
+    return (
+      <div className="flex gap-2 group">
+        <Avatar name={comment.author_name} size={isReply ? 'xs' : 'sm'} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-slate-800">{comment.author_name}</span>
+            <span className="text-[10px] text-slate-400">{timeAgo(comment.created_at)}</span>
+            <button
+              onClick={() => onDelete(comment.id)}
+              className="ml-auto opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition"
+              title="Elimina commento"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-600 mt-0.5 whitespace-pre-wrap leading-relaxed">{comment.body}</p>
+          {!isReply && (
+            <button
+              onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+              className="text-[10px] text-slate-400 hover:text-indigo-500 mt-1 transition font-medium"
+            >
+              {replyingTo === comment.id ? 'Annulla' : 'Rispondi'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 pt-1">
+      {/* Thread */}
+      {topLevel.map((comment) => (
+        <div key={comment.id} className="space-y-2">
+          <CommentRow comment={comment} />
+
+          {/* Replies */}
+          {replies(comment.id).length > 0 && (
+            <div className="ml-8 space-y-2 border-l-2 border-slate-100 pl-3">
+              {replies(comment.id).map((reply) => (
+                <CommentRow key={reply.id} comment={reply} isReply />
+              ))}
+            </div>
+          )}
+
+          {/* Reply form */}
+          {replyingTo === comment.id && (
+            <div className="ml-8">
+              <CommentForm
+                authorName={authorName}
+                setAuthorName={setAuthorName}
+                placeholder="Scrivi una risposta…"
+                onSubmit={(body) => handleAdd(comment.id, body)}
+                onCancel={() => setReplyingTo(null)}
+                submitting={submitting}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* New top-level comment */}
+      {showNewForm ? (
+        <CommentForm
+          authorName={authorName}
+          setAuthorName={setAuthorName}
+          onSubmit={(body) => handleAdd(null, body)}
+          onCancel={() => setShowNewForm(false)}
+          submitting={submitting}
+        />
+      ) : (
+        <button
+          onClick={() => setShowNewForm(true)}
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-500 transition font-medium"
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          Aggiungi commento
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── FieldEditor ──────────────────────────────────────────────────────────────
+
+function FieldEditor({
+  fieldKey, label, hint, rows, value, locked, onToggleLock, onChange,
+  comments, authorName, setAuthorName, onAddComment, onDeleteComment,
+}: {
+  fieldKey: string;
   label: string;
   hint?: string;
   rows: number;
@@ -99,15 +311,27 @@ function FieldEditor({
   locked: boolean;
   onToggleLock: () => void;
   onChange: (val: string) => void;
+  comments: ConceptFieldComment[];
+  authorName: string;
+  setAuthorName: (v: string) => void;
+  onAddComment: (parentId: string | null, body: string) => Promise<void>;
+  onDeleteComment: (id: string) => Promise<void>;
 }) {
   const [hoveringLock, setHoveringLock] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+
+  // auto-open comments if there are some
+  useEffect(() => {
+    if (comments.length > 0) setShowComments(true);
+  }, [comments.length]);
 
   return (
-    <div className={`rounded-xl border transition-all duration-200 overflow-hidden ${
-      locked
-        ? 'border-emerald-200 shadow-sm shadow-emerald-100/60'
-        : 'border-slate-200 shadow-sm'
-    }`}>
+    <div
+      id={`field-${fieldKey}`}
+      className={`rounded-xl border transition-all duration-200 overflow-hidden ${
+        locked ? 'border-emerald-200 shadow-sm shadow-emerald-100/60' : 'border-slate-200 shadow-sm'
+      }`}
+    >
       {/* Field header */}
       <div className={`flex items-start justify-between gap-3 px-4 pt-3 pb-2 ${
         locked ? 'bg-emerald-50/70' : 'bg-slate-50/80'
@@ -123,7 +347,6 @@ function FieldEditor({
           )}
         </div>
 
-        {/* Approve / approved button */}
         {locked ? (
           <button
             type="button"
@@ -156,7 +379,7 @@ function FieldEditor({
       </div>
 
       {/* Field body */}
-      <div className={`px-4 pb-3 pt-2 ${locked ? 'bg-white' : 'bg-white'}`}>
+      <div className="px-4 pb-3 pt-2 bg-white">
         {locked ? (
           <div className="border-l-2 border-emerald-300 pl-3">
             <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
@@ -173,16 +396,59 @@ function FieldEditor({
           />
         )}
       </div>
+
+      {/* Comments toggle */}
+      <div className="border-t border-slate-100 bg-slate-50/40">
+        <button
+          type="button"
+          onClick={() => setShowComments((v) => !v)}
+          className="w-full flex items-center gap-2 px-4 py-2 text-xs text-slate-400 hover:text-indigo-500 hover:bg-slate-50 transition text-left"
+        >
+          <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+          {comments.length > 0
+            ? <span className="font-medium">{comments.length} {comments.length === 1 ? 'commento' : 'commenti'}</span>
+            : <span>Commenta</span>
+          }
+          {showComments
+            ? <ChevronDown className="w-3 h-3 ml-auto" />
+            : <ChevronRight className="w-3 h-3 ml-auto" />
+          }
+        </button>
+
+        {showComments && (
+          <div className="px-4 pb-4 bg-white border-t border-slate-100">
+            <div className="pt-3">
+              <FieldComments
+                comments={comments}
+                authorName={authorName}
+                setAuthorName={setAuthorName}
+                onAdd={onAddComment}
+                onDelete={onDeleteComment}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
+// ── SectionPanel ─────────────────────────────────────────────────────────────
+
+function SectionPanel({
+  section, form, locked, onToggleLock, onChange,
+  comments, authorName, setAuthorName, onAddComment, onDeleteComment,
+}: {
   section: Section;
   form: ConceptTemplateData;
   locked: Set<string>;
   onToggleLock: (key: string) => void;
   onChange: (key: FieldKey, val: string) => void;
+  comments: Record<string, ConceptFieldComment[]>;
+  authorName: string;
+  setAuthorName: (v: string) => void;
+  onAddComment: (fieldKey: string, parentId: string | null, body: string) => Promise<void>;
+  onDeleteComment: (id: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(true);
   const approvedCount = section.fields.filter((f) => locked.has(f.key)).length;
@@ -197,9 +463,7 @@ function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={`w-full flex items-center justify-between px-5 py-3.5 transition text-left ${
-          allApproved
-            ? 'bg-emerald-600 hover:bg-emerald-700'
-            : 'bg-indigo-600 hover:bg-indigo-700'
+          allApproved ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
         }`}
       >
         <span className="flex items-center gap-2">
@@ -207,17 +471,11 @@ function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
             ? <ChevronDown className="w-4 h-4 text-white/70 shrink-0" />
             : <ChevronRight className="w-4 h-4 text-white/70 shrink-0" />
           }
-          <span className="text-sm font-semibold text-white">
-            {section.title}
-          </span>
+          <span className="text-sm font-semibold text-white">{section.title}</span>
         </span>
 
         {approvedCount > 0 && (
-          <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
-            allApproved
-              ? 'bg-white/20 text-white'
-              : 'bg-white/20 text-white'
-          }`}>
+          <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-white/20 text-white">
             <CheckCircle2 className="w-3 h-3" />
             {allApproved ? 'Completato' : `${approvedCount}/${total}`}
           </span>
@@ -229,6 +487,7 @@ function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
           {section.fields.map((f) => (
             <FieldEditor
               key={f.key}
+              fieldKey={f.key}
               label={f.label}
               hint={f.hint}
               rows={f.rows ?? 3}
@@ -236,6 +495,11 @@ function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
               locked={locked.has(f.key)}
               onToggleLock={() => onToggleLock(f.key)}
               onChange={(val) => onChange(f.key, val)}
+              comments={comments[f.key] ?? []}
+              authorName={authorName}
+              setAuthorName={setAuthorName}
+              onAddComment={(parentId, body) => onAddComment(f.key, parentId, body)}
+              onDeleteComment={onDeleteComment}
             />
           ))}
         </div>
@@ -244,13 +508,50 @@ function SectionPanel({ section, form, locked, onToggleLock, onChange }: {
   );
 }
 
-export default function ConceptTemplatePanel({ data, onSave }: Props) {
+// ── Main panel ───────────────────────────────────────────────────────────────
+
+export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props) {
   const [form, setForm] = useState<ConceptTemplateData>({ ...EMPTY, ...data, locked_fields: data?.locked_fields ?? [] });
   const [locked, setLocked] = useState<Set<string>>(new Set(data?.locked_fields ?? []));
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [parseMsg, setParseMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [comments, setComments] = useState<Record<string, ConceptFieldComment[]>>({});
+  const [authorName, setAuthorName] = useState(() => localStorage.getItem('concept_comment_author') ?? '');
+
+  const loadComments = useCallback(async () => {
+    const list = await conceptFieldCommentsService.list(conceptId);
+    setComments(
+      list.reduce<Record<string, ConceptFieldComment[]>>((acc, c) => {
+        (acc[c.field_key] ??= []).push(c);
+        return acc;
+      }, {}),
+    );
+  }, [conceptId]);
+
+  useEffect(() => { loadComments(); }, [loadComments]);
+
+  function updateAuthorName(v: string) {
+    setAuthorName(v);
+    localStorage.setItem('concept_comment_author', v);
+  }
+
+  async function addComment(fieldKey: string, parentId: string | null, body: string) {
+    await conceptFieldCommentsService.create(conceptId, {
+      field_key: fieldKey,
+      parent_id: parentId,
+      author_name: authorName,
+      body,
+    });
+    await loadComments();
+  }
+
+  async function deleteComment(id: string) {
+    await conceptFieldCommentsService.remove(id);
+    await loadComments();
+  }
 
   function update(key: FieldKey, val: string) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -367,6 +668,11 @@ export default function ConceptTemplatePanel({ data, onSave }: Props) {
             locked={locked}
             onToggleLock={toggleLock}
             onChange={update}
+            comments={comments}
+            authorName={authorName}
+            setAuthorName={updateAuthorName}
+            onAddComment={addComment}
+            onDeleteComment={deleteComment}
           />
         ))}
       </div>
