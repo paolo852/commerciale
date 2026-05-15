@@ -9,6 +9,11 @@ function isPlaceholder(t: string): boolean {
   return /^\[.+\]$/.test(t.trim());
 }
 
+// Handles both Italian (Titolo1/2) and English (Heading1/2) Word styles
+function isHeading(style: string): boolean {
+  return /^(Titolo|Heading)\d+$/i.test(style);
+}
+
 async function extractParas(file: File): Promise<Para[]> {
   const buf = await file.arrayBuffer();
   const zip = await JSZip.loadAsync(buf);
@@ -28,148 +33,139 @@ async function extractParas(file: File): Promise<Para[]> {
   return result;
 }
 
-function getAfter(paras: Para[], label: string, startIdx: number): { value: string; nextIdx: number } {
-  for (let i = startIdx; i < paras.length; i++) {
-    if (paras[i].text === label) {
-      for (let j = i + 1; j < paras.length; j++) {
-        if (!isPlaceholder(paras[j].text) && paras[j].style !== 'Titolo1' && paras[j].style !== 'Titolo2') {
-          return { value: paras[j].text, nextIdx: j + 1 };
-        }
-        if (paras[j].style === 'Titolo1' || paras[j].style === 'Titolo2') break;
-      }
-      return { value: '', nextIdx: i + 1 };
-    }
-  }
-  return { value: '', nextIdx: startIdx };
+// Find index of a heading whose text includes `needle` (case-insensitive)
+function findHeadingIdx(paras: Para[], needle: string, after = 0): number {
+  const low = needle.toLowerCase();
+  return paras.findIndex((p, i) => i >= after && isHeading(p.style) && p.text.toLowerCase().includes(low));
 }
 
-function sectionContent(paras: Para[], heading: string, filterLabels: string[] = []): string {
-  const labelSet = new Set(filterLabels);
-  let inSection = false;
+// Collect content paragraphs for a heading identified by `needle`
+function sectionContent(paras: Para[], needle: string, filterLabels: string[] = []): string {
+  const labelSet = new Set(filterLabels.map((l) => l.toLowerCase()));
+  const start = findHeadingIdx(paras, needle);
+  if (start < 0) return '';
   const lines: string[] = [];
-
-  for (const p of paras) {
-    if (p.style === 'Titolo1' || p.style === 'Titolo2') {
-      if (p.text === heading) { inSection = true; continue; }
-      if (inSection) break;
-      continue;
-    }
-    if (!inSection) continue;
-    if (labelSet.has(p.text)) continue;
-    if (isPlaceholder(p.text)) continue;
-    lines.push(p.text);
+  for (let i = start + 1; i < paras.length; i++) {
+    if (isHeading(paras[i].style)) break;
+    const t = paras[i].text;
+    if (isPlaceholder(t)) continue;
+    if (labelSet.has(t.toLowerCase())) continue;
+    lines.push(t);
   }
   return lines.join('\n');
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  '1. Technology Snapshot': '1',
-  '1.1 Description and novelty': '1.1',
-  '1.2 Current TRL and evidence': '1.2',
-  '1.3 Intellectual property': '1.3',
-  '2. Problem and Value Proposition': '2',
-  '2.1 Problem statement': '2.1',
-  '2.2 Value proposition': '2.2',
-  '2.3 Validation': '2.3',
-  '3. Market and Competition': '3',
-  '3.1 Market size': '3.1',
-  '4. Development Roadmap': '4',
-  '4.1 From current TRL to market': '4.1',
-  '5. Risks and Critical Assumptions': '5',
-  '6.1 Riskiest assumptions to validate': '5.1',
-};
+// Get the value that follows an exact label paragraph
+function getAfter(paras: Para[], label: string, startIdx = 0): string {
+  for (let i = startIdx; i < paras.length; i++) {
+    if (paras[i].text === label) {
+      for (let j = i + 1; j < paras.length; j++) {
+        if (isHeading(paras[j].style)) break;
+        if (!isPlaceholder(paras[j].text)) return paras[j].text;
+      }
+      return '';
+    }
+  }
+  return '';
+}
+
+// Collect paragraphs between two headings (by needle)
+function sliceSection(paras: Para[], needle: string): Para[] {
+  const start = findHeadingIdx(paras, needle);
+  if (start < 0) return [];
+  const end = paras.findIndex((p, i) => i > start && isHeading(p.style));
+  return paras.slice(start + 1, end < 0 ? undefined : end);
+}
+
+// Extract bullet by keyword present in the first word of the paragraph
+function bulletByKeyword(paras: Para[], keyword: string): string {
+  const low = keyword.toLowerCase();
+  return paras
+    .filter((p) => p.text.toLowerCase().startsWith(low) && !isPlaceholder(p.text))
+    .map((p) => p.text.replace(new RegExp(`^${keyword}[^a-zA-Z]*`, 'i'), '').trim())
+    .join('\n');
+}
 
 export async function parseConceptDocx(file: File): Promise<Partial<ConceptTemplateData>> {
   const paras = await extractParas(file);
   const result: Partial<ConceptTemplateData> = {};
 
-  // Cover metadata
-  const coverLabels = ['Project / Technology name', 'Lead organisation', 'Author(s)', 'Version', 'Current TRL', 'PRODUCT CONCEPT TEMPLATE', 'From Low-TRL Technology to Product Concept'];
-  const { value: leadOrg } = getAfter(paras, 'Lead organisation', 0);
-  const { value: authors } = getAfter(paras, 'Author(s)', 0);
-  const { value: version } = getAfter(paras, 'Version', 0);
-  const { value: trlCurrent } = getAfter(paras, 'Current TRL', 0);
+  // ── Cover metadata ──────────────────────────────────────────────────────────
+  const leadOrg   = getAfter(paras, 'Lead organisation');
+  const authors   = getAfter(paras, 'Author(s)');
+  const version   = getAfter(paras, 'Version');
+  const trlCover  = getAfter(paras, 'Current TRL');
 
-  if (leadOrg) result.lead_organisation = leadOrg;
-  if (authors) result.authors = authors;
-  if (version && !isPlaceholder(version)) result.version = version;
-  if (trlCurrent && !isPlaceholder(trlCurrent)) result.trl_current = trlCurrent;
+  if (leadOrg  && !isPlaceholder(leadOrg))  result.lead_organisation = leadOrg;
+  if (authors  && !isPlaceholder(authors))  result.authors = authors;
+  if (version  && !isPlaceholder(version))  result.version = version;
+  if (trlCover && !isPlaceholder(trlCover)) result.trl_current = trlCover;
 
-  // 1.1 Description and novelty — free text
-  result.tech_description = sectionContent(paras, '1.1 Description and novelty', [...coverLabels, ...Object.keys(SECTION_LABELS)]);
+  // ── 1.1 Description and novelty ─────────────────────────────────────────────
+  result.tech_description = sectionContent(paras, '1.1');
 
-  // 1.2 TRL sub-fields
+  // ── 1.2 Current TRL and evidence ────────────────────────────────────────────
   const trl12Labels = ['Current TRL', 'Key evidence', 'Maturity gaps', 'Next TRL milestone'];
-  const sec12Start = paras.findIndex((p) => p.text === '1.2 Current TRL and evidence');
-  const sec12End = paras.findIndex((p, i) => i > sec12Start && (p.style === 'Titolo1' || p.style === 'Titolo2'));
-  const sec12Paras = paras.slice(sec12Start + 1, sec12End < 0 ? undefined : sec12End);
+  const sec12 = sliceSection(paras, '1.2');
 
   const findLabeled = (label: string): string => {
-    const idx = sec12Paras.findIndex((p) => p.text === label);
+    const idx = sec12.findIndex((p) => p.text === label);
     if (idx < 0) return '';
-    for (let j = idx + 1; j < sec12Paras.length; j++) {
-      if (trl12Labels.includes(sec12Paras[j].text)) break;
-      if (!isPlaceholder(sec12Paras[j].text)) return sec12Paras[j].text;
+    for (let j = idx + 1; j < sec12.length; j++) {
+      if (trl12Labels.includes(sec12[j].text)) break;
+      if (isHeading(sec12[j].style)) break;
+      if (!isPlaceholder(sec12[j].text)) return sec12[j].text;
     }
     return '';
   };
-  result.trl_justification = findLabeled('Current TRL');
-  result.trl_evidence = findLabeled('Key evidence');
-  result.trl_gaps = findLabeled('Maturity gaps');
+  result.trl_justification  = findLabeled('Current TRL');
+  result.trl_evidence       = findLabeled('Key evidence');
+  result.trl_gaps           = findLabeled('Maturity gaps');
   result.trl_next_milestone = findLabeled('Next TRL milestone');
 
-  // 1.3 IP
-  result.ip = sectionContent(paras, '1.3 Intellectual property', []);
+  // ── 1.3 Intellectual property ───────────────────────────────────────────────
+  result.ip = sectionContent(paras, '1.3');
 
-  // 2.1 Problem statement
-  result.problem_statement = sectionContent(paras, '2.1 Problem statement', []);
+  // ── 2.1 Problem statement ───────────────────────────────────────────────────
+  result.problem_statement = sectionContent(paras, '2.1');
 
-  // 2.2 Value proposition — parse functional/economic/strategic bullet points
-  const sec22Start = paras.findIndex((p) => p.text === '2.2 Value proposition');
-  const sec22End = paras.findIndex((p, i) => i > sec22Start && (p.style === 'Titolo1' || p.style === 'Titolo2'));
-  const sec22Paras = paras.slice(sec22Start + 1, sec22End < 0 ? undefined : sec22End).filter((p) => !isPlaceholder(p.text));
+  // ── 2.2 Value proposition ───────────────────────────────────────────────────
+  // Handle "Functional benefits: …", "Functional — …", "Functional: …"
+  const sec22 = sliceSection(paras, '2.2').filter((p) => !isPlaceholder(p.text));
 
-  const extractBullet = (prefix: string): string =>
-    sec22Paras
-      .filter((p) => p.text.toLowerCase().startsWith(prefix.toLowerCase()))
-      .map((p) => p.text.replace(new RegExp(`^${prefix}:?\\s*`, 'i'), '').trim())
-      .join('\n') ||
-    sec22Paras
-      .filter((p) => p.text === prefix.split(' ')[0] + ' benefits:' || p.text.startsWith(prefix + ':'))
-      .map((p) => p.text).join('\n');
+  result.value_functional = bulletByKeyword(sec22, 'Functional') ||
+    (sec22.find((p) => p.text.toLowerCase().includes('functional'))?.text ?? '');
+  result.value_economic   = bulletByKeyword(sec22, 'Economic') ||
+    (sec22.find((p) => p.text.toLowerCase().includes('economic'))?.text ?? '');
+  result.value_strategic  = bulletByKeyword(sec22, 'Strategic') ||
+    (sec22.find((p) => p.text.toLowerCase().includes('strategic'))?.text ?? '');
 
-  result.value_functional = extractBullet('Functional benefits') || (sec22Paras.find((p) => p.text.toLowerCase().includes('functional'))?.text ?? '');
-  result.value_economic   = extractBullet('Economic benefits')   || (sec22Paras.find((p) => p.text.toLowerCase().includes('economic'))?.text ?? '');
-  result.value_strategic  = extractBullet('Strategic benefits')  || (sec22Paras.find((p) => p.text.toLowerCase().includes('strategic'))?.text ?? '');
+  // ── 2.3 Validation ──────────────────────────────────────────────────────────
+  result.validation = sectionContent(paras, '2.3');
 
-  // 2.3 Validation
-  result.validation = sectionContent(paras, '2.3 Validation', []);
-
-  // 3.1 Market size — TAM/SAM/SOM
-  const sec31Start = paras.findIndex((p) => p.text === '3.1 Market size');
-  const sec31End = paras.findIndex((p, i) => i > sec31Start && (p.style === 'Titolo1' || p.style === 'Titolo2'));
-  const sec31Paras = paras.slice(sec31Start + 1, sec31End < 0 ? undefined : sec31End);
-
+  // ── 3.1 Market size — TAM / SAM / SOM ──────────────────────────────────────
+  const sec31 = sliceSection(paras, '3.1');
   const marketNoise = new Set(['Indicator', 'Definition / methodology', 'Value']);
-  const marketDescriptions = ['Total Addressable Market', 'Serviceable Available Market', 'Serviceable Obtainable Market'];
-
+  const marketPrefixes = ['Total Addressable Market', 'Serviceable Available Market', 'Serviceable Obtainable Market'];
   let currentMarket: 'tam' | 'sam' | 'som' | null = null;
-  for (const p of sec31Paras) {
+  for (const p of sec31) {
     if (p.text === 'TAM') { currentMarket = 'tam'; continue; }
     if (p.text === 'SAM') { currentMarket = 'sam'; continue; }
     if (p.text === 'SOM') { currentMarket = 'som'; continue; }
     if (marketNoise.has(p.text)) continue;
-    if (marketDescriptions.some((d) => p.text.startsWith(d))) continue;
+    if (marketPrefixes.some((d) => p.text.startsWith(d))) continue;
     if (isPlaceholder(p.text)) continue;
     if (currentMarket && !result[currentMarket]) result[currentMarket] = p.text;
   }
 
-  // 4.1 Roadmap — free text, skip table headers
-  const roadmapNoise = new Set(['Phase', 'TRL', 'Key activities and demonstrators', 'Decision gate / milestone', 'Phase 1', 'Phase 2', 'Phase 3']);
-  result.roadmap = sectionContent(paras, '4.1 From current TRL to market', [...roadmapNoise]);
+  // ── 4.1 Roadmap ─────────────────────────────────────────────────────────────
+  // Filter only the table-column header rows (same in every template version)
+  const roadmapColumnHeaders = new Set(['Phase', 'TRL', 'Key activities and demonstrators', 'Decision gate / milestone']);
+  result.roadmap = sectionContent(paras, '4.1', [...roadmapColumnHeaders]);
 
-  // 5. Risks / assumptions
-  result.risk_assumptions = sectionContent(paras, '6.1 Riskiest assumptions to validate', []);
+  // ── 5. Risks / assumptions ───────────────────────────────────────────────────
+  // Heading may be "6.1 Riskiest…" (blank) or "5.1 Riskiest…" (filled) — match by keyword
+  result.risk_assumptions = sectionContent(paras, 'assumptions to validate', []);
 
   return result;
 }
