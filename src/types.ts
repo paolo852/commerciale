@@ -142,6 +142,39 @@ export type CreateAllowedUserForm = Pick<AllowedUser, 'email' | 'name'>;
 
 export type ConceptStatus = 'in_valutazione' | 'promosso' | 'rifiutato';
 
+export interface ConceptTemplateData {
+  // Cover metadata
+  lead_organisation: string;
+  authors: string;
+  trl_current: string;
+  version: string;
+  // 1.1 Technology description and novelty
+  tech_description: string;
+  // 1.2 TRL
+  trl_justification: string;
+  trl_evidence: string;
+  trl_gaps: string;
+  trl_next_milestone: string;
+  // 1.3 IP
+  ip: string;
+  // 2.1 Problem
+  problem_statement: string;
+  // 2.2 Value proposition
+  value_functional: string;
+  value_economic: string;
+  value_strategic: string;
+  // 2.3 Validation
+  validation: string;
+  // 3.1 Market
+  tam: string;
+  sam: string;
+  som: string;
+  // 4.1 Roadmap
+  roadmap: string;
+  // 5. Risks
+  risk_assumptions: string;
+}
+
 export interface Concept {
   id: string;
   user_id: string;
@@ -152,12 +185,13 @@ export interface Concept {
   status: ConceptStatus;
   notes: string | null;
   promoted_offer_id: string | null;
+  concept_data: ConceptTemplateData | null;
   created_at: string;
   assignees?: ConceptAssignee[];
 }
 
 export type CreateConceptForm = Pick<Concept, 'name' | 'pi' | 'ente' | 'description' | 'status' | 'notes'>;
-export type UpdateConceptForm = Partial<CreateConceptForm & Pick<Concept, 'promoted_offer_id'>>;
+export type UpdateConceptForm = Partial<CreateConceptForm & Pick<Concept, 'promoted_offer_id' | 'concept_data'>>;
 
 export interface ConceptAssignee {
   concept_id: string;

@@ -14,6 +14,7 @@ import {
 import EntityTasks from '../components/EntityTasks';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
+import ConceptTemplatePanel from '../components/concepts/ConceptTemplatePanel';
 import OfferFormModal from '../components/offerte/OfferFormModal';
 import MentionInput, { CommentBody } from '../components/concepts/MentionInput';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -208,6 +209,15 @@ export default function ConceptDetail() {
           userId={user.id}
         />
       )}
+
+      {/* Product Concept Template */}
+      <ConceptTemplatePanel
+        data={concept.concept_data ?? null}
+        onSave={async (templateData) => {
+          await conceptsService.update(concept.id, { concept_data: templateData });
+          await reload();
+        }}
+      />
 
       {/* Documenti tecnologia */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">

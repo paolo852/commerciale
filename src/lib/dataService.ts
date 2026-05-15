@@ -347,6 +347,7 @@ export const conceptsService = {
         status: input.status ?? 'in_valutazione',
         notes: input.notes ?? null,
         promoted_offer_id: null,
+        concept_data: null,
       });
     }
     const { data, error } = await ensureSb()
