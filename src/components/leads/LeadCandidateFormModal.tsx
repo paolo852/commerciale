@@ -268,6 +268,20 @@ export default function LeadCandidateFormModal({
           )}
         </div>
 
+        {/* Tipologia manuale quando non è selezionato un bando */}
+        {!form.funding_call_id && !showNewCall && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Tipologia / ambito</label>
+            <input
+              type="text"
+              value={form.call_type}
+              onChange={(e) => update('call_type', e.target.value)}
+              placeholder="es. PNRR, Horizon Europe, Regionale, Privato…"
+              className={inputClass}
+            />
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Dati di massima sul progetto potenziale</label>
           <textarea

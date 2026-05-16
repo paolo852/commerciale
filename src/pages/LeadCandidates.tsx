@@ -64,6 +64,8 @@ export default function LeadCandidates() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
   const [toDelete, setToDelete] = useState<LeadCandidate | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [assignFcId, setAssignFcId] = useState('');
 
   const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
 
@@ -133,6 +135,18 @@ export default function LeadCandidates() {
     if (!toDelete) return;
     await leadCandidatesService.remove(toDelete.id);
     setToDelete(null);
+    await reload();
+  }
+
+  async function handleQuickAssign(leadId: string) {
+    if (!assignFcId) return;
+    const fc = fundingCalls.find((f) => f.id === assignFcId);
+    await leadCandidatesService.update(leadId, {
+      funding_call_id: assignFcId,
+      call_type: fc ? (fc.body ?? fc.name) : undefined,
+    });
+    setAssigningId(null);
+    setAssignFcId('');
     await reload();
   }
 
@@ -306,11 +320,12 @@ export default function LeadCandidates() {
                 {!isCollapsed && <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {groupLeads.map((lead) => {
                     const leadFc = lead.funding_call_id ? fcById.get(lead.funding_call_id) : null;
+                    const isAssigning = assigningId === lead.id;
                     return (
-                      <button
+                      <div
                         key={lead.id}
-                        onClick={() => navigate(`/leads/${lead.id}`)}
-                        className="text-left bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-200 transition p-4 flex flex-col gap-2"
+                        onClick={() => !isAssigning && navigate(`/leads/${lead.id}`)}
+                        className={`bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-200 transition p-4 flex flex-col gap-2 ${isAssigning ? 'cursor-default' : 'cursor-pointer'}`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -322,10 +337,50 @@ export default function LeadCandidates() {
                           <StatusBadge value={lead.status} />
                         </div>
 
-                        {leadFc && (
+                        {leadFc ? (
                           <p className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1 truncate">
                             {leadFc.code} — {leadFc.name}
                           </p>
+                        ) : (
+                          /* Quick bando assign */
+                          <div onClick={(e) => e.stopPropagation()}>
+                            {isAssigning ? (
+                              <div className="flex gap-1.5 items-center">
+                                <select
+                                  autoFocus
+                                  value={assignFcId}
+                                  onChange={(e) => setAssignFcId(e.target.value)}
+                                  className="flex-1 text-xs px-2 py-1.5 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                                >
+                                  <option value="">— Seleziona bando —</option>
+                                  {fundingCalls.map((fc) => (
+                                    <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => handleQuickAssign(lead.id)}
+                                  disabled={!assignFcId}
+                                  className="px-2 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={() => { setAssigningId(null); setAssignFcId(''); }}
+                                  className="px-2 py-1.5 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setAssigningId(lead.id); setAssignFcId(''); }}
+                                className="w-full flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-dashed border-indigo-200 rounded-lg px-2 py-1.5 hover:bg-indigo-100 hover:border-indigo-300 transition"
+                              >
+                                <Plus className="w-3 h-3 shrink-0" />
+                                Assegna a un bando
+                              </button>
+                            )}
+                          </div>
                         )}
 
                         {lead.potential_project && (
@@ -341,9 +396,9 @@ export default function LeadCandidates() {
                           ) : (
                             <span>Aggiunto {formatDate(lead.created_at)}</span>
                           )}
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             <button
-                              onClick={(e) => { e.stopPropagation(); setToDelete(lead); }}
+                              onClick={() => setToDelete(lead)}
                               className="text-slate-300 hover:text-red-500 transition"
                             >
                               Elimina
@@ -351,7 +406,7 @@ export default function LeadCandidates() {
                             <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
                           </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>}
