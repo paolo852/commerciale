@@ -110,7 +110,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2">
-          <MonthlyChart offers={filteredOffers} year={year === 'all' ? undefined : year} />
+          <MonthlyChart offers={offers} />
         </div>
         <StatusDistribution offers={filteredOffers} />
       </div>
