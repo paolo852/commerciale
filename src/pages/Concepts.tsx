@@ -212,31 +212,84 @@ export default function Concepts() {
               {c.description && (
                 <p className="text-sm text-slate-600 line-clamp-3">{c.description}</p>
               )}
-              {c.assignees && c.assignees.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <div className="flex -space-x-1.5">
-                    {c.assignees.slice(0, 4).map((a) => (
-                      <Avatar
-                        key={a.project_manager_id}
-                        name={a.project_manager?.name ?? ''}
-                        url={a.project_manager?.avatar_url}
-                        size="sm"
-                        className="ring-2 ring-white"
-                        title={a.project_manager?.name ?? ''}
-                      />
-                    ))}
-                    {c.assignees.length > 4 && (
-                      <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
-                        +{c.assignees.length - 4}
-                      </span>
+              {c.assignees && c.assignees.length > 0 && (() => {
+                const pm = c.assignees.find((a) => a.role === 'Project Manager');
+                const sorted = pm
+                  ? [pm, ...c.assignees.filter((a) => a.role !== 'Project Manager')]
+                  : c.assignees;
+                return (
+                  <div className="space-y-1.5">
+                    {pm && (
+                      <div className="flex items-center gap-1.5">
+                        <Avatar
+                          name={pm.project_manager?.name ?? ''}
+                          url={pm.project_manager?.avatar_url}
+                          size="sm"
+                          fallbackClassName="bg-indigo-600 text-white"
+                          className="ring-2 ring-indigo-200 shrink-0"
+                          title={pm.project_manager?.name ?? ''}
+                        />
+                        <span className="text-xs font-medium text-slate-800 truncate">
+                          {pm.project_manager?.name}
+                        </span>
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
+                          PM
+                        </span>
+                      </div>
+                    )}
+                    {sorted.filter((a) => a.role !== 'Project Manager').length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <div className="flex -space-x-1.5">
+                          {sorted.filter((a) => a.role !== 'Project Manager').slice(0, 4).map((a) => (
+                            <Avatar
+                              key={a.project_manager_id}
+                              name={a.project_manager?.name ?? ''}
+                              url={a.project_manager?.avatar_url}
+                              size="sm"
+                              className="ring-2 ring-white"
+                              title={a.project_manager?.name ?? ''}
+                            />
+                          ))}
+                          {sorted.filter((a) => a.role !== 'Project Manager').length > 4 && (
+                            <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
+                              +{sorted.filter((a) => a.role !== 'Project Manager').length - 4}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-500 truncate">
+                          {sorted.filter((a) => a.role !== 'Project Manager').map((a) => a.project_manager?.name).filter(Boolean).join(', ')}
+                        </span>
+                      </div>
+                    )}
+                    {!pm && (
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <div className="flex -space-x-1.5">
+                          {sorted.slice(0, 4).map((a) => (
+                            <Avatar
+                              key={a.project_manager_id}
+                              name={a.project_manager?.name ?? ''}
+                              url={a.project_manager?.avatar_url}
+                              size="sm"
+                              className="ring-2 ring-white"
+                              title={a.project_manager?.name ?? ''}
+                            />
+                          ))}
+                          {sorted.length > 4 && (
+                            <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
+                              +{sorted.length - 4}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-500 truncate">
+                          {sorted.map((a) => a.project_manager?.name).filter(Boolean).join(', ')}
+                        </span>
+                      </div>
                     )}
                   </div>
-                  <span className="text-xs text-slate-500 truncate">
-                    {c.assignees.map((a) => a.project_manager?.name).filter(Boolean).join(', ')}
-                  </span>
-                </div>
-              )}
+                );
+              })()}
               <div className="flex items-center justify-between text-xs text-slate-400 mt-auto pt-2">
                 <span>Creato {formatDate(c.created_at)}</span>
                 <button
