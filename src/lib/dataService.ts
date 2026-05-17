@@ -1008,11 +1008,35 @@ export const tasksService = {
     return (data ?? []) as Task[];
   },
 
-  async create(input: CreateTaskForm, userId: string): Promise<Task> {
-    if (isDemoMode) return demoTasks.create({ ...input, completed: false }, userId);
+  async create(input: CreateTaskForm, userId: string, file?: File): Promise<Task> {
+    let attachment_url: string | null = null;
+    let attachment_name: string | null = null;
+
+    if (file) {
+      attachment_name = file.name;
+      if (isDemoMode) {
+        attachment_url = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      } else {
+        const path = `${userId}/${input.entity_id ?? 'generic'}/${Date.now()}_${file.name}`;
+        const { error: upErr } = await ensureSb()
+          .storage.from('task-files')
+          .upload(path, file, { upsert: true });
+        if (upErr) throw upErr;
+        const { data: urlData } = ensureSb().storage.from('task-files').getPublicUrl(path);
+        attachment_url = urlData.publicUrl;
+      }
+    }
+
+    const extra = { attachment_url, attachment_name };
+    if (isDemoMode) return demoTasks.create({ ...input, completed: false, ...extra }, userId);
     const { data, error } = await ensureSb()
       .from('tasks')
-      .insert({ ...input, user_id: userId, completed: false })
+      .insert({ ...input, user_id: userId, completed: false, ...extra })
       .select().single();
     if (error) throw error;
     return data as Task;

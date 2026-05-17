@@ -336,6 +336,8 @@ export interface Task {
   entity_type: 'lead' | 'concept' | 'offer' | null;
   due_date: string | null;
   completed: boolean;
+  attachment_url: string | null;
+  attachment_name: string | null;
   created_at: string;
 }
 
