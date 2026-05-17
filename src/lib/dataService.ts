@@ -404,12 +404,22 @@ export const conceptAssigneesService = {
     return (data ?? []) as ConceptAssignee[];
   },
 
-  async add(conceptId: string, projectManagerId: string): Promise<void> {
-    if (isDemoMode) { demoConceptAssignees.add(conceptId, projectManagerId); return; }
+  async add(conceptId: string, projectManagerId: string, role?: string | null): Promise<void> {
+    if (isDemoMode) { demoConceptAssignees.add(conceptId, projectManagerId, role); return; }
     const { error } = await ensureSb()
       .from('concept_assignees')
-      .insert({ concept_id: conceptId, project_manager_id: projectManagerId });
-    if (error && error.code !== '23505') throw error; // 23505 = unique violation
+      .insert({ concept_id: conceptId, project_manager_id: projectManagerId, role: role ?? null });
+    if (error && error.code !== '23505') throw error;
+  },
+
+  async setRole(conceptId: string, projectManagerId: string, role: string | null): Promise<void> {
+    if (isDemoMode) { demoConceptAssignees.setRole(conceptId, projectManagerId, role); return; }
+    const { error } = await ensureSb()
+      .from('concept_assignees')
+      .update({ role })
+      .eq('concept_id', conceptId)
+      .eq('project_manager_id', projectManagerId);
+    if (error) throw error;
   },
 
   async remove(conceptId: string, projectManagerId: string): Promise<void> {

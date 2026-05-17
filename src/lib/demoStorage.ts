@@ -205,7 +205,7 @@ export const demoConceptAssignees = {
   list(conceptId: string): ConceptAssignee[] {
     return read<ConceptAssignee[]>(KEYS.conceptAssignees, []).filter((a) => a.concept_id === conceptId);
   },
-  add(conceptId: string, pmId: string): ConceptAssignee {
+  add(conceptId: string, pmId: string, role?: string | null): ConceptAssignee {
     const all = read<ConceptAssignee[]>(KEYS.conceptAssignees, []);
     if (all.some((a) => a.concept_id === conceptId && a.project_manager_id === pmId)) {
       return all.find((a) => a.concept_id === conceptId && a.project_manager_id === pmId)!;
@@ -213,11 +213,17 @@ export const demoConceptAssignees = {
     const item: ConceptAssignee = {
       concept_id: conceptId,
       project_manager_id: pmId,
+      role: role ?? null,
       added_at: new Date().toISOString(),
     };
     all.push(item);
     write(KEYS.conceptAssignees, all);
     return item;
+  },
+  setRole(conceptId: string, pmId: string, role: string | null): void {
+    const all = read<ConceptAssignee[]>(KEYS.conceptAssignees, []);
+    const idx = all.findIndex((a) => a.concept_id === conceptId && a.project_manager_id === pmId);
+    if (idx >= 0) { all[idx] = { ...all[idx], role }; write(KEYS.conceptAssignees, all); }
   },
   remove(conceptId: string, pmId: string): void {
     write(

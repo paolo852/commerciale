@@ -200,6 +200,7 @@ export type UpdateConceptForm = Partial<CreateConceptForm & Pick<Concept, 'promo
 export interface ConceptAssignee {
   concept_id: string;
   project_manager_id: string;
+  role: string | null;
   added_at: string;
   project_manager?: ProjectManager | null;
 }

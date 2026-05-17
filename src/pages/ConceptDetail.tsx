@@ -279,6 +279,55 @@ export default function ConceptDetail() {
 // Assignees
 // ============================================================
 
+const ASSIGNEE_ROLES = ['Project Manager', 'Ricercatore', 'Reviewer'];
+
+const ROLE_STYLES: Record<string, string> = {
+  'Project Manager': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  'Ricercatore':     'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Reviewer':        'bg-violet-50 text-violet-700 border-violet-200',
+};
+
+function RoleBadge({ role, editable, onChange }: { role: string | null; editable: boolean; onChange: (r: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  if (!editable) {
+    return role ? (
+      <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${ROLE_STYLES[role] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+        {role}
+      </span>
+    ) : null;
+  }
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`text-[11px] px-2 py-0.5 rounded-full border font-medium transition ${
+          role
+            ? (ROLE_STYLES[role] ?? 'bg-slate-100 text-slate-600 border-slate-200')
+            : 'bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:border-slate-400'
+        }`}
+      >
+        {role ?? '+ ruolo'}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-6 z-10 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[140px]">
+          {ASSIGNEE_ROLES.map((r) => (
+            <button key={r} onClick={() => { onChange(r); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition ${role === r ? 'font-semibold text-indigo-600' : 'text-slate-700'}`}>
+              {r}
+            </button>
+          ))}
+          {role && (
+            <button onClick={() => { onChange(null); setOpen(false); }}
+              className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition border-t border-slate-100 mt-1">
+              Rimuovi ruolo
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AssigneesSection({
   conceptId, assignees, projectManagers, onChange,
 }: {
@@ -289,14 +338,20 @@ function AssigneesSection({
 }) {
   const [adding, setAdding] = useState(false);
   const [selectedPm, setSelectedPm] = useState('');
+  const [selectedRole, setSelectedRole] = useState('');
 
   const assignedIds = new Set(assignees.map((a) => a.project_manager_id));
   const available = projectManagers.filter((p) => p.active && !assignedIds.has(p.id));
 
   async function add() {
     if (!selectedPm) return;
-    await conceptAssigneesService.add(conceptId, selectedPm);
-    setSelectedPm(''); setAdding(false);
+    await conceptAssigneesService.add(conceptId, selectedPm, selectedRole || null);
+    setSelectedPm(''); setSelectedRole(''); setAdding(false);
+    await onChange();
+  }
+
+  async function handleRoleChange(pmId: string, role: string | null) {
+    await conceptAssigneesService.setRole(conceptId, pmId, role);
     await onChange();
   }
 
@@ -321,20 +376,27 @@ function AssigneesSection({
       </div>
 
       {adding && (
-        <div className="flex gap-2 mb-3">
+        <div className="space-y-2 mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
           <select value={selectedPm} onChange={(e) => setSelectedPm(e.target.value)}
-            className="flex-1 px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="">Seleziona PM…</option>
+            className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Seleziona persona…</option>
             {available.map((pm) => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
           </select>
-          <button onClick={add} disabled={!selectedPm}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-            Aggiungi
-          </button>
-          <button onClick={() => { setAdding(false); setSelectedPm(''); }}
-            className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
-            Annulla
-          </button>
+          <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}
+            className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">— Nessun ruolo —</option>
+            {ASSIGNEE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <div className="flex gap-2">
+            <button onClick={add} disabled={!selectedPm}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+              Aggiungi
+            </button>
+            <button onClick={() => { setAdding(false); setSelectedPm(''); setSelectedRole(''); }}
+              className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
+              Annulla
+            </button>
+          </div>
         </div>
       )}
 
@@ -344,7 +406,9 @@ function AssigneesSection({
         <ul className="space-y-1.5">
           {assignees.map((a) => (
             <li key={a.project_manager_id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50">
-              <span className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0">
+              <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${
+                a.role === 'Project Manager' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'
+              }`}>
                 {a.project_manager?.name[0]?.toUpperCase() ?? '?'}
               </span>
               <div className="flex-1 min-w-0">
@@ -353,8 +417,9 @@ function AssigneesSection({
                   <p className="text-xs text-slate-400 truncate">{a.project_manager.email}</p>
                 )}
               </div>
-              <button onClick={() => remove(a.project_manager_id)}
-                className="text-slate-300 hover:text-red-500 transition">
+              <RoleBadge role={a.role} editable onChange={(r) => void handleRoleChange(a.project_manager_id, r)} />
+              <button onClick={() => void remove(a.project_manager_id)}
+                className="text-slate-300 hover:text-red-500 transition ml-1">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </li>
