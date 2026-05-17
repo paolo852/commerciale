@@ -291,6 +291,8 @@ function AssigneesSection({
   const [adding, setAdding] = useState(false);
   const [selectedPm, setSelectedPm] = useState('');
   const [asPm, setAsPm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [sectionError, setSectionError] = useState<string | null>(null);
 
   const assignedIds = new Set(assignees.map((a) => a.project_manager_id));
   const available = projectManagers.filter((p) => p.active && !assignedIds.has(p.id));
@@ -298,26 +300,47 @@ function AssigneesSection({
 
   async function add() {
     if (!selectedPm) return;
-    if (asPm && currentPmId && currentPmId !== selectedPm) {
-      await conceptAssigneesService.setRole(conceptId, currentPmId, null);
+    setSaving(true); setSectionError(null);
+    try {
+      if (asPm && currentPmId && currentPmId !== selectedPm) {
+        await conceptAssigneesService.setRole(conceptId, currentPmId, null);
+      }
+      await conceptAssigneesService.add(conceptId, selectedPm, asPm ? 'Project Manager' : null);
+      setSelectedPm(''); setAsPm(false); setAdding(false);
+      await onChange();
+    } catch (e) {
+      setSectionError(e instanceof Error ? e.message : 'Errore durante il salvataggio.');
+    } finally {
+      setSaving(false);
     }
-    await conceptAssigneesService.add(conceptId, selectedPm, asPm ? 'Project Manager' : null);
-    setSelectedPm(''); setAsPm(false); setAdding(false);
-    await onChange();
   }
 
   async function handleTogglePm(pmId: string) {
-    const isPm = currentPmId === pmId;
-    if (!isPm && currentPmId) {
-      await conceptAssigneesService.setRole(conceptId, currentPmId, null);
+    setSaving(true); setSectionError(null);
+    try {
+      const isPm = currentPmId === pmId;
+      if (!isPm && currentPmId) {
+        await conceptAssigneesService.setRole(conceptId, currentPmId, null);
+      }
+      await conceptAssigneesService.setRole(conceptId, pmId, isPm ? null : 'Project Manager');
+      await onChange();
+    } catch (e) {
+      setSectionError(e instanceof Error ? e.message : 'Errore durante il salvataggio.');
+    } finally {
+      setSaving(false);
     }
-    await conceptAssigneesService.setRole(conceptId, pmId, isPm ? null : 'Project Manager');
-    await onChange();
   }
 
   async function remove(pmId: string) {
-    await conceptAssigneesService.remove(conceptId, pmId);
-    await onChange();
+    setSaving(true); setSectionError(null);
+    try {
+      await conceptAssigneesService.remove(conceptId, pmId);
+      await onChange();
+    } catch (e) {
+      setSectionError(e instanceof Error ? e.message : 'Errore durante la rimozione.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -328,12 +351,18 @@ function AssigneesSection({
           Chi ci sta lavorando ({assignees.length})
         </h3>
         {!adding && available.length > 0 && (
-          <button onClick={() => setAdding(true)}
+          <button type="button" onClick={() => setAdding(true)}
             className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
             <UserPlus className="w-3.5 h-3.5" /> Aggiungi
           </button>
         )}
       </div>
+
+      {sectionError && (
+        <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+          {sectionError}
+        </div>
+      )}
 
       {adding && (
         <div className="space-y-2 mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -348,11 +377,11 @@ function AssigneesSection({
             <span className="text-sm text-slate-700">Designa come Project Manager</span>
           </label>
           <div className="flex gap-2">
-            <button onClick={() => void add()} disabled={!selectedPm}
+            <button type="button" onClick={() => void add()} disabled={!selectedPm || saving}
               className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-              Aggiungi
+              {saving ? 'Salvataggio…' : 'Aggiungi'}
             </button>
-            <button onClick={() => { setAdding(false); setSelectedPm(''); setAsPm(false); }}
+            <button type="button" onClick={() => { setAdding(false); setSelectedPm(''); setAsPm(false); }}
               className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
               Annulla
             </button>
@@ -381,9 +410,11 @@ function AssigneesSection({
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => void handleTogglePm(a.project_manager_id)}
+                  disabled={saving}
                   title={isPm ? 'Rimuovi ruolo PM' : 'Nomina Project Manager'}
-                  className={`text-[11px] px-2 py-0.5 rounded-full border font-medium transition shrink-0 ${
+                  className={`text-[11px] px-2 py-0.5 rounded-full border font-medium transition shrink-0 disabled:opacity-50 ${
                     isPm
                       ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
                       : 'bg-white text-slate-400 border-dashed border-slate-300 hover:border-indigo-400 hover:text-indigo-600'
@@ -391,8 +422,8 @@ function AssigneesSection({
                 >
                   PM
                 </button>
-                <button onClick={() => void remove(a.project_manager_id)}
-                  className="text-slate-300 hover:text-red-500 transition">
+                <button type="button" onClick={() => void remove(a.project_manager_id)} disabled={saving}
+                  className="text-slate-300 hover:text-red-500 transition disabled:opacity-50">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </li>
