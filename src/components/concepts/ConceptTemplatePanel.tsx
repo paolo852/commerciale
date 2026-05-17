@@ -50,11 +50,11 @@ const SECTIONS: Section[] = [
     fields: [
       { key: 'tech_description', label: '1.1 Technology', hint: 'Principio scientifico, meccanismo e novità (max 10–15 righe).', rows: 6 },
       { key: 'product_description', label: '1.2 Product', hint: 'Descrivi il prodotto previsto: cosa è, come funziona, i benefici ad alto livello.', rows: 5 },
-      { key: 'trl_justification', label: '1.2 Current TRL — giustificazione', rows: 2 },
-      { key: 'trl_evidence', label: '1.2 Key evidence', hint: 'Pubblicazioni, prototipi, dati lab, validazioni terze.', rows: 3 },
-      { key: 'trl_gaps', label: '1.2 Maturity gaps', hint: 'Cosa resta ancora da dimostrare.', rows: 3 },
-      { key: 'trl_next_milestone', label: '1.2 Next TRL milestone', rows: 2 },
-      { key: 'ip', label: '1.3 Intellectual property', hint: 'Brevetti, applicazioni, know-how, segreti commerciali.', rows: 3 },
+      { key: 'trl_justification', label: '1.3 Current TRL — giustificazione', rows: 2 },
+      { key: 'trl_evidence', label: '1.3 Key evidence', hint: 'Pubblicazioni, prototipi, dati lab, validazioni terze.', rows: 3 },
+      { key: 'trl_gaps', label: '1.3 Maturity gaps', hint: 'Cosa resta ancora da dimostrare.', rows: 3 },
+      { key: 'trl_next_milestone', label: '1.3 Next TRL milestone', rows: 2 },
+      { key: 'ip', label: '1.4 Intellectual property', hint: 'Brevetti, applicazioni, know-how, segreti commerciali.', rows: 3 },
     ],
   },
   {

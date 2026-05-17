@@ -104,23 +104,20 @@ export async function parseConceptDocx(file: File): Promise<Partial<ConceptTempl
   // ── 1.1 Technology ──────────────────────────────────────────────────────────
   result.tech_description = sectionContent(paras, '1.1');
 
-  // ── 1.2 Product (new) + 1.2 Current TRL and evidence ───────────────────────
-  // New template has TWO headings numbered "1.2":
-  //   first  → "1.2 Product"
-  //   second → "1.2 Current TRL and evidence"
-  // Old template had a single "1.2" heading for TRL.
-  const first12Idx  = findHeadingIdx(paras, '1.2');
-  const second12Idx = first12Idx >= 0 ? findHeadingIdx(paras, '1.2', first12Idx + 1) : -1;
+  // ── 1.2 Product ─────────────────────────────────────────────────────────────
+  result.product_description = sectionContent(paras, '1.2');
 
-  const trl12Labels = ['Current TRL', 'Key evidence', 'Maturity gaps', 'Next TRL milestone'];
-  const parseTrlFields = (sec12: Para[]) => {
+  // ── 1.3 Current TRL and evidence ────────────────────────────────────────────
+  const trlLabels = ['Current TRL', 'Key evidence', 'Maturity gaps', 'Next TRL milestone'];
+  const sec13 = sliceSection(paras, '1.3');
+  const parseTrlFields = (sec: Para[]) => {
     const findLabeled = (label: string): string => {
-      const idx = sec12.findIndex((p) => p.text === label);
+      const idx = sec.findIndex((p) => p.text === label);
       if (idx < 0) return '';
-      for (let j = idx + 1; j < sec12.length; j++) {
-        if (trl12Labels.includes(sec12[j].text)) break;
-        if (isHeading(sec12[j].style)) break;
-        if (!isPlaceholder(sec12[j].text)) return sec12[j].text;
+      for (let j = idx + 1; j < sec.length; j++) {
+        if (trlLabels.includes(sec[j].text)) break;
+        if (isHeading(sec[j].style)) break;
+        if (!isPlaceholder(sec[j].text)) return sec[j].text;
       }
       return '';
     };
@@ -129,18 +126,10 @@ export async function parseConceptDocx(file: File): Promise<Partial<ConceptTempl
     result.trl_gaps           = findLabeled('Maturity gaps');
     result.trl_next_milestone = findLabeled('Next TRL milestone');
   };
+  parseTrlFields(sec13);
 
-  if (second12Idx >= 0) {
-    // New template: first 1.2 = Product description, second 1.2 = TRL table
-    result.product_description = sectionContentFrom(paras, first12Idx);
-    parseTrlFields(sliceSectionFrom(paras, second12Idx));
-  } else if (first12Idx >= 0) {
-    // Old template: single 1.2 = TRL
-    parseTrlFields(sliceSectionFrom(paras, first12Idx));
-  }
-
-  // ── 1.3 Intellectual property ───────────────────────────────────────────────
-  result.ip = sectionContent(paras, '1.3');
+  // ── 1.4 Intellectual property ───────────────────────────────────────────────
+  result.ip = sectionContent(paras, '1.4');
 
   // ── 2.1 Problem statement ───────────────────────────────────────────────────
   result.problem_statement = sectionContent(paras, '2.1');
