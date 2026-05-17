@@ -144,13 +144,16 @@ export type ConceptStatus = 'in_valutazione' | 'promosso' | 'rifiutato';
 
 export interface ConceptTemplateData {
   // Cover metadata
+  project_name: string;
   lead_organisation: string;
   authors: string;
   trl_current: string;
   version: string;
-  // 1.1 Technology description and novelty
+  // 1.1 Technology
   tech_description: string;
-  // 1.2 TRL
+  // 1.2 Product (new template)
+  product_description: string;
+  // 1.2 Current TRL and evidence
   trl_justification: string;
   trl_evidence: string;
   trl_gaps: string;
@@ -159,12 +162,8 @@ export interface ConceptTemplateData {
   ip: string;
   // 2.1 Problem
   problem_statement: string;
-  // 2.2 Value proposition
-  value_functional: string;
-  value_economic: string;
-  value_strategic: string;
-  // 2.3 Validation
-  validation: string;
+  // 2.2 Value proposition (single field, new template)
+  value_proposition: string;
   // 3.1 Market
   tam: string;
   sam: string;

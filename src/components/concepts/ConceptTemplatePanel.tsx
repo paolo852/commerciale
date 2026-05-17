@@ -14,10 +14,10 @@ interface Props {
 }
 
 const EMPTY: ConceptTemplateData = {
-  lead_organisation: '', authors: '', trl_current: '', version: '',
-  tech_description: '', trl_justification: '', trl_evidence: '', trl_gaps: '', trl_next_milestone: '', ip: '',
-  problem_statement: '',
-  value_functional: '', value_economic: '', value_strategic: '', validation: '',
+  project_name: '', lead_organisation: '', authors: '', trl_current: '', version: '',
+  tech_description: '', product_description: '',
+  trl_justification: '', trl_evidence: '', trl_gaps: '', trl_next_milestone: '', ip: '',
+  problem_statement: '', value_proposition: '',
   tam: '', sam: '', som: '',
   roadmap: '',
   risk_assumptions: '',
@@ -39,16 +39,18 @@ const SECTIONS: Section[] = [
     key: 'meta',
     title: 'Copertina',
     fields: [
+      { key: 'project_name', label: 'Project / Technology name', rows: 1 },
       { key: 'lead_organisation', label: 'Lead organisation', rows: 1 },
-      { key: 'trl_current', label: 'TRL corrente', rows: 1 },
+      { key: 'trl_current', label: 'Current TRL', rows: 1 },
     ],
   },
   {
     key: '1',
-    title: '1. Technology Snapshot',
+    title: '1. Product Snapshot',
     fields: [
-      { key: 'tech_description', label: '1.1 Description and novelty', hint: 'Principio scientifico, meccanismo e novità (max 10–15 righe).', rows: 6 },
-      { key: 'trl_justification', label: '1.2 TRL — giustificazione', rows: 2 },
+      { key: 'tech_description', label: '1.1 Technology', hint: 'Principio scientifico, meccanismo e novità (max 10–15 righe).', rows: 6 },
+      { key: 'product_description', label: '1.2 Product', hint: 'Descrivi il prodotto previsto: cosa è, come funziona, i benefici ad alto livello.', rows: 5 },
+      { key: 'trl_justification', label: '1.2 Current TRL — giustificazione', rows: 2 },
       { key: 'trl_evidence', label: '1.2 Key evidence', hint: 'Pubblicazioni, prototipi, dati lab, validazioni terze.', rows: 3 },
       { key: 'trl_gaps', label: '1.2 Maturity gaps', hint: 'Cosa resta ancora da dimostrare.', rows: 3 },
       { key: 'trl_next_milestone', label: '1.2 Next TRL milestone', rows: 2 },
@@ -59,11 +61,8 @@ const SECTIONS: Section[] = [
     key: '2',
     title: '2. Problem and Value Proposition',
     fields: [
-      { key: 'problem_statement', label: '2.1 Problem statement', hint: 'Chi, contesto, quantificazione del pain (costo, tempo, gap di performance).', rows: 5, showValidation: true },
-      { key: 'value_functional', label: '2.2 Functional benefits', hint: 'Cosa fa il prodotto meglio degli incumbent.', rows: 3, showValidation: true },
-      { key: 'value_economic', label: '2.2 Economic benefits', hint: 'Risparmi, produttività, incremento ricavi.', rows: 3, showValidation: true },
-      { key: 'value_strategic', label: '2.2 Strategic benefits', hint: 'Compliance, sostenibilità, differenziazione.', rows: 3, showValidation: true },
-      { key: 'validation', label: '2.3 Validation', hint: 'Evidenze di validazione problema/soluzione.', rows: 3, showValidation: true },
+      { key: 'problem_statement', label: '2.1 Application Scenario — Problem statement', hint: 'Chi, contesto, quantificazione del pain (costo, tempo, gap). Perché le soluzioni esistenti non bastano.', rows: 6, showValidation: true },
+      { key: 'value_proposition', label: '2.2 Application Scenario — Value Proposition', hint: 'Come cambierebbe lo scenario applicativo con il prodotto.', rows: 6, showValidation: true },
     ],
   },
   {
@@ -599,7 +598,7 @@ function SectionPanel({
 export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props) {
   const [form, setForm] = useState<ConceptTemplateData>({
     ...EMPTY,
-    ...data,
+    ...(data ?? {}),
     locked_fields: data?.locked_fields ?? [],
     validation_status: data?.validation_status ?? {},
     validation_how: data?.validation_how ?? {},
