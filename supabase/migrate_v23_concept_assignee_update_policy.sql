@@ -1,10 +1,7 @@
--- v21: add role column to concept_assignees + UPDATE policy
-ALTER TABLE concept_assignees
-  ADD COLUMN IF NOT EXISTS role text DEFAULT NULL;
-
+-- v23: add missing UPDATE policy on concept_assignees
 -- The original v7 migration created SELECT, INSERT, DELETE policies
--- but forgot the UPDATE policy. Without it Supabase silently drops
--- UPDATE calls (RLS returns 0 rows, no error).
+-- but forgot UPDATE. Without it Supabase silently drops setRole calls
+-- (RLS blocks the UPDATE, returns 0 rows and no error).
 DROP POLICY IF EXISTS "ca: update allowed" ON concept_assignees;
 CREATE POLICY "ca: update allowed" ON concept_assignees
   FOR UPDATE USING (is_allowed_user()) WITH CHECK (is_allowed_user());
