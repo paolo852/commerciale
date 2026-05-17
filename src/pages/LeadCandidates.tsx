@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Archive, CalendarClock, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, FlaskConical,
-  Percent, Plus, Search, TrendingUp, User, UserSearch, X,
+  Link2, Percent, Plus, Search, TrendingUp, User, UserSearch, X,
 } from 'lucide-react';
 import { leadCandidatesService } from '../lib/dataService';
 import { useOffersData } from '../hooks/useOffersData';
@@ -101,35 +101,24 @@ export default function LeadCandidates() {
     );
   }, [leads, tab, search]);
 
-  // Raggruppa solo per funding_call_id; lead senza bando → unica sezione in fondo
-  const groups = useMemo(() => {
-    const map = new Map<string, { label: string; sub?: string; fcId?: string; leads: LeadCandidate[] }>();
-    filtered.forEach((l) => {
-      let key: string;
-      let label: string;
-      let sub: string | undefined;
-      let fcId: string | undefined;
-      const fc = l.funding_call_id ? fcById.get(l.funding_call_id) : undefined;
-      if (fc) {
-        key = l.funding_call_id!;
-        label = fc.name;
-        sub = fc.code;
-        fcId = l.funding_call_id!;
-      } else {
-        key = '__no_call__';
-        label = 'Senza bando specifico';
-      }
-      const grp = map.get(key) ?? { label, sub, fcId, leads: [] };
-      grp.leads.push(l);
-      map.set(key, grp);
+  // Left column: leads with a bando, grouped by bando
+  const groupsWithBando = useMemo(() => {
+    const map = new Map<string, { label: string; sub: string; fcId: string; leads: LeadCandidate[] }>();
+    filtered.filter((l) => l.funding_call_id).forEach((l) => {
+      const fc = fcById.get(l.funding_call_id!);
+      const key = l.funding_call_id!;
+      const existing = map.get(key) ?? { label: fc?.name ?? key, sub: fc?.code ?? '', fcId: key, leads: [] };
+      existing.leads.push(l);
+      map.set(key, existing);
     });
-    // Bandi specifici ordinati alfabeticamente, "Senza bando" sempre in fondo
-    const all = [...map.values()];
-    return [
-      ...all.filter((g) => g.fcId).sort((a, b) => a.label.localeCompare(b.label, 'it')),
-      ...all.filter((g) => !g.fcId),
-    ];
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'it'));
   }, [filtered, fcById]);
+
+  // Right column: leads without a bando (flat)
+  const leadsWithoutBando = useMemo(
+    () => filtered.filter((l) => !l.funding_call_id),
+    [filtered],
+  );
 
   async function handleDelete() {
     if (!toDelete) return;
@@ -148,6 +137,100 @@ export default function LeadCandidates() {
     setAssigningId(null);
     setAssignFcId('');
     await reload();
+  }
+
+  function toggleGroup(key: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  // Shared lead card (used in both columns)
+  function LeadCard({ lead, showAssign }: { lead: LeadCandidate; showAssign: boolean }) {
+    const isAssigning = assigningId === lead.id;
+    return (
+      <div
+        onClick={() => !isAssigning && navigate(`/leads/${lead.id}`)}
+        className={`bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-200 transition p-3.5 flex flex-col gap-2 ${isAssigning ? 'cursor-default' : 'cursor-pointer'}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-slate-900 leading-tight truncate text-sm">{lead.researcher_name}</p>
+            {lead.institution && (
+              <p className="text-xs text-slate-500 truncate mt-0.5">{lead.institution}</p>
+            )}
+          </div>
+          <StatusBadge value={lead.status} />
+        </div>
+
+        {lead.call_type && lead.call_type !== 'Non classificato' && !lead.funding_call_id && (
+          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 truncate">
+            {lead.call_type}
+          </p>
+        )}
+
+        {/* Quick-assign (right column only) */}
+        {showAssign && (
+          <div onClick={(e) => e.stopPropagation()}>
+            {isAssigning ? (
+              <div className="flex gap-1.5 items-center">
+                <select
+                  autoFocus
+                  value={assignFcId}
+                  onChange={(e) => setAssignFcId(e.target.value)}
+                  className="flex-1 text-xs px-2 py-1.5 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                >
+                  <option value="">— Seleziona bando —</option>
+                  {fundingCalls.map((fc) => (
+                    <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleQuickAssign(lead.id)}
+                  disabled={!assignFcId}
+                  className="px-2 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition"
+                >✓</button>
+                <button
+                  onClick={() => { setAssigningId(null); setAssignFcId(''); }}
+                  className="px-2 py-1.5 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+                >✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setAssigningId(lead.id); setAssignFcId(''); }}
+                className="w-full flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-dashed border-indigo-200 rounded-lg px-2 py-1.5 hover:bg-indigo-100 hover:border-indigo-300 transition"
+              >
+                <Link2 className="w-3 h-3 shrink-0" />
+                Assegna a un bando
+              </button>
+            )}
+          </div>
+        )}
+
+        {lead.potential_project && (
+          <p className="text-xs text-slate-600 line-clamp-2">{lead.potential_project}</p>
+        )}
+
+        <div className="flex items-center justify-between text-xs text-slate-400 mt-auto pt-1">
+          {lead.pm_id && pmById.get(lead.pm_id) ? (
+            <span className="flex items-center gap-1 text-slate-500">
+              <User className="w-3 h-3" />
+              {pmById.get(lead.pm_id)!.name}
+            </span>
+          ) : (
+            <span>Aggiunto {formatDate(lead.created_at)}</span>
+          )}
+          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setToDelete(lead)} className="text-slate-300 hover:text-red-500 transition">
+              Elimina
+            </button>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -207,8 +290,6 @@ export default function LeadCandidates() {
             );
           })}
         </div>
-
-        {/* Search */}
         <div className="relative flex-1 min-w-48 max-w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
           <input
@@ -226,6 +307,7 @@ export default function LeadCandidates() {
         </div>
       </div>
 
+      {/* Main content */}
       {loading ? (
         <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">Caricamento…</div>
       ) : filtered.length === 0 ? (
@@ -240,179 +322,129 @@ export default function LeadCandidates() {
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {groups.map(({ label, sub, fcId, leads: groupLeads }) => {
-            const fc = fcId ? fcById.get(fcId) : null;
-            const conceptCount = groupLeads.filter((l) => l.status === 'promosso' && l.promoted_concept_id).length;
-            const offerCount = fc
-              ? offers.filter((o) =>
-                  (o.funding_call && o.funding_call.includes(fc.code)) ||
-                  (o.consulting_call_id === fc.id)
-                ).length
-              : 0;
-            const groupKey = fcId ?? '__no_call__';
-            const isCollapsed = collapsed.has(groupKey);
-            const toggle = () => setCollapsed((prev) => {
-              const next = new Set(prev);
-              next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
-              return next;
-            });
+        <div className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex items-stretch">
 
-            return (
-              <div key={`${label}-${sub ?? ''}`}>
-                <button
-                  onClick={toggle}
-                  className="w-full flex items-start justify-between gap-3 mb-3 text-left group"
-                >
-                  <div className="min-w-0 flex-1">
-                    {sub && (
-                      <p className="text-sm font-semibold text-indigo-600 tracking-wide font-mono mb-0.5">{sub}</p>
-                    )}
-                    <h2 className="text-lg font-bold text-slate-900 leading-tight">{label}</h2>
-                    {fc && (fc.lead_deadline || fc.internal_deadline) && (() => {
-                      const today = new Date().toISOString().slice(0, 10);
-                      const urgent14 = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-                      const deadlineChip = (date: string, label: string) => {
-                        const isPast = date < today;
-                        const isUrgent = date <= urgent14;
-                        return (
-                          <span className={`inline-flex items-center gap-1 font-medium ${isPast ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-slate-500'}`}>
-                            <CalendarClock className="w-3 h-3" />
-                            {label}: {date}
-                            {isPast && <span className="font-semibold">(scaduta)</span>}
-                          </span>
-                        );
-                      };
-                      return (
-                        <p className="text-xs mt-1 flex items-center gap-3 flex-wrap">
-                          {fc.lead_deadline && deadlineChip(fc.lead_deadline, 'Lead')}
-                          {fc.internal_deadline && deadlineChip(fc.internal_deadline, 'Concept')}
-                        </p>
-                      );
-                    })()}
-                    {(conceptCount > 0 || offerCount > 0) && (
-                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                        <span className="font-medium text-slate-600">Stato attuale:</span>
-                        {offerCount > 0 && (
-                          <span className="inline-flex items-center gap-1 text-indigo-600">
-                            <FileText className="w-3 h-3" />
-                            {offerCount} {offerCount === 1 ? 'offerta' : 'offerte'}
-                          </span>
-                        )}
-                        {offerCount > 0 && conceptCount > 0 && <span className="text-slate-300">·</span>}
-                        {conceptCount > 0 && (
-                          <span className="inline-flex items-center gap-1 text-emerald-600">
-                            <FlaskConical className="w-3 h-3" />
-                            {conceptCount} {conceptCount === 1 ? 'concept' : 'concept'}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 shrink-0">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 tabular-nums">
-                      {groupLeads.length}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
-                  </div>
-                </button>
-
-                {!isCollapsed && <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {groupLeads.map((lead) => {
-                    const leadFc = lead.funding_call_id ? fcById.get(lead.funding_call_id) : null;
-                    const isAssigning = assigningId === lead.id;
-                    return (
-                      <div
-                        key={lead.id}
-                        onClick={() => !isAssigning && navigate(`/leads/${lead.id}`)}
-                        className={`bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-200 transition p-4 flex flex-col gap-2 ${isAssigning ? 'cursor-default' : 'cursor-pointer'}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-900 leading-tight truncate">{lead.researcher_name}</p>
-                            {lead.institution && (
-                              <p className="text-xs text-slate-500 truncate mt-0.5">{lead.institution}</p>
-                            )}
-                          </div>
-                          <StatusBadge value={lead.status} />
-                        </div>
-
-                        {leadFc ? (
-                          <p className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1 truncate">
-                            {leadFc.code} — {leadFc.name}
-                          </p>
-                        ) : (
-                          /* Quick bando assign */
-                          <div onClick={(e) => e.stopPropagation()}>
-                            {isAssigning ? (
-                              <div className="flex gap-1.5 items-center">
-                                <select
-                                  autoFocus
-                                  value={assignFcId}
-                                  onChange={(e) => setAssignFcId(e.target.value)}
-                                  className="flex-1 text-xs px-2 py-1.5 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-                                >
-                                  <option value="">— Seleziona bando —</option>
-                                  {fundingCalls.map((fc) => (
-                                    <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
-                                  ))}
-                                </select>
-                                <button
-                                  onClick={() => handleQuickAssign(lead.id)}
-                                  disabled={!assignFcId}
-                                  className="px-2 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={() => { setAssigningId(null); setAssignFcId(''); }}
-                                  className="px-2 py-1.5 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => { setAssigningId(lead.id); setAssignFcId(''); }}
-                                className="w-full flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-dashed border-indigo-200 rounded-lg px-2 py-1.5 hover:bg-indigo-100 hover:border-indigo-300 transition"
-                              >
-                                <Plus className="w-3 h-3 shrink-0" />
-                                Assegna a un bando
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {lead.potential_project && (
-                          <p className="text-xs text-slate-600 line-clamp-2">{lead.potential_project}</p>
-                        )}
-
-                        <div className="flex items-center justify-between text-xs text-slate-400 mt-auto pt-1">
-                          {lead.pm_id && pmById.get(lead.pm_id) ? (
-                            <span className="flex items-center gap-1 text-slate-500">
-                              <User className="w-3 h-3" />
-                              {pmById.get(lead.pm_id)!.name}
-                            </span>
-                          ) : (
-                            <span>Aggiunto {formatDate(lead.created_at)}</span>
-                          )}
-                          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => setToDelete(lead)}
-                              className="text-slate-300 hover:text-red-500 transition"
-                            >
-                              Elimina
-                            </button>
-                            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>}
+          {/* ── Left: Match individuato ────────────────────────────────── */}
+          <div className="w-1/2 flex flex-col border-r border-slate-200">
+            {/* Column header */}
+            <div className="bg-indigo-600 px-5 py-3.5 flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">Match individuato</p>
+                <p className="text-sm font-semibold text-white mt-0.5">
+                  {groupsWithBando.reduce((n, g) => n + g.leads.length, 0)} lead · {groupsWithBando.length} {groupsWithBando.length === 1 ? 'bando' : 'bandi'}
+                </p>
               </div>
-            );
-          })}
+              <Link2 className="w-5 h-5 text-indigo-300 shrink-0" />
+            </div>
+
+            {/* Groups */}
+            <div className="flex-1 p-4 space-y-3 bg-slate-50/60">
+              {groupsWithBando.length === 0 ? (
+                <div className="py-10 text-center">
+                  <p className="text-sm text-slate-400">Nessun lead con bando assegnato.</p>
+                </div>
+              ) : (
+                groupsWithBando.map(({ label, sub, fcId, leads: groupLeads }) => {
+                  const fc = fcById.get(fcId);
+                  const conceptCount = groupLeads.filter((l) => l.promoted_concept_id).length;
+                  const offerCount = fc
+                    ? offers.filter((o) =>
+                        (o.funding_call && o.funding_call.includes(fc.code)) ||
+                        (o.consulting_call_id === fc.id)
+                      ).length
+                    : 0;
+                  const isCollapsed = collapsed.has(fcId);
+
+                  return (
+                    <div key={fcId} className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+                      {/* Group header */}
+                      <button
+                        onClick={() => toggleGroup(fcId)}
+                        className="w-full flex items-start justify-between gap-2 px-4 py-3 text-left bg-white hover:bg-slate-50 transition"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 font-mono">{sub}</p>
+                          <p className="text-sm font-semibold text-slate-800 leading-snug mt-0.5 truncate">{label}</p>
+                          {fc && (fc.lead_deadline || fc.internal_deadline) && (() => {
+                            const today = new Date().toISOString().slice(0, 10);
+                            const urgent = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+                            const chip = (date: string, chipLabel: string) => {
+                              const past = date < today;
+                              const urg = date <= urgent;
+                              return (
+                                <span className={`inline-flex items-center gap-1 ${past ? 'text-red-600' : urg ? 'text-amber-600' : 'text-slate-400'}`}>
+                                  <CalendarClock className="w-3 h-3" />
+                                  {chipLabel}: {date}
+                                  {past && <span className="font-semibold">(scaduta)</span>}
+                                </span>
+                              );
+                            };
+                            return (
+                              <p className="text-xs mt-1 flex items-center gap-3 flex-wrap">
+                                {fc.lead_deadline && chip(fc.lead_deadline, 'Lead')}
+                                {fc.internal_deadline && chip(fc.internal_deadline, 'Concept')}
+                              </p>
+                            );
+                          })()}
+                          {(conceptCount > 0 || offerCount > 0) && (
+                            <p className="text-xs mt-1 flex items-center gap-1.5 text-slate-400">
+                              {offerCount > 0 && <span className="inline-flex items-center gap-1 text-indigo-500"><FileText className="w-3 h-3" />{offerCount} offerte</span>}
+                              {offerCount > 0 && conceptCount > 0 && <span>·</span>}
+                              {conceptCount > 0 && <span className="inline-flex items-center gap-1 text-emerald-600"><FlaskConical className="w-3 h-3" />{conceptCount} concept</span>}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold tabular-nums">
+                            {groupLeads.length}
+                          </span>
+                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+                        </div>
+                      </button>
+
+                      {/* Cards */}
+                      {!isCollapsed && (
+                        <div className="px-3 pb-3 space-y-2 border-t border-slate-100 pt-2 bg-slate-50/40">
+                          {groupLeads.map((lead) => (
+                            <LeadCard key={lead.id} lead={lead} showAssign={false} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* ── Right: Match da individuare ───────────────────────────── */}
+          <div className="w-1/2 flex flex-col">
+            {/* Column header */}
+            <div className="bg-amber-500 px-5 py-3.5 flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-100">Match da individuare</p>
+                <p className="text-sm font-semibold text-white mt-0.5">
+                  {leadsWithoutBando.length} {leadsWithoutBando.length === 1 ? 'lead' : 'lead'}
+                </p>
+              </div>
+              <Search className="w-5 h-5 text-amber-200 shrink-0" />
+            </div>
+
+            {/* Flat list */}
+            <div className="flex-1 p-4 space-y-2 bg-slate-50/60">
+              {leadsWithoutBando.length === 0 ? (
+                <div className="py-10 text-center">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-200 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">Tutti i lead hanno un bando assegnato.</p>
+                </div>
+              ) : (
+                leadsWithoutBando.map((lead) => (
+                  <LeadCard key={lead.id} lead={lead} showAssign />
+                ))
+              )}
+            </div>
+          </div>
+
         </div>
       )}
 
