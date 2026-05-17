@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Plus } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { Plus, Sparkles, Tag, X } from 'lucide-react';
 import Modal from '../Modal';
 import { useAuth } from '../../contexts/AuthContext';
 import { leadCandidatesService, fundingCallsService } from '../../lib/dataService';
@@ -20,6 +20,7 @@ interface FormState {
   call_type: string;
   funding_call_id: string;
   potential_project: string;
+  keywords: string[];
   status: LeadCandidateStatus;
   pm_id: string;
 }
@@ -37,6 +38,46 @@ const STATUS_OPTIONS: { value: LeadCandidateStatus; label: string }[] = [
   { value: 'archiviato', label: 'Archiviato' },
 ];
 
+const KEYWORD_GROUPS: { label: string; color: 'indigo' | 'violet'; keywords: string[] }[] = [
+  {
+    label: 'Tecnologia',
+    color: 'indigo',
+    keywords: [
+      'AI / Machine Learning', 'Deep Learning', 'Computer Vision', 'NLP',
+      'IoT', 'Robotica', 'Sensori avanzati', 'Materiali avanzati',
+      'Biotech', 'Medtech', 'Fotonica', 'Quantum Computing',
+      'Digital Twin', 'Simulazione', 'Energie rinnovabili', 'Storage / Batterie',
+      'Idrogeno', 'Nanotecnologie', 'Manifattura additiva', 'Cybersecurity',
+      'Edge Computing', 'Drone / UAV', 'Automazione industriale',
+    ],
+  },
+  {
+    label: 'Ambito applicativo',
+    color: 'violet',
+    keywords: [
+      'Salute / Healthcare', 'Industria / Manufacturing', 'Agricoltura',
+      'Ambiente / Cleantech', 'Energia', 'Trasporti / Mobility', 'Difesa',
+      'Spazio', 'Smart City', 'Fintech', 'Edtech', 'Agroalimentare',
+      'Costruzioni', 'Logistica', 'Farmaceutica', 'Blue Economy', 'Turismo',
+    ],
+  },
+];
+
+const ALL_KEYWORDS = KEYWORD_GROUPS.flatMap((g) => g.keywords);
+
+const COLOR_CLASSES = {
+  indigo: {
+    chip: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100',
+    chipActive: 'bg-indigo-600 text-white border-indigo-600',
+    suggested: 'bg-indigo-50/70 text-indigo-600 border-dashed border-indigo-300 hover:bg-indigo-100',
+  },
+  violet: {
+    chip: 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100',
+    chipActive: 'bg-violet-600 text-white border-violet-600',
+    suggested: 'bg-violet-50/70 text-violet-600 border-dashed border-violet-300 hover:bg-violet-100',
+  },
+};
+
 const inputClass =
   'w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
 
@@ -46,7 +87,6 @@ export default function LeadCandidateFormModal({
   const { user } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
 
-  // Non-expired calls from props + any newly created inline
   const [extraCalls, setExtraCalls] = useState<FundingCall[]>([]);
   const activeCalls = useMemo(() => {
     const all = [...fundingCalls, ...extraCalls];
@@ -55,12 +95,12 @@ export default function LeadCandidateFormModal({
 
   const [form, setForm] = useState<FormState>({
     researcher_name: '', institution: '', call_type: '',
-    funding_call_id: '', potential_project: '', status: 'attivo', pm_id: '',
+    funding_call_id: '', potential_project: '', keywords: [], status: 'attivo', pm_id: '',
   });
+  const [kwInput, setKwInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Inline new-call creation
   const [showNewCall, setShowNewCall] = useState(false);
   const [newCall, setNewCall] = useState<NewCallDraft>({ code: '', name: '', body: '', deadline: '' });
   const [creatingCall, setCreatingCall] = useState(false);
@@ -72,6 +112,7 @@ export default function LeadCandidateFormModal({
     setShowNewCall(false);
     setNewCall({ code: '', name: '', body: '', deadline: '' });
     setExtraCalls([]);
+    setKwInput('');
     if (lead) {
       setForm({
         researcher_name: lead.researcher_name,
@@ -79,13 +120,14 @@ export default function LeadCandidateFormModal({
         call_type: lead.call_type,
         funding_call_id: lead.funding_call_id ?? '',
         potential_project: lead.potential_project ?? '',
+        keywords: lead.keywords ?? [],
         status: lead.status,
         pm_id: lead.pm_id ?? '',
       });
     } else {
       setForm({
         researcher_name: '', institution: '', call_type: '',
-        funding_call_id: '', potential_project: '', status: 'attivo', pm_id: '',
+        funding_call_id: '', potential_project: '', keywords: [], status: 'attivo', pm_id: '',
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,11 +137,41 @@ export default function LeadCandidateFormModal({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function handleCallSelect(value: string) {
-    if (value === '__new__') {
-      setShowNewCall(true);
-      return;
+  function toggleKeyword(kw: string) {
+    setForm((f) => {
+      const kws = f.keywords;
+      return { ...f, keywords: kws.includes(kw) ? kws.filter((k) => k !== kw) : [...kws, kw] };
+    });
+  }
+
+  function addCustomKeyword(raw: string) {
+    const kw = raw.trim().replace(/,$/, '').trim();
+    if (!kw || form.keywords.includes(kw)) { setKwInput(''); return; }
+    setForm((f) => ({ ...f, keywords: [...f.keywords, kw] }));
+    setKwInput('');
+  }
+
+  function handleKwKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') { e.preventDefault(); addCustomKeyword(kwInput); }
+    if (e.key === ',') { e.preventDefault(); addCustomKeyword(kwInput); }
+    if (e.key === 'Backspace' && !kwInput && form.keywords.length) {
+      setForm((f) => ({ ...f, keywords: f.keywords.slice(0, -1) }));
     }
+  }
+
+  // Auto-suggest: scan free-text fields for known keywords
+  const autoSuggested = useMemo(() => {
+    const text = [form.potential_project, form.call_type, form.institution]
+      .join(' ').toLowerCase();
+    if (!text.trim()) return [];
+    return ALL_KEYWORDS.filter((kw) => {
+      const terms = kw.toLowerCase().split(/[\s/,]+/).filter((w) => w.length > 3);
+      return terms.some((t) => text.includes(t));
+    });
+  }, [form.potential_project, form.call_type, form.institution]);
+
+  function handleCallSelect(value: string) {
+    if (value === '__new__') { setShowNewCall(true); return; }
     setShowNewCall(false);
     update('funding_call_id', value);
     if (value) {
@@ -151,6 +223,7 @@ export default function LeadCandidateFormModal({
         call_type: form.call_type.trim() || 'Non classificato',
         funding_call_id: form.funding_call_id || null,
         potential_project: form.potential_project.trim() || null,
+        keywords: form.keywords.length ? form.keywords : null,
         status: form.status,
         pm_id: form.pm_id || null,
       };
@@ -163,6 +236,8 @@ export default function LeadCandidateFormModal({
       setError((e as { message?: string })?.message ?? 'Errore nel salvataggio');
     } finally { setSaving(false); }
   }
+
+  const unselectedAutoSuggested = autoSuggested.filter((kw) => !form.keywords.includes(kw));
 
   return (
     <Modal open={open} onClose={onClose} title={lead ? 'Modifica lead' : 'Nuovo lead candidate'} size="lg">
@@ -202,7 +277,6 @@ export default function LeadCandidateFormModal({
             <option value="__new__">+ Crea nuovo bando in anagrafica…</option>
           </select>
 
-          {/* Inline new-call mini-form */}
           {showNewCall && (
             <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
               <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Nuovo bando</p>
@@ -212,55 +286,39 @@ export default function LeadCandidateFormModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Codice *</label>
-                  <input
-                    type="text" value={newCall.code}
+                  <input type="text" value={newCall.code}
                     onChange={(e) => setNewCall((n) => ({ ...n, code: e.target.value }))}
-                    placeholder="es. HORIZON-MSCA-2025"
-                    className={inputClass}
-                  />
+                    placeholder="es. HORIZON-MSCA-2025" className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Nome *</label>
-                  <input
-                    type="text" value={newCall.name}
+                  <input type="text" value={newCall.name}
                     onChange={(e) => setNewCall((n) => ({ ...n, name: e.target.value }))}
-                    placeholder="es. Marie Skłodowska-Curie Postdoctoral"
-                    className={inputClass}
-                  />
+                    placeholder="es. Marie Skłodowska-Curie Postdoctoral" className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Tipologia</label>
-                  <input
-                    type="text" value={newCall.body}
+                  <input type="text" value={newCall.body}
                     onChange={(e) => setNewCall((n) => ({ ...n, body: e.target.value }))}
-                    placeholder="es. HORIZON Europe, PNRR, Regionale…"
-                    className={inputClass}
-                  />
+                    placeholder="es. HORIZON Europe, PNRR, Regionale…" className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza</label>
-                  <input
-                    type="date" value={newCall.deadline}
+                  <input type="date" value={newCall.deadline}
                     onChange={(e) => setNewCall((n) => ({ ...n, deadline: e.target.value }))}
-                    className={inputClass}
-                  />
+                    className={inputClass} />
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleCreateCall}
+                <button type="button" onClick={handleCreateCall}
                   disabled={creatingCall || !newCall.code.trim() || !newCall.name.trim()}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-1.5"
-                >
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5" />
                   {creatingCall ? 'Creazione…' : 'Crea bando'}
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => { setShowNewCall(false); setNewCall({ code: '', name: '', body: '', deadline: '' }); }}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
-                >
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition">
                   Annulla
                 </button>
               </div>
@@ -268,29 +326,93 @@ export default function LeadCandidateFormModal({
           )}
         </div>
 
-        {/* Tipologia manuale quando non è selezionato un bando */}
         {!form.funding_call_id && !showNewCall && (
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Tipologia / ambito</label>
-            <input
-              type="text"
-              value={form.call_type}
+            <input type="text" value={form.call_type}
               onChange={(e) => update('call_type', e.target.value)}
               placeholder="es. PNRR, Horizon Europe, Regionale, Privato…"
-              className={inputClass}
-            />
+              className={inputClass} />
           </div>
         )}
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Dati di massima sul progetto potenziale</label>
-          <textarea
-            rows={4}
-            value={form.potential_project}
+          <textarea rows={4} value={form.potential_project}
             onChange={(e) => update('potential_project', e.target.value)}
             placeholder="Descrivi brevemente l'idea progettuale, il tema di ricerca, il TRL, le tecnologie…"
-            className={`${inputClass} resize-none`}
-          />
+            className={`${inputClass} resize-none`} />
+        </div>
+
+        {/* ── Keywords ─────────────────────────────────────────── */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Tag className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-medium text-slate-700">Keywords</span>
+            <span className="text-xs text-slate-400">(tecnologia e ambito)</span>
+          </div>
+
+          {/* Tag input + selected pills */}
+          <div className="flex flex-wrap gap-1.5 min-h-[2.5rem] bg-white border border-slate-300 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent cursor-text"
+            onClick={() => document.getElementById('kw-input')?.focus()}>
+            {form.keywords.map((kw) => (
+              <span key={kw}
+                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-indigo-600 text-white font-medium">
+                {kw}
+                <button type="button" onClick={() => toggleKeyword(kw)} className="hover:opacity-70 transition ml-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <input
+              id="kw-input"
+              type="text"
+              value={kwInput}
+              onChange={(e) => setKwInput(e.target.value)}
+              onKeyDown={handleKwKeyDown}
+              onBlur={() => kwInput && addCustomKeyword(kwInput)}
+              placeholder={form.keywords.length === 0 ? 'Aggiungi keyword libera o scegli sotto…' : ''}
+              className="flex-1 min-w-24 text-xs outline-none bg-transparent text-slate-700 placeholder-slate-400"
+            />
+          </div>
+
+          {/* Auto-suggested */}
+          {unselectedAutoSuggested.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 mb-1.5 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Suggerite dal testo
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {unselectedAutoSuggested.map((kw) => (
+                  <button key={kw} type="button" onClick={() => toggleKeyword(kw)}
+                    className="text-xs px-2.5 py-1 rounded-full border border-dashed border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 transition font-medium">
+                    + {kw}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Catalog groups */}
+          {KEYWORD_GROUPS.map((group) => {
+            const cls = COLOR_CLASSES[group.color];
+            return (
+              <div key={group.label}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">{group.label}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.keywords.map((kw) => {
+                    const active = form.keywords.includes(kw);
+                    return (
+                      <button key={kw} type="button" onClick={() => toggleKeyword(kw)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition font-medium ${active ? cls.chipActive : cls.chip}`}>
+                        {active ? '✓ ' : ''}{kw}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="grid grid-cols-2 gap-4">

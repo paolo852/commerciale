@@ -209,6 +209,21 @@ export default function LeadCandidates() {
           </div>
         )}
 
+        {lead.keywords && lead.keywords.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {lead.keywords.slice(0, 4).map((kw) => (
+              <span key={kw} className="inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 font-medium">
+                {kw}
+              </span>
+            ))}
+            {lead.keywords.length > 4 && (
+              <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400">
+                +{lead.keywords.length - 4}
+              </span>
+            )}
+          </div>
+        )}
+
         {lead.potential_project && (
           <p className="text-xs text-slate-600 line-clamp-2">{lead.potential_project}</p>
         )}

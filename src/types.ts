@@ -309,6 +309,7 @@ export interface LeadCandidate {
   call_type: string;
   funding_call_id: string | null;
   potential_project: string | null;
+  keywords: string[] | null;
   status: LeadCandidateStatus;
   promoted_concept_id: string | null;
   pm_id: string | null;
@@ -317,7 +318,7 @@ export interface LeadCandidate {
 
 export type CreateLeadCandidateForm = Pick<
   LeadCandidate,
-  'researcher_name' | 'institution' | 'call_type' | 'funding_call_id' | 'potential_project' | 'status' | 'pm_id'
+  'researcher_name' | 'institution' | 'call_type' | 'funding_call_id' | 'potential_project' | 'keywords' | 'status' | 'pm_id'
 >;
 export type UpdateLeadCandidateForm = Partial<CreateLeadCandidateForm & Pick<LeadCandidate, 'promoted_concept_id'>>;
 
