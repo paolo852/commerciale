@@ -219,6 +219,19 @@ export default function LeadCandidateDetail() {
             <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{lead.potential_project}</p>
           </div>
         )}
+
+        {lead.keywords && lead.keywords.length > 0 && (
+          <div className="mt-2 bg-slate-50 rounded-xl px-4 py-3">
+            <p className="text-xs font-medium text-slate-500 mb-2">Keywords</p>
+            <div className="flex flex-wrap gap-1.5">
+              {lead.keywords.map((kw) => (
+                <span key={kw} className="inline-flex text-xs px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">
+                  {kw}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {user && (
