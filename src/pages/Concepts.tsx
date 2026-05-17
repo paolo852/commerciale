@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Clock, FlaskConical, Plus, Users, XCircle } from 'lucide-react';
+import Avatar from '../components/Avatar';
 import { useConceptsData } from '../hooks/useConceptsData';
 import { useOffersData } from '../hooks/useOffersData';
 import { conceptsService } from '../lib/dataService';
@@ -65,12 +66,12 @@ export default function Concepts() {
 
   // Carico per PM: conta concept attivi (non rifiutati) per ogni PM assegnato
   const pmWorkload = useMemo(() => {
-    const map = new Map<string, { name: string; total: number; in_valutazione: number; promosso: number }>();
+    const map = new Map<string, { name: string; avatar_url: string | null; total: number; in_valutazione: number; promosso: number }>();
     concepts.forEach((c) => {
       (c.assignees ?? []).forEach((a) => {
         if (!a.project_manager) return;
         const key = a.project_manager.id;
-        const entry = map.get(key) ?? { name: a.project_manager.name, total: 0, in_valutazione: 0, promosso: 0 };
+        const entry = map.get(key) ?? { name: a.project_manager.name, avatar_url: a.project_manager.avatar_url ?? null, total: 0, in_valutazione: 0, promosso: 0 };
         entry.total += 1;
         if (c.status === 'in_valutazione') entry.in_valutazione += 1;
         if (c.status === 'promosso') entry.promosso += 1;
@@ -133,9 +134,7 @@ export default function Concepts() {
               <ul className="space-y-1.5">
                 {pmWorkload.map((pm) => (
                   <li key={pm.name} className="flex items-center gap-2 text-sm">
-                    <span className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0">
-                      {pm.name[0]?.toUpperCase()}
-                    </span>
+                    <Avatar name={pm.name} url={pm.avatar_url} size="md" />
                     <span className="flex-1 truncate text-slate-700">{pm.name}</span>
                     <span className="text-xs text-slate-500 tabular-nums flex items-center gap-2">
                       {pm.in_valutazione > 0 && (
@@ -218,13 +217,14 @@ export default function Concepts() {
                   <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <div className="flex -space-x-1.5">
                     {c.assignees.slice(0, 4).map((a) => (
-                      <span
+                      <Avatar
                         key={a.project_manager_id}
+                        name={a.project_manager?.name ?? ''}
+                        url={a.project_manager?.avatar_url}
+                        size="sm"
+                        className="ring-2 ring-white"
                         title={a.project_manager?.name ?? ''}
-                        className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center ring-2 ring-white"
-                      >
-                        {a.project_manager?.name[0]?.toUpperCase() ?? '?'}
-                      </span>
+                      />
                     ))}
                     {c.assignees.length > 4 && (
                       <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center ring-2 ring-white">

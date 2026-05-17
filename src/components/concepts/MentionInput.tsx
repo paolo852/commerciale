@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ProjectManager } from '../../types';
+import Avatar from '../Avatar';
 
 interface Props {
   value: string;
@@ -110,9 +111,7 @@ export default function MentionInput({
               onClick={() => applyMention(pm)}
               className="w-full px-3 py-1.5 text-left text-sm hover:bg-indigo-50 transition flex items-center gap-2"
             >
-              <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">
-                {pm.name[0]?.toUpperCase()}
-              </span>
+              <Avatar name={pm.name} url={pm.avatar_url} size="xs" />
               <span>{pm.name}</span>
             </button>
           ))}

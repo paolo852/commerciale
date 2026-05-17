@@ -4,6 +4,7 @@ import {
   BookOpen, CalendarDays, CheckCircle2, ChevronDown, Circle,
   FileText, FlaskConical, Plus, Trash2, UserSearch, Users, X,
 } from 'lucide-react';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
 import { leadCandidatesService, conceptsService, tasksService } from '../lib/dataService';
@@ -56,9 +57,7 @@ function WorkloadCard({
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
       {/* PM header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-        <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-          <span className="text-sm font-bold text-indigo-700 uppercase">{pm.name[0]}</span>
-        </div>
+        <Avatar name={pm.name} url={pm.avatar_url} size="lg" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-900 truncate">{pm.name}</p>
           {pm.email && <p className="text-xs text-slate-400 truncate">{pm.email}</p>}
@@ -144,7 +143,7 @@ function TaskRow({
         <div className="flex items-center gap-2 flex-wrap mt-1.5">
           {pm && (
             <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
-              <span className="w-3.5 h-3.5 rounded-full bg-violet-200 text-violet-800 flex items-center justify-center text-[9px] font-bold uppercase shrink-0">{pm.name[0]}</span>
+              <Avatar name={pm.name} url={pm.avatar_url} size="xxs" fallbackClassName="bg-violet-200 text-violet-800" />
               {pm.name}
             </span>
           )}

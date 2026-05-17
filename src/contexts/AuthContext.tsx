@@ -9,7 +9,8 @@ import {
 } from 'react';
 import { isDemoMode, supabase } from '../lib/supabase';
 import { demoAuth, type DemoUser } from '../lib/demoStorage';
-import { allowedUsersService } from '../lib/dataService';
+import { allowedUsersService, projectManagersService } from '../lib/dataService';
+import type { ProjectManager } from '../types';
 
 export interface AuthUser {
   id: string;
@@ -18,6 +19,8 @@ export interface AuthUser {
 
 interface AuthContextValue {
   user: AuthUser | null;
+  currentPm: ProjectManager | null;
+  refreshCurrentPm: () => Promise<void>;
   loading: boolean;
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -35,7 +38,16 @@ function toAuthUser(u: { id: string; email?: string | null } | DemoUser | null):
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [currentPm, setCurrentPm] = useState<ProjectManager | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshCurrentPm = useCallback(async () => {
+    if (!user) { setCurrentPm(null); return; }
+    try { setCurrentPm(await projectManagersService.getByUserId(user.id)); }
+    catch { /* ignore */ }
+  }, [user]);
+
+  useEffect(() => { void refreshCurrentPm(); }, [refreshCurrentPm]);
 
   useEffect(() => {
     if (isDemoMode) {
@@ -123,8 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, isDemoMode, signIn, signUp, requestAccess, signOut }),
-    [user, loading, signIn, signUp, requestAccess, signOut],
+    () => ({ user, currentPm, refreshCurrentPm, loading, isDemoMode, signIn, signUp, requestAccess, signOut }),
+    [user, currentPm, refreshCurrentPm, loading, signIn, signUp, requestAccess, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

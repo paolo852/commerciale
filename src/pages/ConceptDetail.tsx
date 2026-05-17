@@ -5,6 +5,7 @@ import {
   ArrowLeft, CheckCircle2, Clock, Edit3, FileText,
   Trash2, Upload, UserPlus, Users, XCircle,
 } from 'lucide-react';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
 import {
@@ -406,11 +407,12 @@ function AssigneesSection({
         <ul className="space-y-1.5">
           {assignees.map((a) => (
             <li key={a.project_manager_id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50">
-              <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${
-                a.role === 'Project Manager' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'
-              }`}>
-                {a.project_manager?.name[0]?.toUpperCase() ?? '?'}
-              </span>
+              <Avatar
+                name={a.project_manager?.name ?? ''}
+                url={a.project_manager?.avatar_url}
+                size="md"
+                fallbackClassName={a.role === 'Project Manager' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'}
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-900 truncate">{a.project_manager?.name ?? '—'}</p>
                 {a.project_manager?.email && (

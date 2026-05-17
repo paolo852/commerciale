@@ -140,6 +140,7 @@ export const projectManagersService = {
       return demoProjectManagers.create({
         name: input.name,
         email: input.email ?? null,
+        avatar_url: null,
         active: input.active ?? true,
       });
     }
@@ -175,6 +176,37 @@ export const projectManagersService = {
     }
     const { error } = await ensureSb().from('project_managers').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  async getByUserId(userId: string): Promise<ProjectManager | null> {
+    if (isDemoMode) {
+      return demoProjectManagers.list().find((p) => p.user_id === userId) ?? null;
+    }
+    const { data, error } = await ensureSb()
+      .from('project_managers').select('*').eq('user_id', userId).maybeSingle();
+    if (error) throw error;
+    return data as ProjectManager | null;
+  },
+
+  async uploadAvatar(pm: ProjectManager, file: File): Promise<ProjectManager> {
+    let avatar_url: string;
+    if (isDemoMode) {
+      avatar_url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    } else {
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `${pm.id}/avatar.${ext}`;
+      const { error: upErr } = await ensureSb()
+        .storage.from('avatars').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = ensureSb().storage.from('avatars').getPublicUrl(path);
+      avatar_url = `${urlData.publicUrl}?t=${Date.now()}`;
+    }
+    return projectManagersService.update(pm.id, { avatar_url });
   },
 };
 

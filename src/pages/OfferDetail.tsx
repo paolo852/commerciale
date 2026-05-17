@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Edit3, Euro, Percent, Trash2, User } from 'lucide-react';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
@@ -83,9 +84,7 @@ export default function OfferDetail() {
             </div>
             {pm && (
               <span className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
-                <span className="w-4 h-4 rounded-full bg-violet-200 text-violet-800 flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
-                  {pm.name[0]}
-                </span>
+                <Avatar name={pm.name} url={pm.avatar_url} size="xs" fallbackClassName="bg-violet-200 text-violet-800" />
                 {pm.name}
               </span>
             )}

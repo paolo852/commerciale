@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   BarChart3,
   BookOpen,
+  Camera,
   ChevronRight,
   FileText,
   FlaskConical,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Menu,
   UserSearch,
@@ -14,6 +16,8 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { projectManagersService } from '../lib/dataService';
+import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
 
 const navItems = [
@@ -26,8 +30,48 @@ const navItems = [
   { to: '/anagrafiche', label: 'Anagrafiche', icon: BookOpen },
 ];
 
+function UserAvatarUpload() {
+  const { currentPm, refreshCurrentPm, user } = useAuth();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !currentPm) return;
+    setUploading(true);
+    try {
+      await projectManagersService.uploadAvatar(currentPm, file);
+      await refreshCurrentPm();
+    } finally {
+      setUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  }
+
+  const name = currentPm?.name ?? user?.email ?? '';
+  const title = currentPm ? 'Clicca per cambiare foto profilo' : 'Nessun profilo PM collegato';
+
+  return (
+    <div
+      className={`relative shrink-0 ${currentPm ? 'cursor-pointer group' : ''}`}
+      onClick={() => currentPm && !uploading && fileRef.current?.click()}
+      title={title}
+    >
+      <Avatar name={name} url={currentPm?.avatar_url} size="md" />
+      {currentPm && (
+        <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+          {uploading
+            ? <Loader2 className="w-3 h-3 text-white animate-spin" />
+            : <Camera className="w-3 h-3 text-white" />}
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => void handleFile(e)} />
+    </div>
+  );
+}
+
 function Sidebar({ onClose }: { onClose?: () => void }) {
-  const { user, signOut, isDemoMode } = useAuth();
+  const { user, currentPm, signOut, isDemoMode } = useAuth();
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200/80">
@@ -84,13 +128,14 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
           </div>
         )}
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 group">
-          <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-            <span className="text-xs font-semibold text-indigo-700 uppercase">
-              {user?.email?.[0] ?? '?'}
-            </span>
-          </div>
+          <UserAvatarUpload />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-slate-900 truncate">{user?.email}</p>
+            {currentPm?.name && (
+              <p className="text-xs font-semibold text-slate-900 truncate">{currentPm.name}</p>
+            )}
+            <p className={`truncate ${currentPm?.name ? 'text-[11px] text-slate-400' : 'text-xs font-medium text-slate-900'}`}>
+              {user?.email}
+            </p>
           </div>
           <button onClick={signOut} title="Esci"
             className="opacity-0 group-hover:opacity-100 transition text-slate-300 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100">

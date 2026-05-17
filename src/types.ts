@@ -17,6 +17,7 @@ export interface ProjectManager {
   user_id: string;
   name: string;
   email: string | null;
+  avatar_url: string | null;
   active: boolean;
   created_at: string;
 }
@@ -70,7 +71,7 @@ export interface Offer {
 
 export type CreateProjectManagerForm = Pick<ProjectManager, 'name' | 'email' | 'active'>;
 
-export type UpdateProjectManagerForm = Partial<CreateProjectManagerForm>;
+export type UpdateProjectManagerForm = Partial<Pick<ProjectManager, 'name' | 'email' | 'active' | 'avatar_url'>>;
 
 export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'lead_deadline' | 'internal_deadline' | 'description' | 'notes' | 'probability' | 'source_url'>;
 
