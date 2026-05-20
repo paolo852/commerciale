@@ -2,16 +2,21 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+
+type Mode = 'signin' | 'request' | 'forgot';
 
 export default function Login() {
   const { signIn, requestAccess, isDemoMode } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'signin' | 'request'>('signin');
+  const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function switchMode(m: Mode) { setMode(m); setError(null); setSuccess(null); }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -22,9 +27,18 @@ export default function Login() {
       if (mode === 'signin') {
         await signIn(email, password);
         navigate('/');
-      } else {
+      } else if (mode === 'request') {
         await requestAccess(email);
         setSuccess('Controlla la tua email: ti abbiamo inviato un link per accedere e impostare la password.');
+        setEmail('');
+      } else {
+        // forgot — send password reset email
+        if (!supabase) throw new Error('Supabase non configurato.');
+        const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (err) throw err;
+        setSuccess('Controlla la tua email: ti abbiamo inviato un link per reimpostare la password.');
         setEmail('');
       }
     } catch (err) {
@@ -74,12 +88,14 @@ export default function Login() {
           </div>
 
           <h1 className="text-2xl font-semibold text-slate-900 mb-1">
-            {mode === 'signin' ? 'Bentornato' : 'Primo accesso'}
+            {mode === 'signin' ? 'Bentornato' : mode === 'request' ? 'Primo accesso' : 'Reimposta password'}
           </h1>
           <p className="text-sm text-slate-500 mb-8">
             {mode === 'signin'
               ? 'Inserisci le tue credenziali per accedere'
-              : 'Se sei in lista, riceverai un link via email per impostare la password'}
+              : mode === 'request'
+              ? 'Se sei in lista, riceverai un link via email per impostare la password'
+              : 'Inserisci la tua email e ti invieremo un link per scegliere una nuova password'}
           </p>
 
           {isDemoMode && (
@@ -136,20 +152,33 @@ export default function Login() {
             >
               {loading
                 ? <Loader2 className="w-4 h-4 animate-spin" />
-                : mode === 'signin' ? 'Accedi' : 'Invia link di accesso'}
+                : mode === 'signin' ? 'Accedi' : 'Invia link via email'}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
-            {mode === 'signin' ? 'Primo accesso?' : 'Hai già una password?'}{' '}
-            <button
-              type="button"
-              onClick={() => { setMode(mode === 'signin' ? 'request' : 'signin'); setError(null); setSuccess(null); }}
-              className="font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              {mode === 'signin' ? 'Richiedi accesso' : 'Accedi'}
-            </button>
-          </p>
+          <div className="mt-6 flex flex-col items-center gap-2 text-sm text-slate-500">
+            {mode !== 'signin' && (
+              <button type="button" onClick={() => switchMode('signin')}
+                className="font-medium text-indigo-600 hover:text-indigo-700">
+                Torna al login
+              </button>
+            )}
+            {mode === 'signin' && (
+              <>
+                <span>
+                  Primo accesso?{' '}
+                  <button type="button" onClick={() => switchMode('request')}
+                    className="font-medium text-indigo-600 hover:text-indigo-700">
+                    Richiedi accesso
+                  </button>
+                </span>
+                <button type="button" onClick={() => switchMode('forgot')}
+                  className="text-slate-400 hover:text-slate-600 text-xs">
+                  Password dimenticata?
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

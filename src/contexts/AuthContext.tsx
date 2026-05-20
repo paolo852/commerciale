@@ -119,7 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { error } = await supabase!.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/reset-password`,
+      },
     });
     if (error) throw error;
   }, []);

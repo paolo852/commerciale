@@ -4,6 +4,7 @@ import { NotificationsProvider } from './contexts/NotificationsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import LeadCandidates from './pages/LeadCandidates';
 import LeadCandidateDetail from './pages/LeadCandidateDetail';
@@ -21,6 +22,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             element={
               <ProtectedRoute>
