@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpDown, ChevronDown, ChevronUp, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
@@ -32,16 +32,6 @@ interface Filters {
   year: number | 'all';
 }
 
-const defaultFilters: Filters = {
-  search: '',
-  status: 'all',
-  outcome: 'all',
-  type: 'all',
-  projectManagerId: 'all',
-  fundingCall: 'all',
-  year: 'all',
-};
-
 function matchesView(o: Offer, view: ViewTab): boolean {
   switch (view) {
     case 'all': return true;
@@ -51,36 +41,82 @@ function matchesView(o: Offer, view: ViewTab): boolean {
   }
 }
 
-
 const selectClass =
   'px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
+
+// ── helpers to read/write URL params ────────────────────────────
+
+function sp(params: URLSearchParams, key: string, fallback: string): string {
+  return params.get(key) ?? fallback;
+}
+
+function filtersFromParams(params: URLSearchParams): Filters {
+  const year = params.get('year');
+  return {
+    search: sp(params, 'q', ''),
+    status: sp(params, 'status', 'all') as Filters['status'],
+    outcome: sp(params, 'outcome', 'all') as Filters['outcome'],
+    type: sp(params, 'type', 'all') as Filters['type'],
+    projectManagerId: sp(params, 'pm', 'all'),
+    fundingCall: sp(params, 'call', 'all'),
+    year: year && year !== 'all' ? Number(year) : 'all',
+  };
+}
+
+function applyFilters(params: URLSearchParams, f: Filters): URLSearchParams {
+  const next = new URLSearchParams(params);
+  f.search ? next.set('q', f.search) : next.delete('q');
+  f.status !== 'all' ? next.set('status', f.status) : next.delete('status');
+  f.outcome !== 'all' ? next.set('outcome', f.outcome) : next.delete('outcome');
+  f.type !== 'all' ? next.set('type', f.type) : next.delete('type');
+  f.projectManagerId !== 'all' ? next.set('pm', f.projectManagerId) : next.delete('pm');
+  f.fundingCall !== 'all' ? next.set('call', f.fundingCall) : next.delete('call');
+  f.year !== 'all' ? next.set('year', String(f.year)) : next.delete('year');
+  return next;
+}
 
 export default function Offerte() {
   const navigate = useNavigate();
   const { offers, projectManagers, fundingCalls, loading, error, reload } = useOffersData();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [view, setView] = useState<ViewTab>('in_corso');
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
+  // All filter/view/sort state lives in the URL so back-navigation restores it
+  const view = sp(searchParams, 'view', 'in_corso') as ViewTab;
+  const sortBy = sp(searchParams, 'sort', 'deadline') as SortBy;
+  const sortDir = sp(searchParams, 'dir', 'asc') as SortDir;
+  const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
+
+  function setView(v: ViewTab) {
+    setSearchParams((p) => { const n = new URLSearchParams(p); n.set('view', v); return n; }, { replace: true });
+  }
+  function setFilters(f: Filters) {
+    setSearchParams(applyFilters(searchParams, f), { replace: true });
+  }
+  function clearFilters() {
+    setSearchParams((p) => {
+      const n = new URLSearchParams(p);
+      ['q','status','outcome','type','pm','call','year'].forEach((k) => n.delete(k));
+      return n;
+    }, { replace: true });
+  }
+  function toggleSort(col: SortBy) {
+    setSearchParams((p) => {
+      const n = new URLSearchParams(p);
+      if (sp(p, 'sort', 'deadline') === col) {
+        n.set('dir', sp(p, 'dir', 'asc') === 'asc' ? 'desc' : 'asc');
+      } else {
+        n.set('sort', col);
+        n.set('dir', col === 'budget' || col === 'created_at' ? 'desc' : 'asc');
+      }
+      return n;
+    }, { replace: true });
+  }
+
+  // Ephemeral UI state (not persisted in URL)
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<SortBy>('deadline');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  // Conteggi per ogni tab (sull'eventuale filtro anno applicato)
-  const yearScopedOffers = useMemo(
-    () => filters.year === 'all' ? offers : offers.filter((o) => offerYear(o) === filters.year),
-    [offers, filters.year],
-  );
-  const tabCounts = useMemo(() => ({
-    all: yearScopedOffers.length,
-    in_corso: yearScopedOffers.filter((o) => matchesView(o, 'in_corso')).length,
-    approvate: yearScopedOffers.filter((o) => matchesView(o, 'approvate')).length,
-    respinte: yearScopedOffers.filter((o) => matchesView(o, 'respinte')).length,
-  }), [yearScopedOffers]);
-
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Offer | null>(null);
   const [toDelete, setToDelete] = useState<Offer | null>(null);
-
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<OfferStatus | ''>('');
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -94,6 +130,17 @@ export default function Offerte() {
     filters.type !== 'all' ||
     filters.projectManagerId !== 'all' ||
     filters.fundingCall !== 'all';
+
+  const yearScopedOffers = useMemo(
+    () => filters.year === 'all' ? offers : offers.filter((o) => offerYear(o) === filters.year),
+    [offers, filters.year],
+  );
+  const tabCounts = useMemo(() => ({
+    all: yearScopedOffers.length,
+    in_corso: yearScopedOffers.filter((o) => matchesView(o, 'in_corso')).length,
+    approvate: yearScopedOffers.filter((o) => matchesView(o, 'approvate')).length,
+    respinte: yearScopedOffers.filter((o) => matchesView(o, 'respinte')).length,
+  }), [yearScopedOffers]);
 
   const visibleOffers = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
@@ -121,11 +168,6 @@ export default function Offerte() {
       return cmp * dir;
     });
   }, [offers, filters, view, sortBy, sortDir]);
-
-  function toggleSort(col: SortBy) {
-    if (sortBy === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortBy(col); setSortDir(col === 'budget' || col === 'created_at' ? 'desc' : 'asc'); }
-  }
 
   function SortIcon({ col }: { col: SortBy }) {
     if (sortBy !== col) return <ArrowUpDown className="w-3 h-3 text-slate-300" />;
@@ -167,18 +209,14 @@ export default function Offerte() {
   }
 
   const allSelected = visibleOffers.length > 0 && visibleOffers.every((o) => selected.has(o.id));
-
   const thClass = 'px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider';
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Offerte</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {offers.length} offerte totali
-          </p>
+          <p className="text-sm text-slate-500 mt-0.5">{offers.length} offerte totali</p>
         </div>
         <button
           onClick={openNew}
@@ -193,7 +231,6 @@ export default function Offerte() {
         <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
 
-      {/* Tabs vista + selettore anno */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
           {([
@@ -229,7 +266,6 @@ export default function Offerte() {
         />
       </div>
 
-      {/* Search + filter toggle */}
       <div className="flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -260,7 +296,6 @@ export default function Offerte() {
         </button>
       </div>
 
-      {/* Filtri espandibili */}
       {filtersOpen && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -287,14 +322,13 @@ export default function Offerte() {
             </select>
           </div>
           {isFiltered && (
-            <button onClick={() => setFilters(defaultFilters)} className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700">
+            <button onClick={clearFilters} className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700">
               <X className="w-3 h-3" /> Pulisci filtri
             </button>
           )}
         </div>
       )}
 
-      {/* Bulk actions */}
       {selected.size > 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium text-indigo-900">{selected.size} selezionate</span>
@@ -309,7 +343,6 @@ export default function Offerte() {
         </div>
       )}
 
-      {/* Tabella */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">

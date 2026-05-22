@@ -232,9 +232,9 @@ export default function Team() {
 
   const workload = useMemo(() => activePms.map((pm) => ({
     pm,
-    leads: leads.filter((l) => l.pm_id === pm.id),
-    concepts: concepts.filter((c) => c.assignees?.some((a) => a.project_manager_id === pm.id)),
-    offers: offers.filter((o) => o.project_manager_id === pm.id).map((o) => ({ id: o.id, name: o.name })),
+    leads: leads.filter((l) => l.pm_id === pm.id && l.status === 'attivo'),
+    concepts: concepts.filter((c) => c.status === 'in_valutazione' && c.assignees?.some((a) => a.project_manager_id === pm.id)),
+    offers: offers.filter((o) => o.project_manager_id === pm.id && o.outcome === 'nessuno').map((o) => ({ id: o.id, name: o.name })),
   })), [activePms, leads, concepts, offers]);
 
   // ── Task data ──

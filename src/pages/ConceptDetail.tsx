@@ -108,6 +108,7 @@ export default function ConceptDetail() {
     }
     setPromoteOpen(false);
     await Promise.all([reload(), reloadOffers()]);
+    if (offer) navigate(`/offerte/${offer.id}`);
   }
 
   if (loading) {
