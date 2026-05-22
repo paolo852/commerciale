@@ -234,7 +234,7 @@ export default function Team() {
     pm,
     leads: leads.filter((l) => l.pm_id === pm.id && l.status === 'attivo'),
     concepts: concepts.filter((c) => c.status === 'in_valutazione' && c.assignees?.some((a) => a.project_manager_id === pm.id)),
-    offers: offers.filter((o) => o.project_manager_id === pm.id && o.outcome === 'nessuno').map((o) => ({ id: o.id, name: o.name })),
+    offers: offers.filter((o) => o.project_manager_id === pm.id && o.status === 'in_lavorazione').map((o) => ({ id: o.id, name: o.name })),
   })), [activePms, leads, concepts, offers]);
 
   // ── Task data ──
