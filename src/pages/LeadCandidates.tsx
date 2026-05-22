@@ -4,6 +4,7 @@ import {
   Archive, CalendarClock, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, FlaskConical,
   Link2, Percent, Plus, Search, Target, TrendingUp, User, UserSearch, X,
 } from 'lucide-react';
+import Avatar from '../components/Avatar';
 import { leadCandidatesService, fundingCallsService } from '../lib/dataService';
 import { useOffersData } from '../hooks/useOffersData';
 import { formatDate } from '../lib/format';
@@ -68,6 +69,7 @@ export default function LeadCandidates() {
   const [assignFcId, setAssignFcId] = useState('');
   const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
   const [targetInput, setTargetInput] = useState('');
+  const [filterPmId, setFilterPmId] = useState<string | null>(null);
 
   const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
 
@@ -93,15 +95,28 @@ export default function LeadCandidates() {
     return Math.round((counts.promosso / concluded) * 100);
   }, [counts]);
 
+  // PMs that appear in at least one lead (for the filter chips)
+  const activePms = useMemo(() => {
+    const ids = new Set(leads.map((l) => l.pm_id).filter(Boolean) as string[]);
+    return projectManagers.filter((pm) => ids.has(pm.id));
+  }, [leads, projectManagers]);
+
+  const hasUnassigned = useMemo(() => leads.some((l) => !l.pm_id), [leads]);
+
   const filtered = useMemo(() => {
-    const byTab = tab === 'all' ? leads : leads.filter((l) => l.status === tab);
-    if (!search.trim()) return byTab;
+    let result = tab === 'all' ? leads : leads.filter((l) => l.status === tab);
+    if (filterPmId === '__none__') {
+      result = result.filter((l) => !l.pm_id);
+    } else if (filterPmId) {
+      result = result.filter((l) => l.pm_id === filterPmId);
+    }
+    if (!search.trim()) return result;
     const q = search.toLowerCase();
-    return byTab.filter((l) =>
+    return result.filter((l) =>
       l.researcher_name.toLowerCase().includes(q) ||
       (l.institution?.toLowerCase().includes(q) ?? false),
     );
-  }, [leads, tab, search]);
+  }, [leads, tab, search, filterPmId]);
 
   // Left column: leads with a bando, grouped by bando
   const groupsWithBando = useMemo(() => {
@@ -330,6 +345,49 @@ export default function LeadCandidates() {
             </button>
           )}
         </div>
+
+        {/* PM filter chips */}
+        {(activePms.length > 0 || hasUnassigned) && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-slate-400 font-medium shrink-0">PM:</span>
+            {activePms.map((pm) => {
+              const active = filterPmId === pm.id;
+              return (
+                <button
+                  key={pm.id}
+                  onClick={() => setFilterPmId(active ? null : pm.id)}
+                  title={pm.name}
+                  className={`flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+                    active
+                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700'
+                  }`}
+                >
+                  <Avatar name={pm.name} url={pm.avatar_url} size="xs" />
+                  {pm.name}
+                </button>
+              );
+            })}
+            {hasUnassigned && (
+              <button
+                onClick={() => setFilterPmId(filterPmId === '__none__' ? null : '__none__')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+                  filterPmId === '__none__'
+                    ? 'bg-slate-600 border-slate-600 text-white shadow-sm'
+                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
+                }`}
+              >
+                <User className="w-3 h-3" />
+                Non assegnati
+              </button>
+            )}
+            {filterPmId && (
+              <button onClick={() => setFilterPmId(null)} className="text-slate-400 hover:text-slate-600 transition" title="Rimuovi filtro PM">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main content */}
