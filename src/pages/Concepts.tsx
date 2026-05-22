@@ -73,7 +73,6 @@ export default function Concepts() {
     return m;
   }, [leads]);
 
-  const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
 
   const counts = useMemo(() => ({
     all: concepts.filter((c) => c.status !== 'promosso').length,
