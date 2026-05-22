@@ -110,22 +110,21 @@ function WorkloadCard({
 // ─── Task tab ───────────────────────────────────────────────────
 
 function TaskRow({
-  task, pms, entityNames, onToggle, onDelete,
+  task, entityNames, onToggle, onDelete,
 }: {
   task: Task;
-  pms: Map<string, ProjectManager>;
   entityNames: Map<string, { name: string; path: string }>;
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
 }) {
   const nav = useNavigate();
-  const pm = task.pm_id ? pms.get(task.pm_id) : null;
   const entity = task.entity_id ? entityNames.get(task.entity_id) : null;
   const isOverdue = !task.completed && task.due_date && task.due_date < new Date().toISOString().slice(0, 10);
 
   return (
-    <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition ${task.completed ? 'bg-slate-50 border-slate-100' : 'bg-white border-slate-200/80 shadow-sm'}`}>
+    <div className={`flex items-start gap-3 px-5 py-3.5 transition ${task.completed ? 'bg-slate-50/50' : 'hover:bg-slate-50/60'}`}>
       <button
+        type="button"
         onClick={() => onToggle(task.id, !task.completed)}
         className="mt-0.5 shrink-0 text-slate-300 hover:text-indigo-500 transition"
       >
@@ -141,16 +140,11 @@ function TaskRow({
           <p className={`text-xs mt-0.5 line-clamp-2 ${task.completed ? 'text-slate-300' : 'text-slate-500'}`}>{task.body}</p>
         )}
         <div className="flex items-center gap-2 flex-wrap mt-1.5">
-          {pm && (
-            <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
-              <Avatar name={pm.name} url={pm.avatar_url} size="xxs" fallbackClassName="bg-violet-200 text-violet-800" />
-              {pm.name}
-            </span>
-          )}
           {entity && (
             <button
+              type="button"
               onClick={() => nav(entity.path)}
-              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 transition truncate max-w-[140px]"
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 transition truncate max-w-[200px]"
             >
               {task.entity_type === 'lead' ? <UserSearch className="w-3 h-3 shrink-0" /> : task.entity_type === 'concept' ? <FlaskConical className="w-3 h-3 shrink-0" /> : <FileText className="w-3 h-3 shrink-0" />}
               <span className="truncate">{entity.name}</span>
@@ -167,6 +161,7 @@ function TaskRow({
         </div>
       </div>
       <button
+        type="button"
         onClick={() => onDelete(task.id)}
         className="shrink-0 text-slate-200 hover:text-red-500 transition mt-0.5"
       >
@@ -197,7 +192,6 @@ export default function Team() {
   const [saving, setSaving] = useState(false);
 
   // Filter state
-  const [filterPm, setFilterPm] = useState('');
   const [hideCompleted, setHideCompleted] = useState(true);
 
   const reload = useCallback(async () => {
@@ -240,9 +234,8 @@ export default function Team() {
   // ── Task data ──
   const filteredTasks = useMemo(() => tasks.filter((t) => {
     if (hideCompleted && t.completed) return false;
-    if (filterPm && t.pm_id !== filterPm) return false;
     return true;
-  }), [tasks, filterPm, hideCompleted]);
+  }), [tasks, hideCompleted]);
 
   async function handleCreateTask() {
     if (!user || !newTitle.trim()) return;
@@ -322,16 +315,8 @@ export default function Team() {
       ) : (
         /* ── Tasks ── */
         <div className="space-y-4">
-          {/* Filter bar */}
+          {/* Toolbar */}
           <div className="flex items-center gap-3 flex-wrap">
-            <select
-              value={filterPm}
-              onChange={(e) => setFilterPm(e.target.value)}
-              className="text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-            >
-              <option value="">Tutte le persone</option>
-              {activePms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
             <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -398,18 +383,65 @@ export default function Team() {
             </div>
           )}
 
-          {/* Task list */}
-          {filteredTasks.length === 0 ? (
+          {/* Tasks grouped by person */}
+          {tasks.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">
-              {tasks.length === 0 ? 'Nessun task ancora. Creane uno con il pulsante sopra.' : 'Nessun task corrisponde ai filtri.'}
+              Nessun task ancora. Creane uno con il pulsante sopra.
             </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredTasks.map((t) => (
-                <TaskRow key={t.id} task={t} pms={pmById} entityNames={entityNames} onToggle={handleToggle} onDelete={handleDelete} />
-              ))}
-            </div>
-          )}
+          ) : (() => {
+            // Build groups: one per PM (ordered by activePms), then unassigned at the end
+            const groups: { key: string; pm: ProjectManager | null; tasks: Task[] }[] = [
+              ...activePms.map((pm) => ({
+                key: pm.id,
+                pm,
+                tasks: filteredTasks.filter((t) => t.pm_id === pm.id),
+              })),
+              {
+                key: '__none__',
+                pm: null,
+                tasks: filteredTasks.filter((t) => !t.pm_id),
+              },
+            ].filter((g) => g.tasks.length > 0);
+
+            if (groups.length === 0) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">
+                  Nessun task corrisponde ai filtri.
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-5">
+                {groups.map(({ key, pm, tasks: groupTasks }) => (
+                  <div key={key} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                    {/* Group header */}
+                    <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+                      {pm ? (
+                        <Avatar name={pm.name} url={pm.avatar_url} size="sm" />
+                      ) : (
+                        <span className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                          <Users className="w-3.5 h-3.5 text-slate-400" />
+                        </span>
+                      )}
+                      <span className="text-sm font-semibold text-slate-900">
+                        {pm ? pm.name : 'Non assegnati'}
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium tabular-nums">
+                        {groupTasks.length}
+                      </span>
+                    </div>
+                    {/* Tasks */}
+                    <div className="divide-y divide-slate-50">
+                      {groupTasks.map((t) => (
+                        <TaskRow key={t.id} task={t} entityNames={entityNames} onToggle={handleToggle} onDelete={handleDelete} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
