@@ -1,14 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Clock, FlaskConical, Plus, Users, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, FlaskConical, Plus, Users, X, XCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import { useConceptsData } from '../hooks/useConceptsData';
 import { useOffersData } from '../hooks/useOffersData';
-import { conceptsService } from '../lib/dataService';
+import { conceptsService, leadCandidatesService } from '../lib/dataService';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { Concept, ConceptStatus } from '../types';
+import type { Concept, ConceptStatus, LeadCandidate } from '../types';
 
 type ViewTab = 'all' | 'in_valutazione' | 'promosso' | 'rifiutato';
 
@@ -51,11 +51,29 @@ function StatusBadge({ value }: { value: ConceptStatus }) {
 export default function Concepts() {
   const navigate = useNavigate();
   const { concepts, loading, error, reload } = useConceptsData();
-  const { projectManagers } = useOffersData();
+  const { projectManagers, fundingCalls } = useOffersData();
 
   const [view, setView] = useState<ViewTab>('all');
   const [formOpen, setFormOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Concept | null>(null);
+  const [filterPmId, setFilterPmId] = useState<string | null>(null);
+  const [filterCallId, setFilterCallId] = useState<string | null>(null);
+  const [leads, setLeads] = useState<LeadCandidate[]>([]);
+
+  useEffect(() => {
+    leadCandidatesService.list().then(setLeads).catch(() => {});
+  }, []);
+
+  // concept id → funding call id (via promoted leads)
+  const conceptCallMap = useMemo(() => {
+    const m = new Map<string, string>();
+    leads.forEach((l) => {
+      if (l.promoted_concept_id && l.funding_call_id) m.set(l.promoted_concept_id, l.funding_call_id);
+    });
+    return m;
+  }, [leads]);
+
+  const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
 
   const counts = useMemo(() => ({
     all: concepts.filter((c) => c.status !== 'promosso').length,
@@ -81,10 +99,32 @@ export default function Concepts() {
     return [...map.values()].sort((a, b) => b.total - a.total);
   }, [concepts]);
 
-  const visible = useMemo(
-    () => view === 'all' ? concepts.filter((c) => c.status !== 'promosso') : concepts.filter((c) => c.status === view),
-    [concepts, view],
-  );
+  const visible = useMemo(() => {
+    let result = view === 'all' ? concepts.filter((c) => c.status !== 'promosso') : concepts.filter((c) => c.status === view);
+    if (filterPmId) {
+      result = result.filter((c) =>
+        (c.assignees ?? []).some((a) => a.project_manager_id === filterPmId),
+      );
+    }
+    if (filterCallId) {
+      result = result.filter((c) => conceptCallMap.get(c.id) === filterCallId);
+    }
+    return result;
+  }, [concepts, view, filterPmId, filterCallId, conceptCallMap]);
+
+  // PMs that appear in at least one concept (in current tab)
+  const activePms = useMemo(() => {
+    const base = view === 'all' ? concepts.filter((c) => c.status !== 'promosso') : concepts.filter((c) => c.status === view);
+    const ids = new Set(base.flatMap((c) => (c.assignees ?? []).map((a) => a.project_manager_id)));
+    return projectManagers.filter((pm) => ids.has(pm.id));
+  }, [concepts, view, projectManagers]);
+
+  // Funding calls that appear in at least one concept (in current tab)
+  const activeCalls = useMemo(() => {
+    const base = view === 'all' ? concepts.filter((c) => c.status !== 'promosso') : concepts.filter((c) => c.status === view);
+    const ids = new Set(base.map((c) => conceptCallMap.get(c.id)).filter(Boolean) as string[]);
+    return fundingCalls.filter((fc) => ids.has(fc.id));
+  }, [concepts, view, fundingCalls, conceptCallMap]);
 
   async function handleDelete() {
     if (!toDelete) return;
@@ -157,26 +197,84 @@ export default function Concepts() {
         </div>
       )}
 
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit flex-wrap">
-        {tabs.map(({ id, label }) => {
-          const active = view === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setView(id)}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {label}
-              <span className={`text-xs px-1.5 py-0.5 rounded-md tabular-nums ${
-                active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/70 text-slate-500'
-              }`}>
-                {counts[id]}
-              </span>
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Status tabs */}
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl flex-wrap">
+          {tabs.map(({ id, label }) => {
+            const active = view === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setView(id)}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                  active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {label}
+                <span className={`text-xs px-1.5 py-0.5 rounded-md tabular-nums ${
+                  active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/70 text-slate-500'
+                }`}>
+                  {counts[id]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Call filter */}
+        {activeCalls.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 font-medium shrink-0">Bando:</span>
+            <div className="relative">
+              <select
+                value={filterCallId ?? ''}
+                onChange={(e) => setFilterCallId(e.target.value || null)}
+                className="pl-2.5 pr-7 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer hover:border-indigo-300 transition"
+              >
+                <option value="">Tutti i bandi</option>
+                {activeCalls.map((fc) => (
+                  <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]">▾</span>
+            </div>
+            {filterCallId && (
+              <button onClick={() => setFilterCallId(null)} className="text-slate-400 hover:text-slate-600 transition" title="Rimuovi filtro bando">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* PM filter chips */}
+        {activePms.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-slate-400 font-medium shrink-0">PM:</span>
+            {activePms.map((pm) => {
+              const active = filterPmId === pm.id;
+              return (
+                <button
+                  key={pm.id}
+                  onClick={() => setFilterPmId(active ? null : pm.id)}
+                  title={pm.name}
+                  className={`flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+                    active
+                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700'
+                  }`}
+                >
+                  <Avatar name={pm.name} url={pm.avatar_url} size="xs" />
+                  {pm.name}
+                </button>
+              );
+            })}
+            {filterPmId && (
+              <button onClick={() => setFilterPmId(null)} className="text-slate-400 hover:text-slate-600 transition" title="Rimuovi filtro PM">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
