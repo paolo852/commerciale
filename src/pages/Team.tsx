@@ -214,7 +214,6 @@ export default function Team() {
 
   // ── Workload data ──
   const activePms = useMemo(() => projectManagers.filter((p) => p.active), [projectManagers]);
-  const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
 
   const entityNames = useMemo(() => {
     const map = new Map<string, { name: string; path: string }>();
