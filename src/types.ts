@@ -37,6 +37,7 @@ export interface FundingCall {
   pdf_path: string | null;
   pdf_filename: string | null;
   source_url: string | null;
+  target_offers: number | null;
   created_at: string;
 }
 
@@ -73,7 +74,7 @@ export type CreateProjectManagerForm = Pick<ProjectManager, 'name' | 'email' | '
 
 export type UpdateProjectManagerForm = Partial<Pick<ProjectManager, 'name' | 'email' | 'active' | 'avatar_url'>>;
 
-export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'lead_deadline' | 'internal_deadline' | 'description' | 'notes' | 'probability' | 'source_url'>;
+export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'lead_deadline' | 'internal_deadline' | 'description' | 'notes' | 'probability' | 'source_url' | 'target_offers'>;
 
 // ============================================================
 // Concept files (documenti tecnologia)

@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Archive, CalendarClock, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, FlaskConical,
-  Link2, Percent, Plus, Search, TrendingUp, User, UserSearch, X,
+  Link2, Percent, Plus, Search, Target, TrendingUp, User, UserSearch, X,
 } from 'lucide-react';
-import { leadCandidatesService } from '../lib/dataService';
+import { leadCandidatesService, fundingCallsService } from '../lib/dataService';
 import { useOffersData } from '../hooks/useOffersData';
 import { formatDate } from '../lib/format';
 import LeadCandidateFormModal from '../components/leads/LeadCandidateFormModal';
@@ -53,7 +53,7 @@ function StatCard({
 
 export default function LeadCandidates() {
   const navigate = useNavigate();
-  const { fundingCalls, offers, projectManagers } = useOffersData();
+  const { fundingCalls, offers, projectManagers, reload: reloadOffers } = useOffersData();
   const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
 
   const [leads, setLeads] = useState<LeadCandidate[]>([]);
@@ -66,6 +66,8 @@ export default function LeadCandidates() {
   const [toDelete, setToDelete] = useState<LeadCandidate | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignFcId, setAssignFcId] = useState('');
+  const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
+  const [targetInput, setTargetInput] = useState('');
 
   const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
 
@@ -137,6 +139,14 @@ export default function LeadCandidates() {
     setAssigningId(null);
     setAssignFcId('');
     await reload();
+  }
+
+  async function handleSaveTarget(fcId: string) {
+    const val = parseInt(targetInput, 10);
+    await fundingCallsService.update(fcId, { target_offers: isNaN(val) || val <= 0 ? null : val });
+    setEditingTargetId(null);
+    setTargetInput('');
+    await reloadOffers();
   }
 
   function toggleGroup(key: string) {
@@ -370,52 +380,130 @@ export default function LeadCandidates() {
                     : 0;
                   const isCollapsed = collapsed.has(fcId);
 
+                  const target = fc?.target_offers ?? null;
+                  const isEditingTarget = editingTargetId === fcId;
+
                   return (
                     <div key={fcId} className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
                       {/* Group header */}
-                      <button
-                        onClick={() => toggleGroup(fcId)}
-                        className="w-full flex items-start justify-between gap-2 px-4 py-3 text-left bg-white hover:bg-slate-50 transition"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 font-mono">{sub}</p>
-                          <p className="text-sm font-semibold text-slate-800 leading-snug mt-0.5 truncate">{label}</p>
-                          {fc && (fc.lead_deadline || fc.internal_deadline) && (() => {
-                            const today = new Date().toISOString().slice(0, 10);
-                            const urgent = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-                            const chip = (date: string, chipLabel: string) => {
-                              const past = date < today;
-                              const urg = date <= urgent;
-                              return (
-                                <span className={`inline-flex items-center gap-1 ${past ? 'text-red-600' : urg ? 'text-amber-600' : 'text-slate-400'}`}>
-                                  <CalendarClock className="w-3 h-3" />
-                                  {chipLabel}: {date}
-                                  {past && <span className="font-semibold">(scaduta)</span>}
-                                </span>
-                              );
-                            };
+                      <div className="bg-white">
+                        {/* Top row: code + collapse */}
+                        <button
+                          onClick={() => toggleGroup(fcId)}
+                          className="w-full flex items-center justify-between gap-2 px-4 pt-3.5 pb-1 text-left hover:bg-slate-50/60 transition"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-base font-extrabold font-mono text-indigo-600 tracking-tight shrink-0">{sub}</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold tabular-nums shrink-0">
+                              {groupLeads.length} lead
+                            </span>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+                        </button>
+
+                        {/* Call name */}
+                        <button onClick={() => toggleGroup(fcId)} className="w-full text-left px-4 pb-2 hover:bg-slate-50/60 transition">
+                          <p className="text-sm font-semibold text-slate-800 leading-snug">{label}</p>
+                        </button>
+
+                        {/* Deadlines */}
+                        {fc && (fc.lead_deadline || fc.internal_deadline) && (() => {
+                          const today = new Date().toISOString().slice(0, 10);
+                          const urgent = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+                          const chip = (date: string, chipLabel: string) => {
+                            const past = date < today;
+                            const urg = date <= urgent;
                             return (
-                              <p className="text-xs mt-1 flex items-center gap-3 flex-wrap">
-                                {fc.lead_deadline && chip(fc.lead_deadline, 'Lead')}
-                                {fc.internal_deadline && chip(fc.internal_deadline, 'Concept')}
-                              </p>
+                              <span className={`inline-flex items-center gap-1 ${past ? 'text-red-600' : urg ? 'text-amber-600' : 'text-slate-400'}`}>
+                                <CalendarClock className="w-3 h-3" />
+                                {chipLabel}: {date}
+                                {past && <span className="font-semibold">(scaduta)</span>}
+                              </span>
                             );
-                          })()}
-                          {(conceptCount > 0 || offerCount > 0) && (
-                            <p className="text-xs mt-1 flex items-center gap-1.5 text-slate-400">
-                              {offerCount > 0 && <span className="inline-flex items-center gap-1 text-indigo-500"><FileText className="w-3 h-3" />{offerCount} offerte</span>}
-                              {offerCount > 0 && conceptCount > 0 && <span>·</span>}
-                              {conceptCount > 0 && <span className="inline-flex items-center gap-1 text-emerald-600"><FlaskConical className="w-3 h-3" />{conceptCount} concept</span>}
+                          };
+                          return (
+                            <p className="text-xs px-4 pb-2 flex items-center gap-3 flex-wrap">
+                              {fc.lead_deadline && chip(fc.lead_deadline, 'Lead')}
+                              {fc.internal_deadline && chip(fc.internal_deadline, 'Concept')}
                             </p>
-                          )}
+                          );
+                        })()}
+
+                        {/* Pipeline counters + target */}
+                        <div className="border-t border-slate-100 px-4 py-2.5 flex items-center gap-3 flex-wrap">
+                          {/* Concept count */}
+                          <div className="flex items-center gap-1.5">
+                            <FlaskConical className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span className="text-xs text-slate-500">Concept</span>
+                            <span className={`text-sm font-bold tabular-nums ${conceptCount > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
+                              {conceptCount}
+                            </span>
+                          </div>
+
+                          <span className="text-slate-200">|</span>
+
+                          {/* Offer count + target */}
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <FileText className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <span className="text-xs text-slate-500">Offerte</span>
+                            <span className={`text-sm font-bold tabular-nums ${offerCount > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
+                              {offerCount}
+                            </span>
+                            {target !== null && (
+                              <>
+                                <span className="text-xs text-slate-400">/ {target}</span>
+                                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[40px] max-w-[80px]">
+                                  <div
+                                    className="h-full rounded-full bg-indigo-500 transition-all"
+                                    style={{ width: `${Math.min(100, Math.round((offerCount / target) * 100))}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] text-slate-400 tabular-nums">
+                                  {Math.round((offerCount / target) * 100)}%
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Target edit */}
+                          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                            {isEditingTarget ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  autoFocus
+                                  value={targetInput}
+                                  onChange={(e) => setTargetInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') void handleSaveTarget(fcId);
+                                    if (e.key === 'Escape') { setEditingTargetId(null); setTargetInput(''); }
+                                  }}
+                                  placeholder="N"
+                                  className="w-14 px-2 py-0.5 text-xs border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-center"
+                                />
+                                <button
+                                  onClick={() => void handleSaveTarget(fcId)}
+                                  className="text-xs px-2 py-0.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                                >✓</button>
+                                <button
+                                  onClick={() => { setEditingTargetId(null); setTargetInput(''); }}
+                                  className="text-xs px-1.5 py-0.5 text-slate-500 hover:text-slate-700"
+                                >✕</button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setEditingTargetId(fcId); setTargetInput(target !== null ? String(target) : ''); }}
+                                className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 transition"
+                                title={target !== null ? 'Modifica target offerte' : 'Imposta target offerte'}
+                              >
+                                <Target className="w-3 h-3" />
+                                {target !== null ? `target: ${target}` : 'target'}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0 mt-0.5">
-                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold tabular-nums">
-                            {groupLeads.length}
-                          </span>
-                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
-                        </div>
-                      </button>
+                      </div>
 
                       {/* Cards */}
                       {!isCollapsed && (
