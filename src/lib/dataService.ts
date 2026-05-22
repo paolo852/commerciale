@@ -244,6 +244,7 @@ export const fundingCallsService = {
         pdf_path: null,
         pdf_filename: null,
         source_url: input.source_url ?? null,
+        target_offers: input.target_offers ?? null,
       });
     }
     const { data, error } = await ensureSb()

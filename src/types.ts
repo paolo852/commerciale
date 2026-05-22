@@ -74,7 +74,7 @@ export type CreateProjectManagerForm = Pick<ProjectManager, 'name' | 'email' | '
 
 export type UpdateProjectManagerForm = Partial<Pick<ProjectManager, 'name' | 'email' | 'active' | 'avatar_url'>>;
 
-export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'lead_deadline' | 'internal_deadline' | 'description' | 'notes' | 'probability' | 'source_url' | 'target_offers'>;
+export type CreateFundingCallForm = Pick<FundingCall, 'code' | 'name' | 'body' | 'deadline' | 'lead_deadline' | 'internal_deadline' | 'description' | 'notes' | 'probability' | 'source_url'> & { target_offers?: number | null };
 
 // ============================================================
 // Concept files (documenti tecnologia)
