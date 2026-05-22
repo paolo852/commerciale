@@ -153,59 +153,6 @@ export default function ConceptDetail() {
                 {concept.ente && <span>{concept.ente}</span>}
               </p>
             )}
-            {/* Bando associato */}
-            <div className="mt-2 flex items-center gap-2 flex-wrap">
-              {editingCall ? (
-                <div className="flex items-center gap-2">
-                  <select
-                    autoFocus
-                    defaultValue={concept.funding_call_id ?? ''}
-                    disabled={callSaving}
-                    onChange={async (e) => {
-                      setCallSaving(true);
-                      await conceptsService.update(concept.id, { funding_call_id: e.target.value || null });
-                      await reload();
-                      setEditingCall(false);
-                      setCallSaving(false);
-                    }}
-                    className="text-sm px-2.5 py-1.5 border border-indigo-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white min-w-[220px]"
-                  >
-                    <option value="">— Nessun bando —</option>
-                    {fundingCalls.map((fc) => (
-                      <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setEditingCall(false)}
-                    className="p-1.5 text-slate-400 hover:text-slate-600 transition"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : concept.funding_call_id ? (() => {
-                const fc = fundingCalls.find((f) => f.id === concept.funding_call_id);
-                return (
-                  <button
-                    type="button"
-                    onClick={() => setEditingCall(true)}
-                    className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition"
-                  >
-                    <Link2 className="w-3 h-3 shrink-0" />
-                    {fc ? `${fc.code} — ${fc.name}` : concept.funding_call_id}
-                  </button>
-                );
-              })() : (
-                <button
-                  type="button"
-                  onClick={() => setEditingCall(true)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 hover:border-indigo-400 rounded-xl px-3.5 py-2 transition shadow-sm"
-                >
-                  <Link2 className="w-4 h-4" />
-                  Assegna bando
-                </button>
-              )}
-            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {concept.status !== 'promosso' && (
@@ -232,6 +179,67 @@ export default function ConceptDetail() {
             <p className="text-xs font-medium text-slate-500 mb-1">Note</p>
             <p className="text-sm text-slate-600 whitespace-pre-wrap">{concept.notes}</p>
           </div>
+        )}
+      </div>
+
+      {/* Bando associato */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <Link2 className="w-3.5 h-3.5" /> Bando associato
+        </p>
+        {editingCall ? (
+          <div className="flex items-center gap-2">
+            <select
+              autoFocus
+              defaultValue={concept.funding_call_id ?? ''}
+              disabled={callSaving}
+              onChange={async (e) => {
+                setCallSaving(true);
+                await conceptsService.update(concept.id, { funding_call_id: e.target.value || null });
+                await reload();
+                setEditingCall(false);
+                setCallSaving(false);
+              }}
+              className="flex-1 text-sm px-3 py-2 border border-indigo-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+            >
+              <option value="">— Nessun bando —</option>
+              {fundingCalls.map((fc) => (
+                <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
+              ))}
+            </select>
+            <button type="button" onClick={() => setEditingCall(false)} className="p-2 text-slate-400 hover:text-slate-600 transition">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : concept.funding_call_id ? (() => {
+          const fc = fundingCalls.find((f) => f.id === concept.funding_call_id);
+          return (
+            <div className="flex items-center justify-between gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Link2 className="w-4 h-4 text-indigo-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-indigo-700 font-mono truncate">{fc?.code}</p>
+                  <p className="text-xs text-indigo-600 truncate">{fc?.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCall(true)}
+                className="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition"
+              >
+                Cambia
+              </button>
+            </div>
+          );
+        })() : (
+          <button
+            type="button"
+            onClick={() => setEditingCall(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm shadow-indigo-200 transition"
+          >
+            <Link2 className="w-4 h-4" />
+            Assegna bando
+          </button>
         )}
       </div>
 
