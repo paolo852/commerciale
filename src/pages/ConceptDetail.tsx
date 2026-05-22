@@ -199,9 +199,9 @@ export default function ConceptDetail() {
                 <button
                   type="button"
                   onClick={() => setEditingCall(true)}
-                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 rounded-full px-2.5 py-1 transition"
+                  className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 hover:border-indigo-400 rounded-xl px-3.5 py-2 transition shadow-sm"
                 >
-                  <Link2 className="w-3 h-3" />
+                  <Link2 className="w-4 h-4" />
                   Assegna bando
                 </button>
               )}
