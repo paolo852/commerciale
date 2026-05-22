@@ -191,13 +191,14 @@ export interface Concept {
   status: ConceptStatus;
   notes: string | null;
   promoted_offer_id: string | null;
+  funding_call_id: string | null;
   concept_data: ConceptTemplateData | null;
   created_at: string;
   assignees?: ConceptAssignee[];
 }
 
 export type CreateConceptForm = Pick<Concept, 'name' | 'pi' | 'ente' | 'description' | 'status' | 'notes'>;
-export type UpdateConceptForm = Partial<CreateConceptForm & Pick<Concept, 'promoted_offer_id' | 'concept_data'>>;
+export type UpdateConceptForm = Partial<CreateConceptForm & Pick<Concept, 'promoted_offer_id' | 'funding_call_id' | 'concept_data'>>;
 
 export interface ConceptAssignee {
   concept_id: string;

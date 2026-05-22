@@ -64,14 +64,17 @@ export default function Concepts() {
     leadCandidatesService.list().then(setLeads).catch(() => {});
   }, []);
 
-  // concept id → funding call id (via promoted leads)
+  // concept id → funding call id (direct field takes priority, fallback to promoted leads)
   const conceptCallMap = useMemo(() => {
     const m = new Map<string, string>();
     leads.forEach((l) => {
       if (l.promoted_concept_id && l.funding_call_id) m.set(l.promoted_concept_id, l.funding_call_id);
     });
+    concepts.forEach((c) => {
+      if (c.funding_call_id) m.set(c.id, c.funding_call_id);
+    });
     return m;
-  }, [leads]);
+  }, [leads, concepts]);
 
 
   const counts = useMemo(() => ({

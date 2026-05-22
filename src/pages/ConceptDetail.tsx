@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Paperclip } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, CheckCircle2, Clock, Edit3, FileText,
+  ArrowLeft, CheckCircle2, Clock, Edit3, FileText, Link2, X,
   Trash2, Upload, UserPlus, Users, XCircle,
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
@@ -49,6 +49,8 @@ export default function ConceptDetail() {
 
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [toDelete, setToDelete] = useState(false);
+  const [editingCall, setEditingCall] = useState(false);
+  const [callSaving, setCallSaving] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -151,6 +153,59 @@ export default function ConceptDetail() {
                 {concept.ente && <span>{concept.ente}</span>}
               </p>
             )}
+            {/* Bando associato */}
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              {editingCall ? (
+                <div className="flex items-center gap-2">
+                  <select
+                    autoFocus
+                    defaultValue={concept.funding_call_id ?? ''}
+                    disabled={callSaving}
+                    onChange={async (e) => {
+                      setCallSaving(true);
+                      await conceptsService.update(concept.id, { funding_call_id: e.target.value || null });
+                      await reload();
+                      setEditingCall(false);
+                      setCallSaving(false);
+                    }}
+                    className="text-sm px-2.5 py-1.5 border border-indigo-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white min-w-[220px]"
+                  >
+                    <option value="">— Nessun bando —</option>
+                    {fundingCalls.map((fc) => (
+                      <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setEditingCall(false)}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 transition"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : concept.funding_call_id ? (() => {
+                const fc = fundingCalls.find((f) => f.id === concept.funding_call_id);
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setEditingCall(true)}
+                    className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition"
+                  >
+                    <Link2 className="w-3 h-3 shrink-0" />
+                    {fc ? `${fc.code} — ${fc.name}` : concept.funding_call_id}
+                  </button>
+                );
+              })() : (
+                <button
+                  type="button"
+                  onClick={() => setEditingCall(true)}
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 rounded-full px-2.5 py-1 transition"
+                >
+                  <Link2 className="w-3 h-3" />
+                  Assegna bando
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {concept.status !== 'promosso' && (
