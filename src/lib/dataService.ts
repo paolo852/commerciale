@@ -383,6 +383,7 @@ export const conceptsService = {
         status: input.status ?? 'in_valutazione',
         notes: input.notes ?? null,
         promoted_offer_id: null,
+        funding_call_id: null,
         concept_data: null,
       });
     }
