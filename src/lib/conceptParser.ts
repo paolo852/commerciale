@@ -9,9 +9,11 @@ function isPlaceholder(t: string): boolean {
   return /^\[.+\]$/.test(t.trim());
 }
 
-// Handles both Italian (Titolo1/2) and English (Heading1/2) Word styles
+// Handles all common Word heading style names across locales:
+// English: Heading1/2, Italian: Titolo1/2, Portuguese/Spanish: Ttulo1/2,
+// French: Titre1/2, German: berschrift1/2, generic: Title1/2
 function isHeading(style: string): boolean {
-  return /^(Titolo|Heading)\d+$/i.test(style);
+  return /^(heading|titolo|ttulo|titulo|titre|berschrift|title)\d+$/i.test(style);
 }
 
 async function extractParas(file: File): Promise<Para[]> {
@@ -59,14 +61,14 @@ function sectionContent(paras: Para[], needle: string, filterLabels: string[] = 
   return sectionContentFrom(paras, findHeadingIdx(paras, needle), filterLabels);
 }
 
-// Get the value that follows an exact label paragraph
+// Get the value that immediately follows a label paragraph (Label → Value pattern).
+// Only looks 1 paragraph ahead so we never bleed into a sibling label.
 function getAfter(paras: Para[], label: string): string {
-  for (let i = 0; i < paras.length; i++) {
+  for (let i = 0; i < paras.length - 1; i++) {
     if (paras[i].text === label) {
-      for (let j = i + 1; j < paras.length; j++) {
-        if (!isPlaceholder(paras[j].text)) return paras[j].text;
-      }
-      return '';
+      const next = paras[i + 1];
+      if (isHeading(next.style) || isPlaceholder(next.text)) return '';
+      return next.text;
     }
   }
   return '';
