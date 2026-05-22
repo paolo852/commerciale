@@ -58,7 +58,7 @@ export default function Concepts() {
   const [toDelete, setToDelete] = useState<Concept | null>(null);
 
   const counts = useMemo(() => ({
-    all: concepts.length,
+    all: concepts.filter((c) => c.status !== 'promosso').length,
     in_valutazione: concepts.filter((c) => c.status === 'in_valutazione').length,
     promosso: concepts.filter((c) => c.status === 'promosso').length,
     rifiutato: concepts.filter((c) => c.status === 'rifiutato').length,
@@ -82,7 +82,7 @@ export default function Concepts() {
   }, [concepts]);
 
   const visible = useMemo(
-    () => view === 'all' ? concepts : concepts.filter((c) => c.status === view),
+    () => view === 'all' ? concepts.filter((c) => c.status !== 'promosso') : concepts.filter((c) => c.status === view),
     [concepts, view],
   );
 

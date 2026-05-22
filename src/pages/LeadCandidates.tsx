@@ -83,7 +83,7 @@ export default function LeadCandidates() {
   useEffect(() => { void reload(); }, [reload]);
 
   const counts = useMemo(() => ({
-    all: leads.length,
+    all: leads.filter((l) => l.status !== 'promosso').length,
     attivo: leads.filter((l) => l.status === 'attivo').length,
     promosso: leads.filter((l) => l.status === 'promosso').length,
     archiviato: leads.filter((l) => l.status === 'archiviato').length,
@@ -104,7 +104,7 @@ export default function LeadCandidates() {
   const hasUnassigned = useMemo(() => leads.some((l) => !l.pm_id), [leads]);
 
   const filtered = useMemo(() => {
-    let result = tab === 'all' ? leads : leads.filter((l) => l.status === tab);
+    let result = tab === 'all' ? leads.filter((l) => l.status !== 'promosso') : leads.filter((l) => l.status === tab);
     if (filterPmId === '__none__') {
       result = result.filter((l) => !l.pm_id);
     } else if (filterPmId) {
