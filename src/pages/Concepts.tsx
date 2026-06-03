@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarClock, CheckCircle2, Clock, FlaskConical, Plus, Users, X, XCircle } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Clock, FileText, FlaskConical, Plus, Users, X, XCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import { useConceptsData } from '../hooks/useConceptsData';
 import { useOffersData } from '../hooks/useOffersData';
