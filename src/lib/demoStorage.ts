@@ -425,14 +425,12 @@ export const demoNotifications = {
 };
 
 const DEFAULT_PREFS: Omit<NotificationPreferences, 'user_id'> = {
-  in_app_lead_promoted: true,
-  in_app_lead_archived: true,
-  in_app_offer_deadline: true,
-  in_app_concept_status: true,
-  email_lead_promoted: false,
-  email_lead_archived: false,
-  email_offer_deadline: false,
-  email_concept_status: false,
+  in_app_lead_promoted: true,  in_app_lead_archived: true,
+  in_app_offer_deadline: true, in_app_concept_status: true,
+  in_app_task_assigned: true,  in_app_comment_mention: true,
+  email_lead_promoted: false,  email_lead_archived: false,
+  email_offer_deadline: false, email_concept_status: false,
+  email_task_assigned: false,  email_comment_mention: false,
   deadline_days_before: 7,
 };
 

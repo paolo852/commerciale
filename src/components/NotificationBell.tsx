@@ -13,6 +13,8 @@ const TYPE_CONFIG: Record<NotificationType, { Icon: typeof Bell; color: string }
   lead_archived:          { Icon: UserSearch,   color: 'bg-slate-100 text-slate-500' },
   offer_deadline:         { Icon: FileText,      color: 'bg-amber-100 text-amber-600' },
   concept_status_changed: { Icon: FlaskConical,  color: 'bg-indigo-100 text-indigo-600' },
+  task_assigned:          { Icon: CheckCheck,    color: 'bg-violet-100 text-violet-600' },
+  comment_mention:        { Icon: Clock,         color: 'bg-sky-100 text-sky-600' },
 };
 
 function NotifRow({ n, onRead, onClose }: { n: AppNotification; onRead: (id: string) => void; onClose: () => void }) {
