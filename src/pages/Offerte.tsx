@@ -7,7 +7,6 @@ import { offerYear } from '../lib/analytics';
 import YearSelector from '../components/YearSelector';
 import { formatDate, formatEUR } from '../lib/format';
 import {
-  StatusBadge,
   OutcomeBadge,
   TypeBadge,
   OUTCOME_OPTIONS,
