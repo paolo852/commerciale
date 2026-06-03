@@ -5,12 +5,12 @@ import {
   Link2, Percent, Plus, Search, Target, TrendingUp, User, UserSearch, X,
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
-import { leadCandidatesService, fundingCallsService } from '../lib/dataService';
+import { leadCandidatesService, fundingCallsService, conceptsService } from '../lib/dataService';
 import { useOffersData } from '../hooks/useOffersData';
 import { formatDate } from '../lib/format';
 import LeadCandidateFormModal from '../components/leads/LeadCandidateFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { LeadCandidate, LeadCandidateStatus } from '../types';
+import type { Concept, LeadCandidate, LeadCandidateStatus } from '../types';
 
 const STATUS_MAP: Record<LeadCandidateStatus, { label: string; cls: string; Icon: typeof Clock }> = {
   attivo:    { label: 'Attivo',     cls: 'bg-sky-50 text-sky-700 border-sky-200',            Icon: Clock },
@@ -58,6 +58,7 @@ export default function LeadCandidates() {
   const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
 
   const [leads, setLeads] = useState<LeadCandidate[]>([]);
+  const [concepts, setConcepts] = useState<Concept[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<FilterTab>('all');
@@ -76,7 +77,11 @@ export default function LeadCandidates() {
 
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
-    try { setLeads(await leadCandidatesService.list()); }
+    try {
+      const [ls, cs] = await Promise.all([leadCandidatesService.list(), conceptsService.list()]);
+      setLeads(ls);
+      setConcepts(cs);
+    }
     catch (e) { setError((e as { message?: string })?.message ?? 'Errore caricamento'); }
     finally { setLoading(false); }
   }, []);
@@ -442,7 +447,11 @@ export default function LeadCandidates() {
                   </div>
                 ) : groupsWithBando.map(({ label, sub, fcId, leads: groupLeads }) => {
                   const fc = fcById.get(fcId);
-                  const conceptCount = groupLeads.filter((l) => l.promoted_concept_id).length;
+                  const promotedViaLead = new Set(groupLeads.map((l) => l.promoted_concept_id).filter(Boolean));
+                  const directConcepts = concepts.filter(
+                    (c) => c.funding_call_id === fcId && !promotedViaLead.has(c.id)
+                  );
+                  const conceptCount = promotedViaLead.size + directConcepts.length;
                   const offerCount = fc
                     ? offers.filter((o) =>
                         (o.funding_call && o.funding_call.includes(fc.code)) ||
