@@ -5,7 +5,7 @@ import { useNotifications } from '../contexts/NotificationsContext';
 import type { NotificationPreferences } from '../types';
 
 interface EventRow {
-  key: 'lead_promoted' | 'lead_archived' | 'offer_deadline' | 'concept_status';
+  key: 'lead_promoted' | 'lead_archived' | 'offer_deadline' | 'concept_status' | 'task_assigned' | 'comment_mention';
   label: string;
 }
 
@@ -14,6 +14,8 @@ const EVENTS: EventRow[] = [
   { key: 'lead_archived',    label: 'Lead archiviato' },
   { key: 'offer_deadline',   label: 'Scadenza offerta imminente' },
   { key: 'concept_status',   label: 'Cambio stato concept' },
+  { key: 'task_assigned',    label: 'Task assegnato' },
+  { key: 'comment_mention',  label: 'Menzione in un commento' },
 ];
 
 export default function NotificationSettings({ open, onClose }: { open: boolean; onClose: () => void }) {

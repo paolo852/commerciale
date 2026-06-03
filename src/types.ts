@@ -356,7 +356,9 @@ export type NotificationType =
   | 'lead_promoted'
   | 'lead_archived'
   | 'offer_deadline'
-  | 'concept_status_changed';
+  | 'concept_status_changed'
+  | 'task_assigned'
+  | 'comment_mention';
 
 export interface AppNotification {
   id: string;
@@ -376,10 +378,14 @@ export interface NotificationPreferences {
   in_app_lead_archived: boolean;
   in_app_offer_deadline: boolean;
   in_app_concept_status: boolean;
+  in_app_task_assigned: boolean;
+  in_app_comment_mention: boolean;
   email_lead_promoted: boolean;
   email_lead_archived: boolean;
   email_offer_deadline: boolean;
   email_concept_status: boolean;
+  email_task_assigned: boolean;
+  email_comment_mention: boolean;
   deadline_days_before: number;
 }
 

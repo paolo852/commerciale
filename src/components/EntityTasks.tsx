@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, Circle, Paperclip, Plus, Trash2, X } from 'lucide-react';
 import { tasksService } from '../lib/dataService';
+import { useNotifications } from '../contexts/NotificationsContext';
 import type { ProjectManager, Task } from '../types';
 
 interface Props {
@@ -19,6 +20,7 @@ function fileSize(bytes: number): string {
 }
 
 export default function EntityTasks({ entityId, entityType, projectManagers, userId }: Props) {
+  const { notify } = useNotifications();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -54,6 +56,16 @@ export default function EntityTasks({ entityId, entityType, projectManagers, use
       setNewTitle(''); setNewPmId(''); setNewDue(''); setNewFile(null);
       if (fileRef.current) fileRef.current.value = '';
       setShowForm(false);
+      if (created.pm_id) {
+        const pm = projectManagers.find((p) => p.id === created.pm_id);
+        void notify({
+          type: 'task_assigned',
+          title: `Task assegnato: ${created.title}`,
+          body: `Assegnato a ${pm?.name ?? 'PM'}${created.due_date ? ` — scadenza ${created.due_date}` : ''}.`,
+          entity_id: entityId,
+          entity_type: entityType,
+        });
+      }
     } finally { setSaving(false); }
   }
 

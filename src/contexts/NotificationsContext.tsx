@@ -17,10 +17,12 @@ const PREF_KEY: Record<NotificationType, {
   in_app: keyof NotificationPreferences;
   email: keyof NotificationPreferences;
 }> = {
-  lead_promoted:          { in_app: 'in_app_lead_promoted',  email: 'email_lead_promoted' },
-  lead_archived:          { in_app: 'in_app_lead_archived',  email: 'email_lead_archived' },
-  offer_deadline:         { in_app: 'in_app_offer_deadline', email: 'email_offer_deadline' },
-  concept_status_changed: { in_app: 'in_app_concept_status', email: 'email_concept_status' },
+  lead_promoted:          { in_app: 'in_app_lead_promoted',    email: 'email_lead_promoted' },
+  lead_archived:          { in_app: 'in_app_lead_archived',    email: 'email_lead_archived' },
+  offer_deadline:         { in_app: 'in_app_offer_deadline',   email: 'email_offer_deadline' },
+  concept_status_changed: { in_app: 'in_app_concept_status',   email: 'email_concept_status' },
+  task_assigned:          { in_app: 'in_app_task_assigned',    email: 'email_task_assigned' },
+  comment_mention:        { in_app: 'in_app_comment_mention',  email: 'email_comment_mention' },
 };
 
 interface NotificationsContextValue {
