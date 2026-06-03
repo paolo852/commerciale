@@ -69,6 +69,7 @@ export default function EntityTasks({ entityId, entityType, entityName, projectM
           body: `È stato assegnato un nuovo task a ${assignedTo?.name ?? 'PM'}.`,
           entity_id: entityId,
           entity_type: entityType,
+          toEmail: assignedTo?.email ?? undefined,
           fields: [
             { label: 'Assegnato da', value: assignedBy?.name ?? 'Sistema' },
             { label: 'Assegnato a', value: assignedTo?.name ?? '—' },
