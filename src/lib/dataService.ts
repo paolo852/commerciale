@@ -382,6 +382,7 @@ export const conceptsService = {
         description: input.description ?? null,
         status: input.status ?? 'in_valutazione',
         notes: input.notes ?? null,
+        deadline: null,
         promoted_offer_id: null,
         funding_call_id: null,
         concept_data: null,

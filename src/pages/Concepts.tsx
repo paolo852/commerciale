@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Clock, FlaskConical, Plus, Users, X, XCircle } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Clock, FlaskConical, Plus, Users, X, XCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import { useConceptsData } from '../hooks/useConceptsData';
 import { useOffersData } from '../hooks/useOffersData';
@@ -390,7 +390,28 @@ export default function Concepts() {
                   </div>
                 );
               })()}
-              <div className="flex items-center justify-between text-xs text-slate-400 mt-auto pt-2">
+              {c.deadline && (() => {
+                const days = Math.ceil((new Date(c.deadline).getTime() - Date.now()) / 86400000);
+                const past = days < 0;
+                const urgent = !past && days <= 14;
+                const soon = !past && !urgent && days <= 30;
+                const [bg, border, text, badge] = past
+                  ? ['bg-red-50', 'border-red-200', 'text-red-700', 'bg-red-100 text-red-700']
+                  : urgent
+                  ? ['bg-amber-50', 'border-amber-200', 'text-amber-700', 'bg-amber-100 text-amber-700']
+                  : soon
+                  ? ['bg-yellow-50', 'border-yellow-200', 'text-yellow-700', 'bg-yellow-100 text-yellow-700']
+                  : ['bg-emerald-50', 'border-emerald-200', 'text-emerald-700', 'bg-emerald-100 text-emerald-700'];
+                const label = past ? `scaduta ${Math.abs(days)} gg fa` : days === 0 ? 'oggi!' : `tra ${days} gg`;
+                return (
+                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border ${bg} ${border} mt-auto`}>
+                    <CalendarClock className={`w-3.5 h-3.5 shrink-0 ${text}`} />
+                    <span className={`text-xs font-semibold ${text} flex-1`}>{c.deadline}</span>
+                    <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md tabular-nums ${badge}`}>{label}</span>
+                  </div>
+                );
+              })()}
+              <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
                 <span>Creato {formatDate(c.created_at)}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); setToDelete(c); }}

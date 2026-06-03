@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Paperclip } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, CheckCircle2, Clock, Edit3, FileText, Link2, X,
+  ArrowLeft, CalendarClock, CheckCircle2, Clock, Edit3, FileText, Link2, X,
   Trash2, Upload, UserPlus, Users, XCircle,
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
@@ -51,6 +51,8 @@ export default function ConceptDetail() {
   const [toDelete, setToDelete] = useState(false);
   const [editingCall, setEditingCall] = useState(false);
   const [callSaving, setCallSaving] = useState(false);
+  const [editingDeadline, setEditingDeadline] = useState(false);
+  const [deadlineInput, setDeadlineInput] = useState('');
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -242,6 +244,90 @@ export default function ConceptDetail() {
           </button>
         )}
       </div>
+
+      {/* Scadenza concept */}
+      {(() => {
+        const todayMs = Date.now();
+        const dl = concept.deadline;
+        let chip: React.ReactNode = null;
+        if (dl) {
+          const days = Math.ceil((new Date(dl).getTime() - todayMs) / 86400000);
+          const past = days < 0;
+          const urgent = !past && days <= 14;
+          const soon = !past && !urgent && days <= 30;
+          const [bg, border, text, badge] = past
+            ? ['bg-red-50', 'border-red-200', 'text-red-700', 'bg-red-100 text-red-700']
+            : urgent
+            ? ['bg-amber-50', 'border-amber-200', 'text-amber-700', 'bg-amber-100 text-amber-700']
+            : soon
+            ? ['bg-yellow-50', 'border-yellow-200', 'text-yellow-700', 'bg-yellow-100 text-yellow-700']
+            : ['bg-emerald-50', 'border-emerald-200', 'text-emerald-700', 'bg-emerald-100 text-emerald-700'];
+          const label = past ? `scaduta ${Math.abs(days)} gg fa` : days === 0 ? 'oggi!' : `tra ${days} gg`;
+          chip = (
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${bg} ${border}`}>
+              <CalendarClock className={`w-5 h-5 shrink-0 ${text}`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-[11px] font-semibold uppercase tracking-wide ${text} opacity-70`}>Scadenza concept</p>
+                <p className={`text-sm font-bold ${text}`}>{dl}</p>
+              </div>
+              <span className={`text-xs font-bold px-2 py-1 rounded-lg tabular-nums shrink-0 ${badge}`}>{label}</span>
+              <button type="button" onClick={() => { setEditingDeadline(true); setDeadlineInput(dl); }}
+                className={`shrink-0 text-xs font-medium ${text} hover:opacity-80 transition`}>Modifica</button>
+            </div>
+          );
+        }
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <CalendarClock className="w-3.5 h-3.5" /> Scadenza concept
+            </p>
+            {editingDeadline ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  autoFocus
+                  value={deadlineInput}
+                  onChange={(e) => setDeadlineInput(e.target.value)}
+                  className="flex-1 text-sm px-3 py-2 border border-indigo-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await conceptsService.update(concept.id, { deadline: deadlineInput || null });
+                    await reload();
+                    setEditingDeadline(false);
+                  }}
+                  className="px-3 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition"
+                >✓</button>
+                {dl && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await conceptsService.update(concept.id, { deadline: null });
+                      await reload();
+                      setEditingDeadline(false);
+                    }}
+                    className="px-3 py-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition"
+                  >Rimuovi</button>
+                )}
+                <button type="button" onClick={() => setEditingDeadline(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 transition">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : chip ? chip : (
+              <button
+                type="button"
+                onClick={() => { setEditingDeadline(true); setDeadlineInput(''); }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300 hover:border-slate-400 text-slate-500 hover:text-slate-700 text-sm font-medium rounded-xl transition"
+              >
+                <CalendarClock className="w-4 h-4" />
+                Imposta scadenza
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <AssigneesSection conceptId={concept.id} assignees={assignees} projectManagers={projectManagers} onChange={reload} />

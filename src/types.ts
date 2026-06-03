@@ -190,6 +190,7 @@ export interface Concept {
   description: string | null;
   status: ConceptStatus;
   notes: string | null;
+  deadline: string | null;
   promoted_offer_id: string | null;
   funding_call_id: string | null;
   concept_data: ConceptTemplateData | null;
@@ -198,7 +199,7 @@ export interface Concept {
 }
 
 export type CreateConceptForm = Pick<Concept, 'name' | 'pi' | 'ente' | 'description' | 'status' | 'notes'>;
-export type UpdateConceptForm = Partial<CreateConceptForm & Pick<Concept, 'promoted_offer_id' | 'funding_call_id' | 'concept_data'>>;
+export type UpdateConceptForm = Partial<CreateConceptForm & Pick<Concept, 'promoted_offer_id' | 'funding_call_id' | 'deadline' | 'concept_data'>>;
 
 export interface ConceptAssignee {
   concept_id: string;
