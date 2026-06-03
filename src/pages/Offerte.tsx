@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, ChevronDown, ChevronUp, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, ChevronUp, PauseCircle, Pencil, Plus, Search, Send, SlidersHorizontal, X } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
 import { offerYear } from '../lib/analytics';
@@ -10,7 +10,6 @@ import {
   StatusBadge,
   OutcomeBadge,
   TypeBadge,
-  STATUS_OPTIONS,
   OUTCOME_OPTIONS,
   TYPE_OPTIONS,
 } from '../components/Badges';
@@ -20,11 +19,10 @@ import type { Offer, OfferOutcome, OfferStatus, OfferType } from '../types';
 
 type SortBy = 'deadline' | 'budget' | 'created_at' | 'name';
 type SortDir = 'asc' | 'desc';
-type ViewTab = 'all' | 'in_corso' | 'approvate' | 'respinte';
+type ViewTab = 'in_lavorazione' | 'presentata' | 'ferma';
 
 interface Filters {
   search: string;
-  status: OfferStatus | 'all';
   outcome: OfferOutcome | 'all';
   type: OfferType | 'all';
   projectManagerId: string | 'all';
@@ -32,19 +30,8 @@ interface Filters {
   year: number | 'all';
 }
 
-function matchesView(o: Offer, view: ViewTab): boolean {
-  switch (view) {
-    case 'all': return true;
-    case 'in_corso': return o.outcome === 'nessuno';
-    case 'approvate': return o.outcome === 'approvato';
-    case 'respinte': return o.outcome === 'rifiutato';
-  }
-}
-
 const selectClass =
   'px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
-
-// ── helpers to read/write URL params ────────────────────────────
 
 function sp(params: URLSearchParams, key: string, fallback: string): string {
   return params.get(key) ?? fallback;
@@ -54,7 +41,6 @@ function filtersFromParams(params: URLSearchParams): Filters {
   const year = params.get('year');
   return {
     search: sp(params, 'q', ''),
-    status: sp(params, 'status', 'all') as Filters['status'],
     outcome: sp(params, 'outcome', 'all') as Filters['outcome'],
     type: sp(params, 'type', 'all') as Filters['type'],
     projectManagerId: sp(params, 'pm', 'all'),
@@ -66,7 +52,6 @@ function filtersFromParams(params: URLSearchParams): Filters {
 function applyFilters(params: URLSearchParams, f: Filters): URLSearchParams {
   const next = new URLSearchParams(params);
   f.search ? next.set('q', f.search) : next.delete('q');
-  f.status !== 'all' ? next.set('status', f.status) : next.delete('status');
   f.outcome !== 'all' ? next.set('outcome', f.outcome) : next.delete('outcome');
   f.type !== 'all' ? next.set('type', f.type) : next.delete('type');
   f.projectManagerId !== 'all' ? next.set('pm', f.projectManagerId) : next.delete('pm');
@@ -80,8 +65,7 @@ export default function Offerte() {
   const { offers, projectManagers, fundingCalls, loading, error, reload } = useOffersData();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // All filter/view/sort state lives in the URL so back-navigation restores it
-  const view = sp(searchParams, 'view', 'in_corso') as ViewTab;
+  const view = sp(searchParams, 'view', 'in_lavorazione') as ViewTab;
   const sortBy = sp(searchParams, 'sort', 'deadline') as SortBy;
   const sortDir = sp(searchParams, 'dir', 'asc') as SortDir;
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
@@ -95,7 +79,7 @@ export default function Offerte() {
   function clearFilters() {
     setSearchParams((p) => {
       const n = new URLSearchParams(p);
-      ['q','status','outcome','type','pm','call','year'].forEach((k) => n.delete(k));
+      ['q', 'outcome', 'type', 'pm', 'call', 'year'].forEach((k) => n.delete(k));
       return n;
     }, { replace: true });
   }
@@ -112,7 +96,6 @@ export default function Offerte() {
     }, { replace: true });
   }
 
-  // Ephemeral UI state (not persisted in URL)
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Offer | null>(null);
@@ -125,7 +108,6 @@ export default function Offerte() {
 
   const isFiltered =
     filters.search ||
-    filters.status !== 'all' ||
     filters.outcome !== 'all' ||
     filters.type !== 'all' ||
     filters.projectManagerId !== 'all' ||
@@ -135,20 +117,19 @@ export default function Offerte() {
     () => filters.year === 'all' ? offers : offers.filter((o) => offerYear(o) === filters.year),
     [offers, filters.year],
   );
+
   const tabCounts = useMemo(() => ({
-    all: yearScopedOffers.length,
-    in_corso: yearScopedOffers.filter((o) => matchesView(o, 'in_corso')).length,
-    approvate: yearScopedOffers.filter((o) => matchesView(o, 'approvate')).length,
-    respinte: yearScopedOffers.filter((o) => matchesView(o, 'respinte')).length,
+    in_lavorazione: yearScopedOffers.filter((o) => o.status === 'in_lavorazione').length,
+    presentata: yearScopedOffers.filter((o) => o.status === 'presentata').length,
+    ferma: yearScopedOffers.filter((o) => o.status === 'ferma').length,
   }), [yearScopedOffers]);
 
   const visibleOffers = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
     const filtered = offers.filter((o) => {
-      if (!matchesView(o, view)) return false;
+      if (o.status !== view) return false;
       if (filters.year !== 'all' && offerYear(o) !== filters.year) return false;
       if (search && !o.name.toLowerCase().includes(search)) return false;
-      if (filters.status !== 'all' && o.status !== filters.status) return false;
       if (filters.outcome !== 'all' && o.outcome !== filters.outcome) return false;
       if (filters.type !== 'all' && o.type !== filters.type) return false;
       if (filters.projectManagerId !== 'all') {
@@ -211,8 +192,15 @@ export default function Offerte() {
   const allSelected = visibleOffers.length > 0 && visibleOffers.every((o) => selected.has(o.id));
   const thClass = 'px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider';
 
+  const STATUS_OPTIONS_BULK: { value: OfferStatus; label: string }[] = [
+    { value: 'in_lavorazione', label: 'In lavorazione' },
+    { value: 'presentata', label: 'Presentata' },
+    { value: 'ferma', label: 'Ferma' },
+  ];
+
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Offerte</h1>
@@ -231,41 +219,72 @@ export default function Offerte() {
         <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-          {([
-            { id: 'all', label: 'Tutte' },
-            { id: 'in_corso', label: 'In corso' },
-            { id: 'approvate', label: 'Approvate' },
-            { id: 'respinte', label: 'Respinte' },
-          ] as const).map(({ id, label }) => {
-            const active = view === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setView(id)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                  active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {label}
-                <span className={`text-xs px-1.5 py-0.5 rounded-md tabular-nums ${
-                  active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/70 text-slate-500'
-                }`}>
-                  {tabCounts[id]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+      {/* Status toggle buttons */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* In lavorazione */}
+        <button
+          onClick={() => setView('in_lavorazione')}
+          className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border-2 transition-all font-medium text-sm ${
+            view === 'in_lavorazione'
+              ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200'
+              : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700'
+          }`}
+        >
+          <Pencil className="w-4 h-4 shrink-0" />
+          <span className="font-semibold">In lavorazione</span>
+          <span className={`text-sm font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center tabular-nums ${
+            view === 'in_lavorazione' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {tabCounts.in_lavorazione}
+          </span>
+        </button>
 
-        <YearSelector
-          offers={offers}
-          value={filters.year}
-          onChange={(year) => setFilters({ ...filters, year })}
-        />
+        {/* Presentata */}
+        <button
+          onClick={() => setView('presentata')}
+          className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border-2 transition-all font-medium text-sm ${
+            view === 'presentata'
+              ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200'
+              : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-700'
+          }`}
+        >
+          <Send className="w-4 h-4 shrink-0" />
+          <span className="font-semibold">Presentata</span>
+          <span className={`text-sm font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center tabular-nums ${
+            view === 'presentata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {tabCounts.presentata}
+          </span>
+        </button>
+
+        {/* Ferma — smaller secondary button */}
+        <button
+          onClick={() => setView('ferma')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-sm ${
+            view === 'ferma'
+              ? 'bg-amber-500 border-amber-500 text-white shadow-sm shadow-amber-200'
+              : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-600'
+          }`}
+        >
+          <PauseCircle className="w-3.5 h-3.5 shrink-0" />
+          <span>Ferma</span>
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
+            view === 'ferma' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+          }`}>
+            {tabCounts.ferma}
+          </span>
+        </button>
+
+        <div className="ml-auto">
+          <YearSelector
+            offers={offers}
+            value={filters.year}
+            onChange={(year) => setFilters({ ...filters, year })}
+          />
+        </div>
       </div>
 
+      {/* Search + filter toggle */}
       <div className="flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -289,20 +308,17 @@ export default function Offerte() {
           Filtri
           {isFiltered && (
             <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center font-medium">
-              {[filters.status, filters.outcome, filters.type, filters.projectManagerId, filters.fundingCall]
+              {[filters.outcome, filters.type, filters.projectManagerId, filters.fundingCall]
                 .filter((v) => v !== 'all').length}
             </span>
           )}
         </button>
       </div>
 
+      {/* Filter panel */}
       {filtersOpen && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value as Filters['status'] })} className={selectClass}>
-              <option value="all">Tutti gli stati</option>
-              {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <select value={filters.outcome} onChange={(e) => setFilters({ ...filters, outcome: e.target.value as Filters['outcome'] })} className={selectClass}>
               <option value="all">Tutti gli esiti</option>
               {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -329,12 +345,13 @@ export default function Offerte() {
         </div>
       )}
 
+      {/* Bulk action bar */}
       {selected.size > 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium text-indigo-900">{selected.size} selezionate</span>
           <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value as OfferStatus | '')} className="px-3 py-1.5 text-sm border border-indigo-200 rounded-lg bg-white">
             <option value="">Cambia stato in…</option>
-            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {STATUS_OPTIONS_BULK.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
           <button onClick={applyBulkStatus} disabled={!bulkStatus || bulkBusy} className="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60">
             {bulkBusy ? 'Aggiornamento…' : 'Applica'}
@@ -343,6 +360,7 @@ export default function Offerte() {
         </div>
       )}
 
+      {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -365,17 +383,18 @@ export default function Offerte() {
                   <button onClick={() => toggleSort('budget')} className="inline-flex items-center gap-1.5 ml-auto">Importo <SortIcon col="budget" /></button>
                 </th>
                 <th className={`${thClass} text-right`}>Prob.</th>
-                <th className={thClass}>Stato</th>
                 <th className={thClass}>Esito</th>
                 <th className={`${thClass} text-right`} />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr><td colSpan={11} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
+                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
               ) : visibleOffers.length === 0 ? (
-                <tr><td colSpan={11} className="text-center py-12 text-slate-400 text-sm">
-                  {offers.length === 0 ? 'Nessuna offerta. Clicca "+ Nuova offerta" per iniziare.' : 'Nessuna offerta corrisponde ai filtri.'}
+                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">
+                  {offers.length === 0
+                    ? 'Nessuna offerta. Clicca "+ Nuova offerta" per iniziare.'
+                    : `Nessuna offerta ${view === 'in_lavorazione' ? 'in lavorazione' : view === 'presentata' ? 'presentata' : 'ferma'}${isFiltered ? ' corrisponde ai filtri' : ''}.`}
                 </td></tr>
               ) : visibleOffers.map((o) => {
                 const pm = o.project_manager_id ? pmById.get(o.project_manager_id) : undefined;
@@ -401,7 +420,6 @@ export default function Offerte() {
                         (o.probability ?? 50) >= 40 ? 'text-amber-600' : 'text-red-500'
                       }`}>{o.probability ?? 50}%</span>
                     </td>
-                    <td className="px-4 py-3.5"><StatusBadge value={o.status} /></td>
                     <td className="px-4 py-3.5"><OutcomeBadge value={o.outcome} /></td>
                     <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => setToDelete(o)} className="text-xs text-slate-400 hover:text-red-600 transition">Elimina</button>
@@ -414,7 +432,7 @@ export default function Offerte() {
         </div>
         {visibleOffers.length > 0 && (
           <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
-            <p className="text-xs text-slate-400">{visibleOffers.length} di {offers.length} offerte</p>
+            <p className="text-xs text-slate-400">{visibleOffers.length} di {tabCounts[view]} offerte {view === 'in_lavorazione' ? 'in lavorazione' : view === 'presentata' ? 'presentate' : 'ferme'}</p>
           </div>
         )}
       </div>
