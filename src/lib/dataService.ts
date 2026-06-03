@@ -188,6 +188,16 @@ export const projectManagersService = {
     return data as ProjectManager | null;
   },
 
+  async getByEmail(email: string): Promise<ProjectManager | null> {
+    if (isDemoMode) {
+      return demoProjectManagers.list().find((p) => p.email === email) ?? null;
+    }
+    const { data, error } = await ensureSb()
+      .from('project_managers').select('*').eq('email', email).maybeSingle();
+    if (error) throw error;
+    return data as ProjectManager | null;
+  },
+
   async uploadAvatar(pm: ProjectManager, file: File): Promise<ProjectManager> {
     let avatar_url: string;
     if (isDemoMode) {

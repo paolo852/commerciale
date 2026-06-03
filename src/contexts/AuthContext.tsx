@@ -42,8 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refreshCurrentPm = useCallback(async () => {
-    if (!user) { setCurrentPm(null); return; }
-    try { setCurrentPm(await projectManagersService.getByUserId(user.id)); }
+    if (!user?.email) { setCurrentPm(null); return; }
+    try { setCurrentPm(await projectManagersService.getByEmail(user.email)); }
     catch { /* ignore */ }
   }, [user]);
 
