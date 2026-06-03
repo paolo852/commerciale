@@ -77,6 +77,8 @@ export default function Concepts() {
   }, [leads, concepts]);
 
 
+  const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
+
   const counts = useMemo(() => ({
     all: concepts.filter((c) => c.status !== 'promosso').length,
     in_valutazione: concepts.filter((c) => c.status === 'in_valutazione').length,
@@ -309,6 +311,17 @@ export default function Concepts() {
                   {c.ente && <span>{c.ente}</span>}
                 </p>
               )}
+              {(() => {
+                const fcId = conceptCallMap.get(c.id);
+                const fc = fcId ? fcById.get(fcId) : null;
+                if (!fc) return null;
+                return (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 truncate max-w-full">
+                    <FileText className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{fc.name}</span>
+                  </span>
+                );
+              })()}
               {c.description && (
                 <p className="text-sm text-slate-600 line-clamp-3">{c.description}</p>
               )}
