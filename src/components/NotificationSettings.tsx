@@ -99,10 +99,9 @@ export default function NotificationSettings({ open, onClose }: { open: boolean;
           </select>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 leading-relaxed">
-          <span className="font-semibold">Notifiche email</span> richiedono la configurazione
-          dell'Edge Function Supabase con Resend. Vedi{' '}
-          <code className="font-mono bg-amber-100 px-1 rounded">supabase/functions/send-notification-email/</code>.
+        <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-600 leading-relaxed">
+          Le notifiche email vengono inviate tramite <span className="font-semibold">Brevo</span>. Assicurati che la variabile{' '}
+          <code className="font-mono bg-slate-100 px-1 rounded">BREVO_API_KEY</code> sia configurata nelle impostazioni Supabase.
         </div>
 
         <div className="flex justify-end gap-2">
