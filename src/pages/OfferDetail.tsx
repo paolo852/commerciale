@@ -190,6 +190,7 @@ export default function OfferDetail() {
         <EntityTasks
           entityId={offer.id}
           entityType="offer"
+          entityName={offer.name}
           projectManagers={projectManagers}
           userId={user.id}
         />

@@ -252,6 +252,7 @@ export default function LeadCandidateDetail() {
         <EntityTasks
           entityId={lead.id}
           entityType="lead"
+          entityName={lead.researcher_name}
           projectManagers={projectManagers}
           userId={user.id}
         />

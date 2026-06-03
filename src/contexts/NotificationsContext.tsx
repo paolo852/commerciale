@@ -10,6 +10,7 @@ export interface NotifyInput {
   body?: string;
   entity_id?: string;
   entity_type?: 'lead' | 'concept' | 'offer';
+  fields?: Array<{ label: string; value: string }>;
 }
 
 // Maps each notification type to its preference keys
@@ -103,7 +104,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         : null;
       const url = entityPath ? `${window.location.origin}${entityPath}` : null;
       void supabase.functions.invoke('send-notification-email', {
-        body: { to: user.email, subject: input.title, body: input.body ?? input.title, url },
+        body: { to: user.email, subject: input.title, body: input.body ?? input.title, url, fields: input.fields ?? null },
       }).catch(() => { /* non-critical */ });
     }
   }, [user, prefs]);

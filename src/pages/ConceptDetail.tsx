@@ -339,6 +339,7 @@ export default function ConceptDetail() {
         <EntityTasks
           entityId={concept.id}
           entityType="concept"
+          entityName={concept.name}
           projectManagers={projectManagers}
           userId={user.id}
         />

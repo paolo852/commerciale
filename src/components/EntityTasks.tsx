@@ -7,6 +7,7 @@ import type { ProjectManager, Task } from '../types';
 interface Props {
   entityId: string;
   entityType: 'lead' | 'concept' | 'offer';
+  entityName?: string;
   projectManagers: ProjectManager[];
   userId: string;
 }
@@ -19,7 +20,7 @@ function fileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function EntityTasks({ entityId, entityType, projectManagers, userId }: Props) {
+export default function EntityTasks({ entityId, entityType, entityName, projectManagers, userId }: Props) {
   const { notify } = useNotifications();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -57,13 +58,22 @@ export default function EntityTasks({ entityId, entityType, projectManagers, use
       if (fileRef.current) fileRef.current.value = '';
       setShowForm(false);
       if (created.pm_id) {
-        const pm = projectManagers.find((p) => p.id === created.pm_id);
+        const assignedTo = projectManagers.find((p) => p.id === created.pm_id);
+        const assignedBy = projectManagers.find((p) => p.user_id === userId);
+        const entityTypeLabel: Record<string, string> = { lead: 'Lead', concept: 'Concept', offer: 'Offerta' };
         void notify({
           type: 'task_assigned',
           title: `Task assegnato: ${created.title}`,
-          body: `Assegnato a ${pm?.name ?? 'PM'}${created.due_date ? ` — scadenza ${created.due_date}` : ''}.`,
+          body: `È stato assegnato un nuovo task a ${assignedTo?.name ?? 'PM'}.`,
           entity_id: entityId,
           entity_type: entityType,
+          fields: [
+            { label: 'Assegnato da', value: assignedBy?.name ?? 'Sistema' },
+            { label: 'Assegnato a', value: assignedTo?.name ?? '—' },
+            { label: 'Progetto', value: `${entityTypeLabel[entityType] ?? entityType}${entityName ? `: ${entityName}` : ''}` },
+            { label: 'Task', value: created.title },
+            { label: 'Scadenza', value: created.due_date ?? 'Non definita' },
+          ],
         });
       }
     } finally { setSaving(false); }

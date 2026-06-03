@@ -9,11 +9,14 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface Field { label: string; value: string }
+
 interface Payload {
   to: string;
   subject: string;
   body: string;
   url?: string | null;
+  fields?: Field[] | null;
 }
 
 serve(async (req) => {
@@ -44,11 +47,21 @@ serve(async (req) => {
     });
   }
 
+  const fieldsTable = payload.fields && payload.fields.length > 0
+    ? `<table style="width:100%; border-collapse:collapse; margin-top:16px; font-size:14px;">
+        ${payload.fields.map((f, i) => `
+        <tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'};">
+          <td style="padding:8px 12px; color:#64748b; font-weight:600; white-space:nowrap; width:35%;">${f.label}</td>
+          <td style="padding:8px 12px; color:#1e293b;">${f.value}</td>
+        </tr>`).join('')}
+       </table>`
+    : '';
+
   const ctaButton = payload.url
-    ? `<div style="margin-top: 20px;">
+    ? `<div style="margin-top:24px;">
         <a href="${payload.url}"
-           style="display: inline-block; padding: 10px 20px; background-color: #6366f1; color: #ffffff;
-                  text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">
+           style="display:inline-block; padding:10px 22px; background-color:#6366f1; color:#ffffff;
+                  text-decoration:none; border-radius:8px; font-size:14px; font-weight:600;">
           Apri →
         </a>
        </div>`
@@ -58,12 +71,29 @@ serve(async (req) => {
 <!DOCTYPE html>
 <html lang="it">
 <head><meta charset="UTF-8"></head>
-<body style="font-family: sans-serif; color: #1e293b; padding: 24px; max-width: 600px; margin: 0 auto;">
-  <div style="border-left: 4px solid #6366f1; padding-left: 16px; margin-bottom: 24px;">
-    <p style="margin: 0; font-size: 15px; line-height: 1.6;">${payload.body.replace(/\n/g, '<br>')}</p>
-    ${ctaButton}
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:32px 16px;">
+  <div style="max-width:580px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+
+    <!-- Header -->
+    <div style="background:#6366f1; padding:20px 28px;">
+      <p style="margin:0; font-size:13px; font-weight:600; color:#c7d2fe; letter-spacing:0.05em; text-transform:uppercase;">Gestione Commerciale</p>
+      <h1 style="margin:4px 0 0; font-size:18px; font-weight:700; color:#ffffff;">${payload.subject}</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:24px 28px;">
+      <p style="margin:0 0 4px; font-size:15px; color:#334155; line-height:1.6;">${payload.body.replace(/\n/g, '<br>')}</p>
+
+      ${fieldsTable}
+      ${ctaButton}
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:16px 28px; border-top:1px solid #e2e8f0; background:#f8fafc;">
+      <p style="margin:0; font-size:12px; color:#94a3b8;">Notifica automatica — non rispondere a questa email.</p>
+    </div>
+
   </div>
-  <p style="margin: 0; font-size: 12px; color: #94a3b8;">Gestione Commerciale — notifica automatica</p>
 </body>
 </html>`;
 
