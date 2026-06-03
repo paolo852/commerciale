@@ -4,7 +4,7 @@ import { CalendarClock, CheckCircle2, Clock, FileText, FlaskConical, Plus, Users
 import Avatar from '../components/Avatar';
 import { useConceptsData } from '../hooks/useConceptsData';
 import { useOffersData } from '../hooks/useOffersData';
-import { conceptsService, leadCandidatesService } from '../lib/dataService';
+import { conceptsService, conceptFieldCommentsService, leadCandidatesService } from '../lib/dataService';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -59,9 +59,11 @@ export default function Concepts() {
   const [filterPmId, setFilterPmId] = useState<string | null>(null);
   const [filterCallId, setFilterCallId] = useState<string | null>(null);
   const [leads, setLeads] = useState<LeadCandidate[]>([]);
+  const [lastConceptUpdate, setLastConceptUpdate] = useState<Map<string, { created_at: string; author_name: string }>>(new Map());
 
   useEffect(() => {
     leadCandidatesService.list().then(setLeads).catch(() => {});
+    conceptFieldCommentsService.latestPerConcept().then(setLastConceptUpdate).catch(() => {});
   }, []);
 
   // concept id → funding call id (direct field takes priority, fallback to promoted leads)
@@ -424,15 +426,27 @@ export default function Concepts() {
                   </div>
                 );
               })()}
-              <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
-                <span>Creato {formatDate(c.created_at)}</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setToDelete(c); }}
-                  className="text-slate-300 hover:text-red-600 transition"
-                >
-                  Elimina
-                </button>
-              </div>
+              {(() => {
+                const lu = lastConceptUpdate.get(c.id);
+                return (
+                  <div className="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-100">
+                    {lu ? (
+                      <span className="flex items-center gap-1 min-w-0">
+                        <Clock className="w-3 h-3 shrink-0" />
+                        <span className="truncate">Agg. {formatDate(lu.created_at)} · <span className="font-medium text-slate-500">{lu.author_name}</span></span>
+                      </span>
+                    ) : (
+                      <span>Creato {formatDate(c.created_at)}</span>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setToDelete(c); }}
+                      className="text-slate-300 hover:text-red-600 transition shrink-0 ml-2"
+                    >
+                      Elimina
+                    </button>
+                  </div>
+                );
+              })()}
             </button>
           ))}
         </div>

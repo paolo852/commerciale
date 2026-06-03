@@ -952,6 +952,24 @@ export const leadUpdatesService = {
     const { error } = await ensureSb().from('lead_updates').delete().eq('id', id);
     if (error) throw error;
   },
+
+  async latestPerLead(): Promise<Map<string, { created_at: string; author_name: string }>> {
+    const m = new Map<string, { created_at: string; author_name: string }>();
+    if (isDemoMode) {
+      const all = demoLeadUpdates.listAll().sort((a, b) => b.created_at.localeCompare(a.created_at));
+      for (const u of all) if (!m.has(u.lead_id)) m.set(u.lead_id, { created_at: u.created_at, author_name: u.author_name });
+      return m;
+    }
+    const { data, error } = await ensureSb()
+      .from('lead_updates')
+      .select('lead_id, created_at, author_name')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    for (const row of (data ?? [])) {
+      if (!m.has(row.lead_id)) m.set(row.lead_id, { created_at: row.created_at, author_name: row.author_name });
+    }
+    return m;
+  },
 };
 
 // ================================================================
@@ -1208,5 +1226,23 @@ export const conceptFieldCommentsService = {
     if (isDemoMode) { demoConceptFieldComments.remove(id); return; }
     const { error } = await ensureSb().from('concept_field_comments').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  async latestPerConcept(): Promise<Map<string, { created_at: string; author_name: string }>> {
+    const m = new Map<string, { created_at: string; author_name: string }>();
+    if (isDemoMode) {
+      const all = demoConceptFieldComments.listAll().sort((a, b) => b.created_at.localeCompare(a.created_at));
+      for (const c of all) if (!m.has(c.concept_id)) m.set(c.concept_id, { created_at: c.created_at, author_name: c.author_name });
+      return m;
+    }
+    const { data, error } = await ensureSb()
+      .from('concept_field_comments')
+      .select('concept_id, created_at, author_name')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    for (const row of (data ?? [])) {
+      if (!m.has(row.concept_id)) m.set(row.concept_id, { created_at: row.created_at, author_name: row.author_name });
+    }
+    return m;
   },
 };

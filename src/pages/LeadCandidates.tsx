@@ -5,7 +5,7 @@ import {
   Link2, Percent, Plus, Search, Target, TrendingUp, User, UserSearch, X,
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
-import { leadCandidatesService, fundingCallsService, conceptsService } from '../lib/dataService';
+import { leadCandidatesService, leadUpdatesService, fundingCallsService, conceptsService } from '../lib/dataService';
 import { useOffersData } from '../hooks/useOffersData';
 import { formatDate } from '../lib/format';
 import LeadCandidateFormModal from '../components/leads/LeadCandidateFormModal';
@@ -59,6 +59,7 @@ export default function LeadCandidates() {
 
   const [leads, setLeads] = useState<LeadCandidate[]>([]);
   const [concepts, setConcepts] = useState<Concept[]>([]);
+  const [lastLeadUpdate, setLastLeadUpdate] = useState<Map<string, { created_at: string; author_name: string }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<FilterTab>('all');
@@ -78,9 +79,14 @@ export default function LeadCandidates() {
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [ls, cs] = await Promise.all([leadCandidatesService.list(), conceptsService.list()]);
+      const [ls, cs, llu] = await Promise.all([
+        leadCandidatesService.list(),
+        conceptsService.list(),
+        leadUpdatesService.latestPerLead(),
+      ]);
       setLeads(ls);
       setConcepts(cs);
+      setLastLeadUpdate(llu);
     }
     catch (e) { setError((e as { message?: string })?.message ?? 'Errore caricamento'); }
     finally { setLoading(false); }
@@ -218,6 +224,7 @@ export default function LeadCandidates() {
 
   function LeadCard({ lead, showAssign }: { lead: LeadCandidate; showAssign: boolean }) {
     const isAssigning = assigningId === lead.id;
+    const lastUpdate = lastLeadUpdate.get(lead.id);
     return (
       <div
         onClick={() => !isAssigning && navigate(`/leads/${lead.id}`)}
@@ -307,6 +314,12 @@ export default function LeadCandidates() {
             <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
           </div>
         </div>
+        {lastUpdate && (
+          <div className="flex items-center gap-1 text-[11px] text-slate-400 border-t border-slate-100 pt-1.5 -mx-0.5">
+            <Clock className="w-3 h-3 shrink-0" />
+            <span>Agg. {formatDate(lastUpdate.created_at)} · <span className="font-medium text-slate-500">{lastUpdate.author_name}</span></span>
+          </div>
+        )}
       </div>
     );
   }

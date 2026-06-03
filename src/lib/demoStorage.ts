@@ -376,6 +376,9 @@ export const demoLeadCandidates = {
 };
 
 export const demoLeadUpdates = {
+  listAll(): LeadUpdate[] {
+    return read<LeadUpdate[]>(KEYS.leadUpdates, []);
+  },
   list(leadId: string): LeadUpdate[] {
     return read<LeadUpdate[]>(KEYS.leadUpdates, [])
       .filter((u) => u.lead_id === leadId)
@@ -506,6 +509,9 @@ export const demoConceptFiles = {
 // ============================================================
 
 export const demoConceptFieldComments = {
+  listAll(): ConceptFieldComment[] {
+    return read<ConceptFieldComment[]>(KEYS.conceptFieldComments, []);
+  },
   list(conceptId: string): ConceptFieldComment[] {
     return read<ConceptFieldComment[]>(KEYS.conceptFieldComments, [])
       .filter((c) => c.concept_id === conceptId)
