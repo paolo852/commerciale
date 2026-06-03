@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { notificationsService, notificationPrefsService } from '../lib/dataService';
 import { isDemoMode, supabase } from '../lib/supabase';
@@ -40,10 +40,25 @@ interface NotificationsContextValue {
 
 const Ctx = createContext<NotificationsContextValue | null>(null);
 
+function showBrowserNotif(title: string, body?: string | null) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if (!document.hidden && document.hasFocus()) return; // tab is visible & focused — in-app bell is enough
+  new Notification(title, { body: body ?? undefined, icon: '/favicon.ico' });
+}
+
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
+  const seenIds = useRef(new Set<string>());
+  const initialised = useRef(false);
+
+  // Request browser notification permission once when logged in
+  useEffect(() => {
+    if (user && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      void Notification.requestPermission();
+    }
+  }, [user]);
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -52,6 +67,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         notificationsService.list(user.id),
         notificationPrefsService.get(user.id),
       ]);
+      // Show browser notification for any notification that arrived after first load
+      if (initialised.current) {
+        notifs.filter((n) => !seenIds.current.has(n.id)).forEach((n) => showBrowserNotif(n.title, n.body));
+      }
+      seenIds.current = new Set(notifs.map((n) => n.id));
+      initialised.current = true;
       setNotifications(notifs);
       setPrefs(p);
     } catch { /* silent */ }
@@ -71,7 +92,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           event: 'INSERT', schema: 'public', table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         }, (payload) => {
-          setNotifications((prev) => [payload.new as AppNotification, ...prev]);
+          const notif = payload.new as AppNotification;
+          setNotifications((prev) => [notif, ...prev]);
+          showBrowserNotif(notif.title, notif.body);
         })
         .subscribe();
       return () => {

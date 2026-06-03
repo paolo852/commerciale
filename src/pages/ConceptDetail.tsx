@@ -353,6 +353,8 @@ export default function ConceptDetail() {
           await conceptsService.update(concept.id, { concept_data: templateData });
           await reload();
         }}
+        projectManagers={projectManagers}
+        currentUserName={projectManagers.find((p) => p.email && p.email === user?.email)?.name ?? user?.email}
       />
 
       {/* Documenti tecnologia */}

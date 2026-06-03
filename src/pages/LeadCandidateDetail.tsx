@@ -12,6 +12,8 @@ import { formatDate } from '../lib/format';
 import LeadCandidateFormModal from '../components/leads/LeadCandidateFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EntityTasks from '../components/EntityTasks';
+import MentionTextarea from '../components/MentionTextarea';
+import { sendMentionNotifications } from '../lib/mentionNotify';
 import type { LeadCandidate, LeadCandidateStatus, LeadUpdate, ProjectManager } from '../types';
 
 const STATUS_MAP: Record<LeadCandidateStatus, { label: string; cls: string; Icon: typeof Clock }> = {
@@ -37,6 +39,7 @@ export default function LeadCandidateDetail() {
 
   // New update form
   const [newBody, setNewBody] = useState('');
+  const [newMentions, setNewMentions] = useState<string[]>([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [posting, setPosting] = useState(false);
@@ -82,7 +85,11 @@ export default function LeadCandidateDetail() {
         attachFile ?? undefined,
         user?.id,
       );
+      const authorName = currentPm?.name ?? user?.email ?? 'Anonimo';
+      const pmById = new Map(projectManagers.map((p) => [p.id, p]));
+      void sendMentionNotifications(newMentions, pmById, authorName, newBody.trim(), window.location.href);
       setNewBody('');
+      setNewMentions([]);
       setAttachFile(null);
       await reload();
     } catch (e) {
@@ -310,11 +317,14 @@ export default function LeadCandidateDetail() {
           </label>
           <div className="flex gap-2 items-end">
             <div className="flex-1 space-y-2">
-              <textarea
+              <MentionTextarea
                 rows={3}
                 value={newBody}
-                onChange={(e) => setNewBody(e.target.value)}
-                placeholder="Descrivi l'interazione avuta, le note del colloquio, i prossimi passi…"
+                onChange={setNewBody}
+                mentions={newMentions}
+                onMentionsChange={setNewMentions}
+                projectManagers={projectManagers}
+                placeholder="Descrivi l'interazione avuta, le note del colloquio, i prossimi passi… (usa @ per menzionare)"
                 disabled={posting}
                 className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none disabled:opacity-50"
               />

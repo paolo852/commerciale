@@ -5,12 +5,16 @@ import {
 } from 'lucide-react';
 import { parseConceptDocx } from '../../lib/conceptParser';
 import { conceptFieldCommentsService } from '../../lib/dataService';
-import type { ConceptFieldComment, ConceptTemplateData } from '../../types';
+import MentionTextarea from '../MentionTextarea';
+import { sendMentionNotifications } from '../../lib/mentionNotify';
+import type { ConceptFieldComment, ConceptTemplateData, ProjectManager } from '../../types';
 
 interface Props {
   conceptId: string;
   data: ConceptTemplateData | null;
   onSave: (data: ConceptTemplateData) => Promise<void>;
+  projectManagers?: ProjectManager[];
+  currentUserName?: string;
 }
 
 const EMPTY: ConceptTemplateData = {
@@ -109,22 +113,25 @@ function timeAgo(iso: string): string {
 // ── CommentForm ──────────────────────────────────────────────────────────────
 
 function CommentForm({
-  authorName, setAuthorName, placeholder, onSubmit, onCancel, submitting,
+  authorName, setAuthorName, placeholder, onSubmit, onCancel, submitting, projectManagers,
 }: {
   authorName: string;
   setAuthorName: (v: string) => void;
   placeholder?: string;
-  onSubmit: (body: string) => Promise<void>;
+  onSubmit: (body: string, mentions: string[]) => Promise<void>;
   onCancel?: () => void;
   submitting: boolean;
+  projectManagers?: ProjectManager[];
 }) {
   const [body, setBody] = useState('');
+  const [mentions, setMentions] = useState<string[]>([]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!body.trim() || !authorName.trim()) return;
-    await onSubmit(body.trim());
+    await onSubmit(body.trim(), mentions);
     setBody('');
+    setMentions([]);
   }
 
   return (
@@ -136,13 +143,26 @@ function CommentForm({
         placeholder="Il tuo nome"
         className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white placeholder-slate-300"
       />
-      <textarea
-        rows={2}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder={placeholder ?? 'Scrivi un commento…'}
-        className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white resize-none placeholder-slate-300"
-      />
+      {projectManagers && projectManagers.length > 0 ? (
+        <MentionTextarea
+          rows={2}
+          value={body}
+          onChange={setBody}
+          mentions={mentions}
+          onMentionsChange={setMentions}
+          projectManagers={projectManagers}
+          placeholder={placeholder ?? 'Scrivi un commento… (usa @ per menzionare)'}
+          className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white resize-none placeholder-slate-300"
+        />
+      ) : (
+        <textarea
+          rows={2}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder={placeholder ?? 'Scrivi un commento…'}
+          className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white resize-none placeholder-slate-300"
+        />
+      )}
       <div className="flex items-center gap-2 justify-end">
         {onCancel && (
           <button
@@ -171,13 +191,14 @@ function CommentForm({
 // ── FieldComments ────────────────────────────────────────────────────────────
 
 function FieldComments({
-  comments, authorName, setAuthorName, onAdd, onDelete,
+  comments, authorName, setAuthorName, onAdd, onDelete, projectManagers,
 }: {
   comments: ConceptFieldComment[];
   authorName: string;
   setAuthorName: (v: string) => void;
-  onAdd: (parentId: string | null, body: string) => Promise<void>;
+  onAdd: (parentId: string | null, body: string, mentions: string[]) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  projectManagers?: ProjectManager[];
 }) {
   const [showNewForm, setShowNewForm] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -186,10 +207,10 @@ function FieldComments({
   const topLevel = comments.filter((c) => c.parent_id === null);
   const replies = (parentId: string) => comments.filter((c) => c.parent_id === parentId);
 
-  async function handleAdd(parentId: string | null, body: string) {
+  async function handleAdd(parentId: string | null, body: string, mentions: string[]) {
     setSubmitting(true);
     try {
-      await onAdd(parentId, body);
+      await onAdd(parentId, body, mentions);
       if (parentId) setReplyingTo(null);
       else setShowNewForm(false);
     } finally {
@@ -264,10 +285,11 @@ function FieldComments({
               <CommentForm
                 authorName={authorName}
                 setAuthorName={setAuthorName}
-                placeholder="Scrivi una risposta…"
-                onSubmit={(body) => handleAdd(comment.id, body)}
+                placeholder="Scrivi una risposta… (usa @ per menzionare)"
+                onSubmit={(body, mentions) => handleAdd(comment.id, body, mentions)}
                 onCancel={() => setReplyingTo(null)}
                 submitting={submitting}
+                projectManagers={projectManagers}
               />
             </div>
           )}
@@ -279,9 +301,10 @@ function FieldComments({
         <CommentForm
           authorName={authorName}
           setAuthorName={setAuthorName}
-          onSubmit={(body) => handleAdd(null, body)}
+          onSubmit={(body, mentions) => handleAdd(null, body, mentions)}
           onCancel={() => setShowNewForm(false)}
           submitting={submitting}
+          projectManagers={projectManagers}
         />
       ) : (
         <button
@@ -379,8 +402,9 @@ function FieldEditor({
   comments: ConceptFieldComment[];
   authorName: string;
   setAuthorName: (v: string) => void;
-  onAddComment: (parentId: string | null, body: string) => Promise<void>;
+  onAddComment: (parentId: string | null, body: string, mentions: string[]) => Promise<void>;
   onDeleteComment: (id: string) => Promise<void>;
+  projectManagers?: ProjectManager[];
 }) {
   const [hoveringLock, setHoveringLock] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -499,6 +523,7 @@ function FieldEditor({
                 setAuthorName={setAuthorName}
                 onAdd={onAddComment}
                 onDelete={onDeleteComment}
+                projectManagers={projectManagers}
               />
             </div>
           </div>
@@ -527,8 +552,9 @@ function SectionPanel({
   comments: Record<string, ConceptFieldComment[]>;
   authorName: string;
   setAuthorName: (v: string) => void;
-  onAddComment: (fieldKey: string, parentId: string | null, body: string) => Promise<void>;
+  onAddComment: (fieldKey: string, parentId: string | null, body: string, mentions: string[]) => Promise<void>;
   onDeleteComment: (id: string) => Promise<void>;
+  projectManagers?: ProjectManager[];
 }) {
   const [open, setOpen] = useState(true);
   const approvedCount = section.fields.filter((f) => locked.has(f.key)).length;
@@ -583,8 +609,9 @@ function SectionPanel({
               comments={comments[f.key] ?? []}
               authorName={authorName}
               setAuthorName={setAuthorName}
-              onAddComment={(parentId, body) => onAddComment(f.key, parentId, body)}
+              onAddComment={(parentId, body, mentions) => onAddComment(f.key, parentId, body, mentions)}
               onDeleteComment={onDeleteComment}
+              projectManagers={projectManagers}
             />
           ))}
         </div>
@@ -595,7 +622,7 @@ function SectionPanel({
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props) {
+export default function ConceptTemplatePanel({ conceptId, data, onSave, projectManagers = [], currentUserName }: Props) {
   const [form, setForm] = useState<ConceptTemplateData>({
     ...EMPTY,
     ...(data ?? {}),
@@ -629,7 +656,7 @@ export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props)
     localStorage.setItem('concept_comment_author', v);
   }
 
-  async function addComment(fieldKey: string, parentId: string | null, body: string) {
+  async function addComment(fieldKey: string, parentId: string | null, body: string, mentions: string[] = []) {
     await conceptFieldCommentsService.create(conceptId, {
       field_key: fieldKey,
       parent_id: parentId,
@@ -637,6 +664,10 @@ export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props)
       body,
     });
     await loadComments();
+    if (mentions.length > 0) {
+      const pmById = new Map(projectManagers.map((p) => [p.id, p]));
+      void sendMentionNotifications(mentions, pmById, currentUserName ?? authorName, body, window.location.href);
+    }
   }
 
   async function deleteComment(id: string) {
@@ -782,6 +813,7 @@ export default function ConceptTemplatePanel({ conceptId, data, onSave }: Props)
             setAuthorName={updateAuthorName}
             onAddComment={addComment}
             onDeleteComment={deleteComment}
+            projectManagers={projectManagers}
           />
         ))}
       </div>
