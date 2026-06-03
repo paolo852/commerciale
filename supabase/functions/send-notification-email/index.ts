@@ -16,8 +16,10 @@ serve(async (req) => {
   }
 
   const payload: Payload = await req.json();
+  console.log('[notify] to:', payload.to, '| subject:', payload.subject);
 
   if (!payload.to || !payload.subject) {
+    console.error('[notify] missing required fields');
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -25,6 +27,7 @@ serve(async (req) => {
   }
 
   if (!BREVO_API_KEY) {
+    console.error('[notify] BREVO_API_KEY not configured');
     return new Response(JSON.stringify({ error: 'BREVO_API_KEY not configured' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -58,6 +61,7 @@ serve(async (req) => {
   });
 
   const data = await res.json();
+  console.log('[notify] brevo status:', res.status, '| response:', JSON.stringify(data));
 
   if (!res.ok) {
     return new Response(JSON.stringify({ error: data }), {
