@@ -4,6 +4,11 @@ const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') ?? '';
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'notifiche@yourdomain.com';
 const FROM_NAME = Deno.env.get('FROM_NAME') ?? 'Gestione Commerciale';
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 interface Payload {
   to: string;
   subject: string;
@@ -11,8 +16,13 @@ interface Payload {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS });
+  }
+
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return new Response('Method not allowed', { status: 405, headers: CORS });
   }
 
   const payload: Payload = await req.json();
@@ -22,7 +32,7 @@ serve(async (req) => {
     console.error('[notify] missing required fields');
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
 
@@ -30,7 +40,7 @@ serve(async (req) => {
     console.error('[notify] BREVO_API_KEY not configured');
     return new Response(JSON.stringify({ error: 'BREVO_API_KEY not configured' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
 
@@ -66,12 +76,12 @@ serve(async (req) => {
   if (!res.ok) {
     return new Response(JSON.stringify({ error: data }), {
       status: res.status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
 
   return new Response(JSON.stringify({ messageId: data.messageId }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 });
