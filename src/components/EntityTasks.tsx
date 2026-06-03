@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, Circle, Paperclip, Plus, Trash2, X } from 'lucide-react';
 import { tasksService } from '../lib/dataService';
 import { useNotifications } from '../contexts/NotificationsContext';
+import { useAuth } from '../contexts/AuthContext';
 import type { ProjectManager, Task } from '../types';
 
 interface Props {
@@ -22,6 +23,7 @@ function fileSize(bytes: number): string {
 
 export default function EntityTasks({ entityId, entityType, entityName, projectManagers, userId }: Props) {
   const { notify } = useNotifications();
+  const { user: authUser } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -59,7 +61,7 @@ export default function EntityTasks({ entityId, entityType, entityName, projectM
       setShowForm(false);
       if (created.pm_id) {
         const assignedTo = projectManagers.find((p) => p.id === created.pm_id);
-        const assignedBy = projectManagers.find((p) => p.user_id === userId);
+        const assignedBy = projectManagers.find((p) => p.email && p.email === authUser?.email);
         const entityTypeLabel: Record<string, string> = { lead: 'Lead', concept: 'Concept', offer: 'Offerta' };
         void notify({
           type: 'task_assigned',
