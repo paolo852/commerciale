@@ -45,7 +45,7 @@ export default function LeadCandidateDetail() {
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
 
-  const currentPm: ProjectManager | null = projectManagers.find((p) => p.user_id === user?.id) ?? null;
+  const currentPm: ProjectManager | null = projectManagers.find((p) => p.email && p.email === user?.email) ?? null;
 
   const reload = useCallback(async () => {
     if (!id) return;

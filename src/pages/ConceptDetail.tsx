@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Paperclip } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, CalendarClock, CheckCircle2, Clock, Edit3, FileText, Link2, X,
+  ArrowLeft, Bell, CalendarClock, CheckCircle2, Clock, Edit3, FileText, Link2, X,
   Trash2, Upload, UserPlus, Users, XCircle,
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
@@ -12,6 +12,7 @@ import {
   conceptsService, conceptAssigneesService,
   conceptDeadlinesService, conceptFilesService,
 } from '../lib/dataService';
+import { isDemoMode, supabase } from '../lib/supabase';
 import EntityTasks from '../components/EntityTasks';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
@@ -334,6 +335,14 @@ export default function ConceptDetail() {
         <DeadlinesSection conceptId={concept.id} deadlines={deadlines} onChange={reload} />
       </div>
 
+      <PanelSection
+        conceptId={concept.id}
+        conceptName={concept.name}
+        assignees={assignees}
+        projectManagers={projectManagers}
+        onChange={reload}
+      />
+
       {/* Task panel */}
       {user && (
         <EntityTasks
@@ -447,9 +456,10 @@ function AssigneesSection({
   const [saving, setSaving] = useState(false);
   const [sectionError, setSectionError] = useState<string | null>(null);
 
+  const teamAssignees = assignees.filter((a) => a.role !== 'Panelist');
   const assignedIds = new Set(assignees.map((a) => a.project_manager_id));
   const available = projectManagers.filter((p) => p.active && !assignedIds.has(p.id));
-  const currentPmId = assignees.find((a) => a.role === 'Project Manager')?.project_manager_id ?? null;
+  const currentPmId = teamAssignees.find((a) => a.role === 'Project Manager')?.project_manager_id ?? null;
 
   async function add() {
     if (!selectedPm) return;
@@ -501,7 +511,7 @@ function AssigneesSection({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
           <Users className="w-4 h-4 text-indigo-500" />
-          Chi ci sta lavorando ({assignees.length})
+          Chi ci sta lavorando ({teamAssignees.length})
         </h3>
         {!adding && available.length > 0 && (
           <button type="button" onClick={() => setAdding(true)}
@@ -542,11 +552,11 @@ function AssigneesSection({
         </div>
       )}
 
-      {assignees.length === 0 ? (
+      {teamAssignees.length === 0 ? (
         <p className="text-xs text-slate-400 text-center py-3">Nessun assegnatario.</p>
       ) : (
         <ul className="space-y-1.5">
-          {assignees.map((a) => {
+          {teamAssignees.map((a) => {
             const isPm = a.role === 'Project Manager';
             return (
               <li key={a.project_manager_id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50">
@@ -582,6 +592,175 @@ function AssigneesSection({
               </li>
             );
           })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Panel di revisione
+// ============================================================
+
+function PanelSection({
+  conceptId,
+  conceptName,
+  assignees,
+  projectManagers,
+  onChange,
+}: {
+  conceptId: string;
+  conceptName: string;
+  assignees: ConceptAssignee[];
+  projectManagers: ProjectManager[];
+  onChange: () => Promise<void>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [selectedPm, setSelectedPm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [notifying, setNotifying] = useState(false);
+  const [notifyDone, setNotifyDone] = useState(false);
+  const [sectionError, setSectionError] = useState<string | null>(null);
+
+  const panelists = assignees.filter((a) => a.role === 'Panelist');
+  const assignedIds = new Set(assignees.map((a) => a.project_manager_id));
+  const available = projectManagers.filter((p) => p.active && !assignedIds.has(p.id));
+
+  async function addPanelist() {
+    if (!selectedPm) return;
+    setSaving(true); setSectionError(null);
+    try {
+      await conceptAssigneesService.add(conceptId, selectedPm, 'Panelist');
+      setSelectedPm(''); setAdding(false);
+      await onChange();
+    } catch (e) {
+      setSectionError(e instanceof Error ? e.message : 'Errore durante il salvataggio.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removePanelist(pmId: string) {
+    setSaving(true); setSectionError(null);
+    try {
+      await conceptAssigneesService.remove(conceptId, pmId);
+      await onChange();
+    } catch (e) {
+      setSectionError(e instanceof Error ? e.message : 'Errore durante la rimozione.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function notifyPanel() {
+    if (isDemoMode || !supabase || panelists.length === 0) return;
+    setNotifying(true);
+    const conceptUrl = `${window.location.origin}/concepts/${conceptId}`;
+    await Promise.all(
+      panelists.map((a) => {
+        const email = a.project_manager?.email;
+        if (!email) return Promise.resolve();
+        return supabase!.functions.invoke('send-notification-email', {
+          body: {
+            to: email,
+            subject: `Concept pronto per revisione: ${conceptName}`,
+            body: `Il concept "${conceptName}" è pronto per la tua revisione.`,
+            url: conceptUrl,
+            fields: [
+              { label: 'Concept', value: conceptName },
+              { label: 'Revisore', value: a.project_manager?.name ?? email },
+            ],
+          },
+        }).catch(() => {});
+      })
+    );
+    setNotifying(false);
+    setNotifyDone(true);
+    setTimeout(() => setNotifyDone(false), 3000);
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+          <Users className="w-4 h-4 text-violet-500" />
+          Panel di revisione ({panelists.length})
+        </h3>
+        <div className="flex items-center gap-2">
+          {panelists.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void notifyPanel()}
+              disabled={notifying}
+              className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition ${
+                notifyDone
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
+              } disabled:opacity-50`}
+            >
+              <Bell className="w-3.5 h-3.5" />
+              {notifyDone ? 'Notifiche inviate!' : notifying ? 'Invio…' : 'Notifica panel'}
+            </button>
+          )}
+          {!adding && available.length > 0 && (
+            <button type="button" onClick={() => setAdding(true)}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+              <UserPlus className="w-3.5 h-3.5" /> Aggiungi
+            </button>
+          )}
+        </div>
+      </div>
+
+      {sectionError && (
+        <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+          {sectionError}
+        </div>
+      )}
+
+      {adding && (
+        <div className="space-y-2 mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <select value={selectedPm} onChange={(e) => setSelectedPm(e.target.value)}
+            className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Seleziona revisore…</option>
+            {available.map((pm) => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+          </select>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => void addPanelist()} disabled={!selectedPm || saving}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+              {saving ? 'Salvataggio…' : 'Aggiungi'}
+            </button>
+            <button type="button" onClick={() => { setAdding(false); setSelectedPm(''); }}
+              className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
+
+      {panelists.length === 0 ? (
+        <p className="text-xs text-slate-400 text-center py-3">Nessun revisore nel panel.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {panelists.map((a) => (
+            <li key={a.project_manager_id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50">
+              <Avatar
+                name={a.project_manager?.name ?? ''}
+                url={a.project_manager?.avatar_url}
+                size="md"
+                fallbackClassName="bg-violet-100 text-violet-700"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900 truncate">{a.project_manager?.name ?? '—'}</p>
+                {a.project_manager?.email && (
+                  <p className="text-xs text-slate-400 truncate">{a.project_manager.email}</p>
+                )}
+              </div>
+              <button type="button" onClick={() => void removePanelist(a.project_manager_id)} disabled={saving}
+                className="text-slate-300 hover:text-red-500 transition disabled:opacity-50">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </li>
+          ))}
         </ul>
       )}
     </div>
