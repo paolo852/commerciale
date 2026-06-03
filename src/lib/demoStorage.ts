@@ -285,6 +285,9 @@ export const demoConceptComments = {
 };
 
 export const demoConceptDeadlines = {
+  listAll(): ConceptRevisionDeadline[] {
+    return read<ConceptRevisionDeadline[]>(KEYS.conceptDeadlines, []);
+  },
   list(conceptId: string): ConceptRevisionDeadline[] {
     return read<ConceptRevisionDeadline[]>(KEYS.conceptDeadlines, [])
       .filter((d) => d.concept_id === conceptId)

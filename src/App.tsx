@@ -15,6 +15,7 @@ import OfferDetail from './pages/OfferDetail';
 import Analytics from './pages/Analytics';
 import Anagrafiche from './pages/Anagrafiche';
 import Team from './pages/Team';
+import Scrivania from './pages/Scrivania';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
             }
           >
             <Route path="/" element={<Dashboard />} />
+            <Route path="/scrivania" element={<Scrivania />} />
             <Route path="/leads" element={<LeadCandidates />} />
             <Route path="/leads/:id" element={<LeadCandidateDetail />} />
             <Route path="/concepts" element={<Concepts />} />

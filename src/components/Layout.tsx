@@ -11,6 +11,7 @@ import {
   Loader2,
   LogOut,
   Menu,
+  MonitorCheck,
   UserSearch,
   Users,
   X,
@@ -22,6 +23,7 @@ import NotificationBell from './NotificationBell';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/scrivania', label: 'Scrivania', icon: MonitorCheck },
   { to: '/leads', label: 'Lead Candidates', icon: UserSearch },
   { to: '/concepts', label: 'Concept Development', icon: FlaskConical },
   { to: '/offerte', label: 'Offerte', icon: FileText },

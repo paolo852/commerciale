@@ -598,6 +598,16 @@ export const conceptCommentsService = {
 // ----------------------------------------------------------------
 
 export const conceptDeadlinesService = {
+  async listAll(): Promise<ConceptRevisionDeadline[]> {
+    if (isDemoMode) return demoConceptDeadlines.listAll();
+    const { data, error } = await ensureSb()
+      .from('concept_revision_deadlines')
+      .select('*')
+      .order('due_date', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as ConceptRevisionDeadline[];
+  },
+
   async list(conceptId: string): Promise<ConceptRevisionDeadline[]> {
     if (isDemoMode) return demoConceptDeadlines.list(conceptId);
     const { data, error } = await ensureSb()
