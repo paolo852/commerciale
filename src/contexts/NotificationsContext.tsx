@@ -97,8 +97,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     setNotifications((prev) => [notif, ...prev]);
 
     if (prefs[keys.email] && !isDemoMode && supabase) {
+      const pathMap: Record<string, string> = { lead: '/leads', concept: '/concepts', offer: '/offerte' };
+      const entityPath = input.entity_type && input.entity_id
+        ? `${pathMap[input.entity_type] ?? ''}/${input.entity_id}`
+        : null;
+      const url = entityPath ? `${window.location.origin}${entityPath}` : null;
       void supabase.functions.invoke('send-notification-email', {
-        body: { to: user.email, subject: input.title, body: input.body ?? input.title },
+        body: { to: user.email, subject: input.title, body: input.body ?? input.title, url },
       }).catch(() => { /* non-critical */ });
     }
   }, [user, prefs]);

@@ -13,10 +13,10 @@ interface Payload {
   to: string;
   subject: string;
   body: string;
+  url?: string | null;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS });
   }
@@ -26,7 +26,7 @@ serve(async (req) => {
   }
 
   const payload: Payload = await req.json();
-  console.log('[notify] to:', payload.to, '| subject:', payload.subject);
+  console.log('[notify] to:', payload.to, '| subject:', payload.subject, '| url:', payload.url ?? '—');
 
   if (!payload.to || !payload.subject) {
     console.error('[notify] missing required fields');
@@ -44,6 +44,16 @@ serve(async (req) => {
     });
   }
 
+  const ctaButton = payload.url
+    ? `<div style="margin-top: 20px;">
+        <a href="${payload.url}"
+           style="display: inline-block; padding: 10px 20px; background-color: #6366f1; color: #ffffff;
+                  text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">
+          Apri →
+        </a>
+       </div>`
+    : '';
+
   const htmlBody = `
 <!DOCTYPE html>
 <html lang="it">
@@ -51,6 +61,7 @@ serve(async (req) => {
 <body style="font-family: sans-serif; color: #1e293b; padding: 24px; max-width: 600px; margin: 0 auto;">
   <div style="border-left: 4px solid #6366f1; padding-left: 16px; margin-bottom: 24px;">
     <p style="margin: 0; font-size: 15px; line-height: 1.6;">${payload.body.replace(/\n/g, '<br>')}</p>
+    ${ctaButton}
   </div>
   <p style="margin: 0; font-size: 12px; color: #94a3b8;">Gestione Commerciale — notifica automatica</p>
 </body>
