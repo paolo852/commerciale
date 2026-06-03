@@ -63,6 +63,7 @@ export default function LeadCandidates() {
   const [tab, setTab] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [sectionCollapsed, setSectionCollapsed] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
   const [toDelete, setToDelete] = useState<LeadCandidate | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
@@ -95,7 +96,6 @@ export default function LeadCandidates() {
     return Math.round((counts.promosso / concluded) * 100);
   }, [counts]);
 
-  // PMs that appear in at least one lead (for the filter chips)
   const activePms = useMemo(() => {
     const ids = new Set(leads.map((l) => l.pm_id).filter(Boolean) as string[]);
     return projectManagers.filter((pm) => ids.has(pm.id));
@@ -118,7 +118,6 @@ export default function LeadCandidates() {
     );
   }, [leads, tab, search, filterPmId]);
 
-  // Left column: leads with a bando, grouped by bando
   const groupsWithBando = useMemo(() => {
     const map = new Map<string, { label: string; sub: string; fcId: string; leads: LeadCandidate[] }>();
     filtered.filter((l) => l.funding_call_id).forEach((l) => {
@@ -131,7 +130,6 @@ export default function LeadCandidates() {
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'it'));
   }, [filtered, fcById]);
 
-  // Right column: leads without a bando (flat)
   const leadsWithoutBando = useMemo(
     () => filtered.filter((l) => !l.funding_call_id),
     [filtered],
@@ -141,6 +139,11 @@ export default function LeadCandidates() {
     if (!toDelete) return;
     await leadCandidatesService.remove(toDelete.id);
     setToDelete(null);
+    await reload();
+  }
+
+  async function handleArchive(leadId: string) {
+    await leadCandidatesService.update(leadId, { status: 'archiviato' });
     await reload();
   }
 
@@ -172,7 +175,42 @@ export default function LeadCandidates() {
     });
   }
 
-  // Shared lead card (used in both columns)
+  function toggleSection(key: string) {
+    setSectionCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  function DeadlineChip({ isoDate, chipLabel }: { isoDate: string; chipLabel: string }) {
+    const ms = new Date(isoDate).getTime() - Date.now();
+    const days = Math.ceil(ms / 86400000);
+    const past = days < 0;
+    const urgent = days >= 0 && days <= 14;
+    const soon = days > 14 && days <= 30;
+    const [bg, border, text, countdownCls] = past
+      ? ['bg-red-50', 'border-red-200', 'text-red-700', 'bg-red-100 text-red-700']
+      : urgent
+      ? ['bg-amber-50', 'border-amber-200', 'text-amber-700', 'bg-amber-100 text-amber-700']
+      : soon
+      ? ['bg-yellow-50', 'border-yellow-200', 'text-yellow-700', 'bg-yellow-100 text-yellow-700']
+      : ['bg-slate-50', 'border-slate-200', 'text-slate-600', 'bg-slate-100 text-slate-500'];
+    const countdownLabel = past ? `scaduta ${Math.abs(days)} gg fa` : days === 0 ? 'oggi!' : `tra ${days} gg`;
+    return (
+      <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border ${bg} ${border}`}>
+        <CalendarClock className={`w-3.5 h-3.5 shrink-0 ${text}`} />
+        <div className="flex flex-col leading-tight">
+          <span className={`text-[10px] font-semibold uppercase tracking-wide ${text} opacity-70`}>Scadenza {chipLabel}</span>
+          <span className={`text-xs font-semibold ${text}`}>{isoDate}</span>
+        </div>
+        <span className={`ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md tabular-nums ${countdownCls}`}>
+          {countdownLabel}
+        </span>
+      </div>
+    );
+  }
+
   function LeadCard({ lead, showAssign }: { lead: LeadCandidate; showAssign: boolean }) {
     const isAssigning = assigningId === lead.id;
     return (
@@ -196,37 +234,25 @@ export default function LeadCandidates() {
           </p>
         )}
 
-        {/* Quick-assign (right column only) */}
         {showAssign && (
           <div onClick={(e) => e.stopPropagation()}>
             {isAssigning ? (
               <div className="flex gap-1.5 items-center">
-                <select
-                  autoFocus
-                  value={assignFcId}
-                  onChange={(e) => setAssignFcId(e.target.value)}
-                  className="flex-1 text-xs px-2 py-1.5 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-                >
+                <select autoFocus value={assignFcId} onChange={(e) => setAssignFcId(e.target.value)}
+                  className="flex-1 text-xs px-2 py-1.5 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
                   <option value="">— Seleziona bando —</option>
                   {fundingCalls.map((fc) => (
                     <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
                   ))}
                 </select>
-                <button
-                  onClick={() => handleQuickAssign(lead.id)}
-                  disabled={!assignFcId}
-                  className="px-2 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition"
-                >✓</button>
-                <button
-                  onClick={() => { setAssigningId(null); setAssignFcId(''); }}
-                  className="px-2 py-1.5 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
-                >✕</button>
+                <button onClick={() => handleQuickAssign(lead.id)} disabled={!assignFcId}
+                  className="px-2 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition">✓</button>
+                <button onClick={() => { setAssigningId(null); setAssignFcId(''); }}
+                  className="px-2 py-1.5 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition">✕</button>
               </div>
             ) : (
-              <button
-                onClick={() => { setAssigningId(lead.id); setAssignFcId(''); }}
-                className="w-full flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-dashed border-indigo-200 rounded-lg px-2 py-1.5 hover:bg-indigo-100 hover:border-indigo-300 transition"
-              >
+              <button onClick={() => { setAssigningId(lead.id); setAssignFcId(''); }}
+                className="w-full flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-dashed border-indigo-200 rounded-lg px-2 py-1.5 hover:bg-indigo-100 hover:border-indigo-300 transition">
                 <Link2 className="w-3 h-3 shrink-0" />
                 Assegna a un bando
               </button>
@@ -257,12 +283,19 @@ export default function LeadCandidates() {
           {lead.pm_id && pmById.get(lead.pm_id) ? (
             <span className="flex items-center gap-1 text-slate-500">
               <User className="w-3 h-3" />
-              {pmById.get(lead.pm_id)!.name}
+              <span className="font-semibold text-slate-700">{pmById.get(lead.pm_id)!.name}</span>
             </span>
           ) : (
             <span>Aggiunto {formatDate(lead.created_at)}</span>
           )}
-          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            {lead.status === 'attivo' && (
+              <button onClick={() => handleArchive(lead.id)}
+                className="flex items-center gap-1 text-slate-400 hover:text-amber-600 transition" title="Archivia lead">
+                <Archive className="w-3.5 h-3.5" />
+                <span>Archivia</span>
+              </button>
+            )}
             <button onClick={() => setToDelete(lead)} className="text-slate-300 hover:text-red-500 transition">
               Elimina
             </button>
@@ -282,10 +315,8 @@ export default function LeadCandidates() {
             Ricercatori in contatto · {leads.length} {leads.length === 1 ? 'lead' : 'leads'}
           </p>
         </div>
-        <button
-          onClick={() => setFormOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition"
-        >
+        <button onClick={() => setFormOpen(true)}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition">
           <Plus className="w-4 h-4" />
           Nuovo lead
         </button>
@@ -295,7 +326,6 @@ export default function LeadCandidates() {
         <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
 
-      {/* Analytics */}
       {leads.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard label="Attivi" value={counts.attivo} sub={`${leads.length} totali`} Icon={Clock} color="bg-sky-50 text-sky-600" />
@@ -320,8 +350,7 @@ export default function LeadCandidates() {
               <button key={id} onClick={() => setTab(id)}
                 className={`flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all ${
                   active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
+                }`}>
                 {label}
                 <span className={`text-xs px-1.5 py-0.5 rounded-md tabular-nums ${
                   active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/70 text-slate-500'
@@ -332,57 +361,41 @@ export default function LeadCandidates() {
         </div>
         <div className="relative flex-1 min-w-48 max-w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Cerca ricercatore o istituto…"
-            className="w-full pl-8 pr-8 py-1.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-          />
+            className="w-full pl-8 pr-8 py-1.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
-
-        {/* PM filter chips */}
         {(activePms.length > 0 || hasUnassigned) && (
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs text-slate-400 font-medium shrink-0">PM:</span>
             {activePms.map((pm) => {
               const active = filterPmId === pm.id;
               return (
-                <button
-                  key={pm.id}
-                  onClick={() => setFilterPmId(active ? null : pm.id)}
-                  title={pm.name}
+                <button key={pm.id} onClick={() => setFilterPmId(active ? null : pm.id)} title={pm.name}
                   className={`flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
-                    active
-                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700'
-                  }`}
-                >
+                    active ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700'
+                  }`}>
                   <Avatar name={pm.name} url={pm.avatar_url} size="xs" />
                   {pm.name}
                 </button>
               );
             })}
             {hasUnassigned && (
-              <button
-                onClick={() => setFilterPmId(filterPmId === '__none__' ? null : '__none__')}
+              <button onClick={() => setFilterPmId(filterPmId === '__none__' ? null : '__none__')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
-                  filterPmId === '__none__'
-                    ? 'bg-slate-600 border-slate-600 text-white shadow-sm'
-                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
-                }`}
-              >
+                  filterPmId === '__none__' ? 'bg-slate-600 border-slate-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
+                }`}>
                 <User className="w-3 h-3" />
                 Non assegnati
               </button>
             )}
             {filterPmId && (
-              <button onClick={() => setFilterPmId(null)} className="text-slate-400 hover:text-slate-600 transition" title="Rimuovi filtro PM">
+              <button onClick={() => setFilterPmId(null)} className="text-slate-400 hover:text-slate-600 transition">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -397,37 +410,37 @@ export default function LeadCandidates() {
         <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center">
           <UserSearch className="w-10 h-10 text-slate-200 mx-auto mb-2" />
           <p className="text-sm text-slate-400">
-            {leads.length === 0
-              ? 'Nessun lead. Clicca "+ Nuovo lead" per iniziare.'
-              : search
-              ? `Nessun risultato per "${search}".`
+            {leads.length === 0 ? 'Nessun lead. Clicca "+ Nuovo lead" per iniziare.'
+              : search ? `Nessun risultato per "${search}".`
               : 'Nessun lead in questa vista.'}
           </p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex items-stretch">
+        <div className="space-y-4">
 
-          {/* ── Left: Match individuato ────────────────────────────────── */}
-          <div className="w-1/2 flex flex-col border-r border-slate-200">
-            {/* Column header */}
-            <div className="bg-indigo-600 px-5 py-3.5 flex items-center justify-between shrink-0">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">Match individuato</p>
-                <p className="text-sm font-semibold text-white mt-0.5">
-                  {groupsWithBando.reduce((n, g) => n + g.leads.length, 0)} lead · {groupsWithBando.length} {groupsWithBando.length === 1 ? 'bando' : 'bandi'}
-                </p>
-              </div>
-              <Link2 className="w-5 h-5 text-indigo-300 shrink-0" />
-            </div>
-
-            {/* Groups */}
-            <div className="flex-1 p-4 space-y-3 bg-slate-50/60">
-              {groupsWithBando.length === 0 ? (
-                <div className="py-10 text-center">
-                  <p className="text-sm text-slate-400">Nessun lead con bando assegnato.</p>
+          {/* ── Section 1: Match individuato ─────────────────────────── */}
+          <div className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <button onClick={() => toggleSection('with_bando')}
+              className="w-full bg-indigo-600 px-5 py-3.5 flex items-center justify-between hover:bg-indigo-700 transition">
+              <div className="flex items-center gap-3">
+                <Link2 className="w-5 h-5 text-indigo-300 shrink-0" />
+                <div className="text-left">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">Match individuato</p>
+                  <p className="text-sm font-semibold text-white mt-0.5">
+                    {groupsWithBando.reduce((n, g) => n + g.leads.length, 0)} lead · {groupsWithBando.length} {groupsWithBando.length === 1 ? 'bando' : 'bandi'}
+                  </p>
                 </div>
-              ) : (
-                groupsWithBando.map(({ label, sub, fcId, leads: groupLeads }) => {
+              </div>
+              <ChevronDown className={`w-5 h-5 text-indigo-300 transition-transform duration-200 ${sectionCollapsed.has('with_bando') ? '-rotate-90' : ''}`} />
+            </button>
+
+            {!sectionCollapsed.has('with_bando') && (
+              <div className="p-4 space-y-3 bg-slate-50/60">
+                {groupsWithBando.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <p className="text-sm text-slate-400">Nessun lead con bando assegnato.</p>
+                  </div>
+                ) : groupsWithBando.map(({ label, sub, fcId, leads: groupLeads }) => {
                   const fc = fcById.get(fcId);
                   const conceptCount = groupLeads.filter((l) => l.promoted_concept_id).length;
                   const offerCount = fc
@@ -437,24 +450,26 @@ export default function LeadCandidates() {
                       ).length
                     : 0;
                   const isCollapsed = collapsed.has(fcId);
-
                   const target = fc?.target_offers ?? null;
                   const isEditingTarget = editingTargetId === fcId;
 
                   return (
                     <div key={fcId} className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
-                      {/* Group header */}
                       <div className="bg-white">
-                        {/* Top row: code + collapse */}
-                        <button
-                          onClick={() => toggleGroup(fcId)}
-                          className="w-full flex items-center justify-between gap-2 px-4 pt-3.5 pb-1 text-left hover:bg-slate-50/60 transition"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
+                        {/* Top row: code + main deadline + lead count + collapse */}
+                        <button onClick={() => toggleGroup(fcId)}
+                          className="w-full flex items-center justify-between gap-2 px-4 pt-3.5 pb-1 text-left hover:bg-slate-50/60 transition">
+                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
                             <span className="text-base font-extrabold font-mono text-indigo-600 tracking-tight shrink-0">{sub}</span>
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold tabular-nums shrink-0">
                               {groupLeads.length} lead
                             </span>
+                            {fc?.deadline && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 shrink-0">
+                                <CalendarClock className="w-3 h-3 text-slate-400" />
+                                Scadenza bando: {fc.deadline}
+                              </span>
+                            )}
                           </div>
                           <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
                         </button>
@@ -464,98 +479,47 @@ export default function LeadCandidates() {
                           <p className="text-sm font-semibold text-slate-800 leading-snug">{label}</p>
                         </button>
 
-                        {/* Deadlines */}
-                        {fc && (fc.lead_deadline || fc.internal_deadline) && (() => {
-                          const todayMs = Date.now();
-                          const deadlineChip = (isoDate: string, chipLabel: string) => {
-                            const ms = new Date(isoDate).getTime() - todayMs;
-                            const days = Math.ceil(ms / 86400000);
-                            const past = days < 0;
-                            const urgent = days >= 0 && days <= 14;
-                            const soon = days > 14 && days <= 30;
-                            const [bg, border, text, countdownCls] = past
-                              ? ['bg-red-50', 'border-red-200', 'text-red-700', 'bg-red-100 text-red-700']
-                              : urgent
-                              ? ['bg-amber-50', 'border-amber-200', 'text-amber-700', 'bg-amber-100 text-amber-700']
-                              : soon
-                              ? ['bg-yellow-50', 'border-yellow-200', 'text-yellow-700', 'bg-yellow-100 text-yellow-700']
-                              : ['bg-slate-50', 'border-slate-200', 'text-slate-600', 'bg-slate-100 text-slate-500'];
-                            const countdownLabel = past
-                              ? `scaduta ${Math.abs(days)} gg fa`
-                              : days === 0
-                              ? 'oggi!'
-                              : `tra ${days} gg`;
-                            return (
-                              <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border ${bg} ${border}`}>
-                                <CalendarClock className={`w-3.5 h-3.5 shrink-0 ${text}`} />
-                                <div className="flex flex-col leading-tight">
-                                  <span className={`text-[10px] font-semibold uppercase tracking-wide ${text} opacity-70`}>Scadenza {chipLabel}</span>
-                                  <span className={`text-xs font-semibold ${text}`}>{isoDate}</span>
-                                </div>
-                                <span className={`ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md tabular-nums ${countdownCls}`}>
-                                  {countdownLabel}
-                                </span>
-                              </div>
-                            );
-                          };
-                          return (
-                            <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
-                              {fc.lead_deadline && deadlineChip(fc.lead_deadline, 'Lead')}
-                              {fc.internal_deadline && deadlineChip(fc.internal_deadline, 'Concept')}
-                            </div>
-                          );
-                        })()}
+                        {/* Internal deadlines */}
+                        {fc && (fc.lead_deadline || fc.internal_deadline) && (
+                          <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
+                            {fc.lead_deadline && <DeadlineChip isoDate={fc.lead_deadline} chipLabel="Lead" />}
+                            {fc.internal_deadline && <DeadlineChip isoDate={fc.internal_deadline} chipLabel="Concept" />}
+                          </div>
+                        )}
 
                         {/* Pipeline counters + target */}
                         <div className="border-t border-slate-100 px-4 py-3 space-y-2.5">
-                          {/* Stat chips row */}
                           <div className="flex items-stretch gap-2">
-                            {/* Concept chip */}
                             <div className={`flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 px-3 ${conceptCount > 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200'}`}>
                               <div className="flex items-center gap-1">
                                 <FlaskConical className={`w-3.5 h-3.5 ${conceptCount > 0 ? 'text-emerald-500' : 'text-slate-300'}`} />
                                 <span className={`text-[11px] font-medium ${conceptCount > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>Concept</span>
                               </div>
-                              <span className={`text-2xl font-extrabold tabular-nums leading-none ${conceptCount > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
-                                {conceptCount}
-                              </span>
+                              <span className={`text-2xl font-extrabold tabular-nums leading-none ${conceptCount > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>{conceptCount}</span>
                             </div>
-
-                            {/* Offers chip */}
                             <div className={`flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 px-3 ${offerCount > 0 ? 'bg-indigo-50 border border-indigo-200' : 'bg-slate-50 border border-slate-200'}`}>
                               <div className="flex items-center gap-1">
                                 <FileText className={`w-3.5 h-3.5 ${offerCount > 0 ? 'text-indigo-500' : 'text-slate-300'}`} />
                                 <span className={`text-[11px] font-medium ${offerCount > 0 ? 'text-indigo-700' : 'text-slate-400'}`}>Offerte</span>
                               </div>
                               <div className="flex items-baseline gap-1">
-                                <span className={`text-2xl font-extrabold tabular-nums leading-none ${offerCount > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
-                                  {offerCount}
-                                </span>
-                                {target !== null && (
-                                  <span className="text-sm font-semibold text-slate-400">/ {target}</span>
-                                )}
+                                <span className={`text-2xl font-extrabold tabular-nums leading-none ${offerCount > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>{offerCount}</span>
+                                {target !== null && <span className="text-sm font-semibold text-slate-400">/ {target}</span>}
                               </div>
                             </div>
-
-                            {/* Target chip */}
                             <div onClick={(e) => e.stopPropagation()} className="flex-1">
                               {isEditingTarget ? (
                                 <div className="h-full flex flex-col items-center justify-center gap-1 rounded-xl py-2 px-3 bg-indigo-50 border border-indigo-300">
                                   <span className="text-[11px] font-medium text-indigo-700">Target</span>
                                   <div className="flex items-center gap-1">
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      autoFocus
-                                      value={targetInput}
+                                    <input type="number" min={1} autoFocus value={targetInput}
                                       onChange={(e) => setTargetInput(e.target.value)}
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') void handleSaveTarget(fcId);
                                         if (e.key === 'Escape') { setEditingTargetId(null); setTargetInput(''); }
                                       }}
                                       placeholder="N"
-                                      className="w-14 px-2 py-0.5 text-sm font-bold border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-center bg-white"
-                                    />
+                                      className="w-14 px-2 py-0.5 text-sm font-bold border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-center bg-white" />
                                     <button onClick={() => void handleSaveTarget(fcId)} className="text-xs px-1.5 py-0.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">✓</button>
                                     <button onClick={() => { setEditingTargetId(null); setTargetInput(''); }} className="text-xs px-1 py-0.5 text-slate-500 hover:text-slate-700">✕</button>
                                   </div>
@@ -564,8 +528,7 @@ export default function LeadCandidates() {
                                 <button
                                   onClick={() => { setEditingTargetId(fcId); setTargetInput(target !== null ? String(target) : ''); }}
                                   title={target !== null ? 'Modifica target offerte' : 'Imposta target offerte'}
-                                  className={`w-full h-full flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 px-3 border transition hover:border-indigo-300 hover:bg-indigo-50/60 ${target !== null ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-dashed border-slate-300'}`}
-                                >
+                                  className={`w-full h-full flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 px-3 border transition hover:border-indigo-300 hover:bg-indigo-50/60 ${target !== null ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-dashed border-slate-300'}`}>
                                   <div className="flex items-center gap-1">
                                     <Target className={`w-3.5 h-3.5 ${target !== null ? 'text-amber-500' : 'text-slate-300'}`} />
                                     <span className={`text-[11px] font-medium ${target !== null ? 'text-amber-700' : 'text-slate-400'}`}>Target</span>
@@ -577,8 +540,6 @@ export default function LeadCandidates() {
                               )}
                             </div>
                           </div>
-
-                          {/* Progress bar (when target set) */}
                           {target !== null && (
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -595,7 +556,6 @@ export default function LeadCandidates() {
                         </div>
                       </div>
 
-                      {/* Cards */}
                       {!isCollapsed && (
                         <div className="px-3 pb-3 space-y-2 border-t border-slate-100 pt-2 bg-slate-50/40">
                           {groupLeads.map((lead) => (
@@ -605,37 +565,43 @@ export default function LeadCandidates() {
                       )}
                     </div>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </div>
 
-          {/* ── Right: Match da individuare ───────────────────────────── */}
-          <div className="w-1/2 flex flex-col">
-            {/* Column header */}
-            <div className="bg-amber-500 px-5 py-3.5 flex items-center justify-between shrink-0">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-100">Match da individuare</p>
-                <p className="text-sm font-semibold text-white mt-0.5">
-                  {leadsWithoutBando.length} {leadsWithoutBando.length === 1 ? 'lead' : 'lead'}
-                </p>
-              </div>
-              <Search className="w-5 h-5 text-amber-200 shrink-0" />
-            </div>
-
-            {/* Flat list */}
-            <div className="flex-1 p-4 space-y-2 bg-slate-50/60">
-              {leadsWithoutBando.length === 0 ? (
-                <div className="py-10 text-center">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-200 mx-auto mb-2" />
-                  <p className="text-sm text-slate-400">Tutti i lead hanno un bando assegnato.</p>
+          {/* ── Section 2: Match da individuare ──────────────────────── */}
+          <div className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <button onClick={() => toggleSection('without_bando')}
+              className="w-full bg-amber-500 px-5 py-3.5 flex items-center justify-between hover:bg-amber-600 transition">
+              <div className="flex items-center gap-3">
+                <Search className="w-5 h-5 text-amber-200 shrink-0" />
+                <div className="text-left">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-100">Match da individuare</p>
+                  <p className="text-sm font-semibold text-white mt-0.5">
+                    {leadsWithoutBando.length} {leadsWithoutBando.length === 1 ? 'lead' : 'lead'} senza bando
+                  </p>
                 </div>
-              ) : (
-                leadsWithoutBando.map((lead) => (
-                  <LeadCard key={lead.id} lead={lead} showAssign />
-                ))
-              )}
-            </div>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-amber-200 transition-transform duration-200 ${sectionCollapsed.has('without_bando') ? '-rotate-90' : ''}`} />
+            </button>
+
+            {!sectionCollapsed.has('without_bando') && (
+              <div className="p-4 bg-slate-50/60">
+                {leadsWithoutBando.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-200 mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">Tutti i lead hanno un bando assegnato.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {leadsWithoutBando.map((lead) => (
+                      <LeadCard key={lead.id} lead={lead} showAssign />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
