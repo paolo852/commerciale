@@ -20,6 +20,7 @@ export interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   currentPm: ProjectManager | null;
+  currentPmReady: boolean;
   refreshCurrentPm: () => Promise<void>;
   loading: boolean;
   isDemoMode: boolean;
@@ -39,12 +40,14 @@ function toAuthUser(u: { id: string; email?: string | null } | DemoUser | null):
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [currentPm, setCurrentPm] = useState<ProjectManager | null>(null);
+  const [currentPmReady, setCurrentPmReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refreshCurrentPm = useCallback(async () => {
-    if (!user?.email) { setCurrentPm(null); return; }
+    if (!user?.email) { setCurrentPm(null); setCurrentPmReady(true); return; }
     try { setCurrentPm(await projectManagersService.getByEmail(user.email)); }
-    catch { /* ignore */ }
+    catch { setCurrentPm(null); }
+    finally { setCurrentPmReady(true); }
   }, [user]);
 
   useEffect(() => { void refreshCurrentPm(); }, [refreshCurrentPm]);
@@ -138,8 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, currentPm, refreshCurrentPm, loading, isDemoMode, signIn, signUp, requestAccess, signOut }),
-    [user, currentPm, refreshCurrentPm, loading, signIn, signUp, requestAccess, signOut],
+    () => ({ user, currentPm, currentPmReady, refreshCurrentPm, loading, isDemoMode, signIn, signUp, requestAccess, signOut }),
+    [user, currentPm, currentPmReady, refreshCurrentPm, loading, signIn, signUp, requestAccess, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

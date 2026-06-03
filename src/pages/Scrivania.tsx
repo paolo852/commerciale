@@ -5,11 +5,10 @@ import {
   FlaskConical, Square, UserSearch,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNotifications } from '../contexts/NotificationsContext';
 import { useOffersData } from '../hooks/useOffersData';
 import {
   tasksService, conceptsService, leadCandidatesService,
-  conceptDeadlinesService,
+  conceptDeadlinesService, findMentionsForPm, type MentionResult,
 } from '../lib/dataService';
 import { formatDate } from '../lib/format';
 import type { Concept, ConceptRevisionDeadline, LeadCandidate, Task } from '../types';
@@ -63,35 +62,40 @@ function Section({ title, icon: Icon, count, children, empty }: {
 
 export default function Scrivania() {
   const navigate = useNavigate();
-  const { currentPm, user } = useAuth();
-  const { notifications } = useNotifications();
+  const { currentPm, currentPmReady, user } = useAuth();
   const { fundingCalls } = useOffersData();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [concepts, setConcepts] = useState<Concept[]>([]);
   const [leads, setLeads] = useState<LeadCandidate[]>([]);
   const [revDeadlines, setRevDeadlines] = useState<ConceptRevisionDeadline[]>([]);
+  const [mentions, setMentions] = useState<MentionResult[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pmName?: string) => {
     setLoading(true);
     try {
-      const [t, c, l, rd] = await Promise.all([
+      const [t, c, l, rd, m] = await Promise.all([
         tasksService.list(),
         conceptsService.list(),
         leadCandidatesService.list(),
         conceptDeadlinesService.listAll(),
+        pmName ? findMentionsForPm(pmName) : Promise.resolve<MentionResult[]>([]),
       ]);
       setTasks(t);
       setConcepts(c);
       setLeads(l);
       setRevDeadlines(rd);
+      setMentions(m);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  // Wait for currentPm to be resolved before loading so we can fetch mentions
+  useEffect(() => {
+    if (currentPmReady) void load(currentPm?.name);
+  }, [currentPmReady, currentPm?.name, load]);
 
   // ── derived data ─────────────────────────────────────────────
 
@@ -187,10 +191,6 @@ export default function Scrivania() {
 
   const allDeadlines = [...overdueDeadlines, ...upcomingDeadlines];
 
-  const mentionNotifs = useMemo(
-    () => notifications.filter((n) => n.type === 'comment_mention').slice(0, 10),
-    [notifications],
-  );
 
   async function toggleTask(task: Task) {
     await tasksService.setCompleted(task.id, !task.completed);
@@ -199,7 +199,7 @@ export default function Scrivania() {
 
   const entityPath: Record<string, string> = { lead: '/leads', concept: '/concepts', offer: '/offerte' };
 
-  if (!currentPm && !loading) {
+  if (currentPmReady && !currentPm) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center">
         <p className="text-sm text-slate-500">
@@ -237,9 +237,9 @@ export default function Scrivania() {
       Icon: FlaskConical,
     },
     {
-      label: 'Menzioni non lette',
-      value: mentionNotifs.filter((n) => !n.read).length,
-      sub: `${mentionNotifs.length} recenti`,
+      label: 'Menzioni recenti',
+      value: mentions.length,
+      sub: mentions.length === 1 ? '1 commento' : `${mentions.length} commenti`,
       color: 'bg-violet-50 text-violet-700 border-violet-100',
       iconColor: 'text-violet-500',
       Icon: AtSign,
@@ -412,28 +412,23 @@ export default function Scrivania() {
             </Section>
 
             {/* ── Menzioni ─────────────────────────────────────── */}
-            <Section title="Menzioni recenti" icon={AtSign} count={mentionNotifs.length} empty="Nessuna menzione recente.">
-              {mentionNotifs.map((n) => {
-                const entityLink = n.entity_type && n.entity_id
-                  ? `${entityPath[n.entity_type]}/${n.entity_id}`
-                  : null;
-                return (
-                  <div
-                    key={n.id}
-                    onClick={() => entityLink && navigate(entityLink)}
-                    className={`flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition ${entityLink ? 'cursor-pointer' : ''} ${!n.read ? 'bg-violet-50/40' : ''}`}
-                  >
-                    <AtSign className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 leading-snug line-clamp-2">{n.body ?? n.title}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{formatDate(n.created_at)}</p>
-                    </div>
-                    {!n.read && (
-                      <span className="shrink-0 w-2 h-2 rounded-full bg-violet-500 mt-1.5" />
-                    )}
+            <Section title="Menzioni recenti" icon={AtSign} count={mentions.length} empty="Nessuna menzione recente nei commenti.">
+              {mentions.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => navigate(`${entityPath[m.entity_type]}/${m.entity_id}`)}
+                  className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  <AtSign className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">{m.author_name} · {formatDate(m.created_at)}</p>
+                    <p className="text-sm text-slate-700 leading-snug line-clamp-2">{m.body}</p>
                   </div>
-                );
-              })}
+                  <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${m.entity_type === 'concept' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-700'}`}>
+                    {m.entity_type === 'concept' ? 'Concept' : 'Lead'}
+                  </span>
+                </div>
+              ))}
             </Section>
 
           </div>

@@ -1266,3 +1266,43 @@ export const conceptFieldCommentsService = {
     return m;
   },
 };
+
+// ----------------------------------------------------------------
+// Cross-table mention search
+// ----------------------------------------------------------------
+
+export type MentionResult = {
+  id: string;
+  body: string;
+  author_name: string;
+  created_at: string;
+  entity_type: 'lead' | 'concept';
+  entity_id: string;
+};
+
+export async function findMentionsForPm(pmName: string): Promise<MentionResult[]> {
+  const tag = `@${pmName}`;
+  if (isDemoMode) {
+    const leadResults = demoLeadUpdates.listAll()
+      .filter((u) => u.body.includes(tag) && u.author_name !== pmName)
+      .map((u): MentionResult => ({ id: u.id, body: u.body, author_name: u.author_name, created_at: u.created_at, entity_type: 'lead', entity_id: u.lead_id }));
+    const conceptResults = demoConceptFieldComments.listAll()
+      .filter((c) => c.body.includes(tag) && c.author_name !== pmName)
+      .map((c): MentionResult => ({ id: c.id, body: c.body, author_name: c.author_name, created_at: c.created_at, entity_type: 'concept', entity_id: c.concept_id }));
+    return [...leadResults, ...conceptResults].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
+  }
+  const sb = ensureSb();
+  const [{ data: leads }, { data: concepts }] = await Promise.all([
+    sb.from('lead_updates').select('id, body, author_name, created_at, lead_id')
+      .ilike('body', `%${tag}%`).neq('author_name', pmName)
+      .order('created_at', { ascending: false }).limit(15),
+    sb.from('concept_field_comments').select('id, body, author_name, created_at, concept_id')
+      .ilike('body', `%${tag}%`).neq('author_name', pmName)
+      .order('created_at', { ascending: false }).limit(15),
+  ]);
+  const results: MentionResult[] = [
+    ...(leads ?? []).map((u): MentionResult => ({ id: u.id, body: u.body, author_name: u.author_name, created_at: u.created_at, entity_type: 'lead', entity_id: u.lead_id })),
+    ...(concepts ?? []).map((c): MentionResult => ({ id: c.id, body: c.body, author_name: c.author_name, created_at: c.created_at, entity_type: 'concept', entity_id: c.concept_id })),
+  ];
+  return results.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
+}
