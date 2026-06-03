@@ -95,6 +95,12 @@ export default function LeadCandidateDetail() {
     await reload();
   }
 
+  async function handleArchive() {
+    if (!lead) return;
+    await leadCandidatesService.update(lead.id, { status: 'archiviato' });
+    await reload();
+  }
+
   async function promoteToConc() {
     if (!lead || !user) return;
     setPromoting(true);
@@ -179,14 +185,23 @@ export default function LeadCandidateDetail() {
 
           <div className="flex items-center gap-2 flex-wrap">
             {lead.status === 'attivo' && (
-              <button
-                onClick={promoteToConc}
-                disabled={promoting}
-                className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition flex items-center gap-1.5"
-              >
-                <FlaskConical className="w-3.5 h-3.5" />
-                {promoting ? 'Promozione…' : 'Promuovi a concept'}
-              </button>
+              <>
+                <button
+                  onClick={promoteToConc}
+                  disabled={promoting}
+                  className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition flex items-center gap-1.5"
+                >
+                  <FlaskConical className="w-3.5 h-3.5" />
+                  {promoting ? 'Promozione…' : 'Promuovi a concept'}
+                </button>
+                <button
+                  onClick={handleArchive}
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition flex items-center gap-1.5"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  Archivia
+                </button>
+              </>
             )}
             {lead.status === 'promosso' && lead.promoted_concept_id && (
               <button
