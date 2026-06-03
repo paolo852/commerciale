@@ -384,7 +384,7 @@ function ValidationIndicator({
 function FieldEditor({
   fieldKey, label, hint, rows, value, locked, onToggleLock, onChange,
   showValidation, validationStatus, validationHow, onValidationStatusChange, onValidationHowChange,
-  comments, authorName, setAuthorName, onAddComment, onDeleteComment,
+  comments, authorName, setAuthorName, onAddComment, onDeleteComment, projectManagers,
 }: {
   fieldKey: string;
   label: string;
@@ -538,7 +538,7 @@ function FieldEditor({
 function SectionPanel({
   section, form, locked, onToggleLock, onChange,
   validationStatus, validationHow, onValidationStatusChange, onValidationHowChange,
-  comments, authorName, setAuthorName, onAddComment, onDeleteComment,
+  comments, authorName, setAuthorName, onAddComment, onDeleteComment, projectManagers,
 }: {
   section: Section;
   form: ConceptTemplateData;
