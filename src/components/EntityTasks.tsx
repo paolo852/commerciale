@@ -200,7 +200,7 @@ export default function EntityTasks({ entityId, entityType, entityName, projectM
                   <div className="flex items-center gap-2 flex-wrap mt-1">
                     {pm && (
                       <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
-                        <Avatar name={pm.name} url={pm.avatar_url ?? null} size="xxs" fallbackClassName="bg-violet-200 text-violet-800" />
+                        <Avatar name={pm.name} url={pm.avatar_url ?? null} size="xs" fallbackClassName="bg-violet-200 text-violet-800" />
                         {pm.name}
                       </span>
                     )}

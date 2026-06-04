@@ -229,7 +229,7 @@ function FieldComments({
         <AvatarImg
           name={comment.author_name}
           url={pm?.avatar_url ?? null}
-          size={isReply ? 'xs' : 'sm'}
+          size={isReply ? 'sm' : 'md'}
           fallbackClassName="bg-indigo-100 text-indigo-600"
         />
         <div className="flex-1 min-w-0">

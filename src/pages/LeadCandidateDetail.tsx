@@ -288,7 +288,7 @@ export default function LeadCandidateDetail() {
                       <Avatar
                         name={u.author_name}
                         url={pmByName.get(u.author_name)?.avatar_url ?? null}
-                        size="sm"
+                        size="md"
                         fallbackClassName="bg-indigo-100 text-indigo-700"
                       />
                       <span className="text-xs font-semibold text-slate-700">{u.author_name}</span>
