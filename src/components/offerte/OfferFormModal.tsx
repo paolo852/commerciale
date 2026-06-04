@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Plus } from 'lucide-react';
 import Modal from '../Modal';
 import { useAuth } from '../../contexts/AuthContext';
-import { offersService } from '../../lib/dataService';
+import { offersService, fundingCallsService } from '../../lib/dataService';
 import { toDateInputValue } from '../../lib/format';
 import { STATUS_OPTIONS, OUTCOME_OPTIONS } from '../Badges';
 import type {
   Offer, OfferStatus, OfferOutcome, OfferType, ProjectManager, FundingCall,
 } from '../../types';
+
+interface NewCallDraft {
+  code: string;
+  name: string;
+  body: string;
+  deadline: string;
+}
 
 interface OfferFormModalProps {
   open: boolean;
@@ -85,6 +93,14 @@ export default function OfferFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [extraCalls, setExtraCalls] = useState<FundingCall[]>([]);
+  const [showNewCall, setShowNewCall] = useState(false);
+  const [newCall, setNewCall] = useState<NewCallDraft>({ code: '', name: '', body: '', deadline: '' });
+  const [creatingCall, setCreatingCall] = useState(false);
+  const [newCallError, setNewCallError] = useState<string | null>(null);
+
+  const allCalls = useMemo(() => [...fundingCalls, ...extraCalls], [fundingCalls, extraCalls]);
+
   const duplicateName = useMemo(() => {
     const trimmed = form.name.trim().toLowerCase();
     if (!trimmed) return null;
@@ -107,6 +123,10 @@ export default function OfferFormModal({
       });
     }
     setError(null);
+    setShowNewCall(false);
+    setNewCall({ code: '', name: '', body: '', deadline: '' });
+    setExtraCalls([]);
+    setNewCallError(null);
   }, [open, offer, initial]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -114,13 +134,49 @@ export default function OfferFormModal({
   }
 
   function handleFundingCallChange(code: string) {
-    const fc = fundingCalls.find((f) => f.code === code);
+    if (code === '__new__') { setShowNewCall(true); return; }
+    setShowNewCall(false);
+    const fc = allCalls.find((f) => f.code === code);
     setForm((f) => ({
       ...f,
       funding_call: code,
       ...(fc?.probability != null ? { probability: fc.probability } : {}),
       ...(fc?.deadline ? { deadline: toDateInputValue(fc.deadline) } : {}),
     }));
+  }
+
+  async function handleCreateCall() {
+    if (!user) return;
+    if (!newCall.code.trim() || !newCall.name.trim()) {
+      setNewCallError('Codice e nome sono obbligatori.');
+      return;
+    }
+    setCreatingCall(true); setNewCallError(null);
+    try {
+      const created = await fundingCallsService.create({
+        code: newCall.code.trim(),
+        name: newCall.name.trim(),
+        body: newCall.body.trim() || null,
+        deadline: newCall.deadline || null,
+        lead_deadline: null,
+        internal_deadline: null,
+        description: null,
+        notes: null,
+        probability: 50,
+        source_url: null,
+      }, user.id);
+      setExtraCalls((prev) => [...prev, created]);
+      setForm((f) => ({
+        ...f,
+        funding_call: created.code,
+        ...(created.probability != null ? { probability: created.probability } : {}),
+        ...(created.deadline ? { deadline: toDateInputValue(created.deadline) } : {}),
+      }));
+      setShowNewCall(false);
+      setNewCall({ code: '', name: '', body: '', deadline: '' });
+    } catch (e) {
+      setNewCallError((e as { message?: string })?.message ?? 'Errore creazione bando');
+    } finally { setCreatingCall(false); }
   }
 
   function handleConsultingCallChange(id: string) {
@@ -221,14 +277,68 @@ export default function OfferFormModal({
           {form.type === 'financed' ? (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Bando *</label>
-              <select required value={form.funding_call} onChange={(e) => handleFundingCallChange(e.target.value)} className={selectClass}>
+              <select
+                required={!showNewCall}
+                value={showNewCall ? '__new__' : form.funding_call}
+                onChange={(e) => handleFundingCallChange(e.target.value)}
+                className={selectClass}
+              >
                 <option value="">Seleziona bando…</option>
-                {fundingCalls.map((fc) => (
+                {allCalls.map((fc) => (
                   <option key={fc.id} value={fc.code}>{fc.code} — {fc.name}</option>
                 ))}
+                <option value="__new__">+ Crea nuovo bando in anagrafica…</option>
               </select>
-              {fundingCalls.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">Nessun bando. Aggiungine uno in Anagrafiche.</p>
+              {allCalls.length === 0 && !showNewCall && (
+                <p className="text-xs text-amber-600 mt-1">Nessun bando disponibile. Creane uno qui sotto o in Anagrafiche.</p>
+              )}
+
+              {showNewCall && (
+                <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Nuovo bando</p>
+                  {newCallError && (
+                    <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{newCallError}</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Codice *</label>
+                      <input type="text" value={newCall.code}
+                        onChange={(e) => setNewCall((n) => ({ ...n, code: e.target.value }))}
+                        placeholder="es. HORIZON-MSCA-2025" className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Nome *</label>
+                      <input type="text" value={newCall.name}
+                        onChange={(e) => setNewCall((n) => ({ ...n, name: e.target.value }))}
+                        placeholder="es. Marie Skłodowska-Curie Postdoctoral" className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Tipologia</label>
+                      <input type="text" value={newCall.body}
+                        onChange={(e) => setNewCall((n) => ({ ...n, body: e.target.value }))}
+                        placeholder="es. HORIZON Europe, PNRR, Regionale…" className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza</label>
+                      <input type="date" value={newCall.deadline}
+                        onChange={(e) => setNewCall((n) => ({ ...n, deadline: e.target.value }))}
+                        className={inputClass} />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => void handleCreateCall()}
+                      disabled={creatingCall || !newCall.code.trim() || !newCall.name.trim()}
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5" />
+                      {creatingCall ? 'Creazione…' : 'Crea bando'}
+                    </button>
+                    <button type="button"
+                      onClick={() => { setShowNewCall(false); setNewCall({ code: '', name: '', body: '', deadline: '' }); }}
+                      className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+                      Annulla
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           ) : (

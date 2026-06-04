@@ -41,7 +41,6 @@ const inputClass =
 
 const STATUS_OPTIONS: { value: ConceptStatus; label: string }[] = [
   { value: 'in_valutazione', label: 'In valutazione' },
-  { value: 'promosso', label: 'Promosso a offerta' },
   { value: 'rifiutato', label: 'Rifiutato' },
 ];
 
