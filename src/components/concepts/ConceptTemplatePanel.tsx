@@ -97,9 +97,6 @@ const SECTIONS: Section[] = [
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-function initials(name: string): string {
-  return name.trim().split(/\s+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
-}
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
