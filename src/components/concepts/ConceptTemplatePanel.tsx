@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { parseConceptDocx } from '../../lib/conceptParser';
 import { conceptFieldCommentsService } from '../../lib/dataService';
+import AvatarImg from '../Avatar';
 import MentionTextarea from '../MentionTextarea';
 import { sendMentionNotifications } from '../../lib/mentionNotify';
 import type { ConceptFieldComment, ConceptTemplateData, ProjectManager } from '../../types';
@@ -206,6 +207,7 @@ function FieldComments({
 
   const topLevel = comments.filter((c) => c.parent_id === null);
   const replies = (parentId: string) => comments.filter((c) => c.parent_id === parentId);
+  const pmByName = new Map((projectManagers ?? []).map((p) => [p.name, p]));
 
   async function handleAdd(parentId: string | null, body: string, mentions: string[]) {
     setSubmitting(true);
@@ -218,25 +220,21 @@ function FieldComments({
     }
   }
 
-  function Avatar({ name, size = 'sm' }: { name: string; size?: 'sm' | 'xs' }) {
-    const sz = size === 'sm' ? 'w-6 h-6 text-[9px]' : 'w-5 h-5 text-[8px]';
-    const bg = size === 'sm' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500';
-    return (
-      <div className={`${sz} ${bg} rounded-full flex items-center justify-center shrink-0 font-bold mt-0.5`}>
-        {initials(name || '?')}
-      </div>
-    );
-  }
-
   function CommentRow({
     comment, isReply = false,
   }: {
     comment: ConceptFieldComment;
     isReply?: boolean;
   }) {
+    const pm = pmByName.get(comment.author_name);
     return (
       <div className="flex gap-2 group">
-        <Avatar name={comment.author_name} size={isReply ? 'xs' : 'sm'} />
+        <AvatarImg
+          name={comment.author_name}
+          url={pm?.avatar_url ?? null}
+          size={isReply ? 'xs' : 'sm'}
+          fallbackClassName="bg-indigo-100 text-indigo-600"
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-xs font-semibold text-slate-800">{comment.author_name}</span>

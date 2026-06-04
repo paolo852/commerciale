@@ -46,6 +46,7 @@ export default function LeadCandidateDetail() {
   const [postError, setPostError] = useState<string | null>(null);
 
   const currentPm: ProjectManager | null = projectManagers.find((p) => p.email && p.email === user?.email) ?? null;
+  const pmByName = new Map(projectManagers.map((p) => [p.name, p]));
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -284,6 +285,12 @@ export default function LeadCandidateDetail() {
                 <div className="bg-slate-50 rounded-xl px-4 py-3">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2">
+                      <Avatar
+                        name={u.author_name}
+                        url={pmByName.get(u.author_name)?.avatar_url ?? null}
+                        size="sm"
+                        fallbackClassName="bg-indigo-100 text-indigo-700"
+                      />
                       <span className="text-xs font-semibold text-slate-700">{u.author_name}</span>
                       <span className="text-[11px] text-slate-400">{formatDate(u.created_at)}</span>
                     </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, Circle, Paperclip, Plus, Trash2, X } from 'lucide-react';
+import Avatar from './Avatar';
 import { tasksService } from '../lib/dataService';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -198,7 +199,8 @@ export default function EntityTasks({ entityId, entityType, entityName, projectM
                   </p>
                   <div className="flex items-center gap-2 flex-wrap mt-1">
                     {pm && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
+                      <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
+                        <Avatar name={pm.name} url={pm.avatar_url ?? null} size="xxs" fallbackClassName="bg-violet-200 text-violet-800" />
                         {pm.name}
                       </span>
                     )}
