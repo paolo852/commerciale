@@ -138,7 +138,7 @@ export default function Offerte() {
   );
 
   const tabCounts = useMemo(() => ({
-    in_lavorazione: yearScopedOffers.filter((o) => o.status === 'in_lavorazione').length,
+    in_lavorazione: yearScopedOffers.filter((o) => o.status === 'in_lavorazione' && o.outcome === 'nessuno').length,
     presentata: yearScopedOffers.filter((o) => o.status === 'presentata').length,
     approvata: yearScopedOffers.filter((o) => o.outcome === 'approvato').length,
     rifiutata: yearScopedOffers.filter((o) => o.outcome === 'rifiutato').length,
@@ -153,6 +153,7 @@ export default function Offerte() {
         if (o.outcome !== 'rifiutato') return false;
       } else {
         if (o.status !== view) return false;
+        if (view === 'in_lavorazione' && o.outcome !== 'nessuno') return false;
         if (filters.outcome !== 'all' && o.outcome !== filters.outcome) return false;
       }
       if (filters.year !== 'all' && offerYear(o) !== filters.year) return false;
@@ -500,13 +501,25 @@ export default function Offerte() {
           </table>
         </div>
         {visibleOffers.length > 0 && (
-          <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+          <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-4 flex-wrap">
             <p className="text-xs text-slate-400">{visibleOffers.length} di {tabCounts[view]} offerte {
               view === 'in_lavorazione' ? 'in lavorazione'
               : view === 'presentata' ? 'presentate'
               : view === 'approvata' ? 'approvate'
               : 'rifiutate'
             }</p>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-slate-500">
+                Totale importi: <strong className="text-slate-700 tabular-nums">{formatEUR(visibleOffers.reduce((s, o) => s + o.budget, 0))}</strong>
+              </span>
+              {view !== 'approvata' && (
+                <span className="text-xs text-slate-500">
+                  Valore atteso: <strong className="text-slate-700 tabular-nums">
+                    {formatEUR(visibleOffers.reduce((s, o) => s + o.budget * (o.probability ?? 50) / 100, 0))}
+                  </strong>
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>
