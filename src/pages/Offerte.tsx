@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, ChevronDown, ChevronUp, PauseCircle, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, Trophy, X } from 'lucide-react';
+import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, PauseCircle, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, Trophy, X, XCircle } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
 import { offerYear } from '../lib/analytics';
@@ -18,7 +18,7 @@ import type { Offer, OfferOutcome, OfferStatus, OfferType } from '../types';
 
 type SortBy = 'deadline' | 'budget' | 'created_at' | 'name';
 type SortDir = 'asc' | 'desc';
-type ViewTab = 'in_lavorazione' | 'presentata' | 'ferma';
+type ViewTab = 'in_lavorazione' | 'presentata' | 'ferma' | 'approvata' | 'rifiutata';
 
 interface Filters {
   search: string;
@@ -139,15 +139,23 @@ export default function Offerte() {
     in_lavorazione: yearScopedOffers.filter((o) => o.status === 'in_lavorazione').length,
     presentata: yearScopedOffers.filter((o) => o.status === 'presentata').length,
     ferma: yearScopedOffers.filter((o) => o.status === 'ferma').length,
+    approvata: yearScopedOffers.filter((o) => o.outcome === 'approvato').length,
+    rifiutata: yearScopedOffers.filter((o) => o.outcome === 'rifiutato').length,
   }), [yearScopedOffers]);
 
   const visibleOffers = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
     const filtered = offers.filter((o) => {
-      if (o.status !== view) return false;
+      if (view === 'approvata') {
+        if (o.outcome !== 'approvato') return false;
+      } else if (view === 'rifiutata') {
+        if (o.outcome !== 'rifiutato') return false;
+      } else {
+        if (o.status !== view) return false;
+        if (filters.outcome !== 'all' && o.outcome !== filters.outcome) return false;
+      }
       if (filters.year !== 'all' && offerYear(o) !== filters.year) return false;
       if (search && !o.name.toLowerCase().includes(search)) return false;
-      if (filters.outcome !== 'all' && o.outcome !== filters.outcome) return false;
       if (filters.type !== 'all' && o.type !== filters.type) return false;
       if (filters.projectManagerId !== 'all') {
         if (filters.projectManagerId === '__none__') { if (o.project_manager_id) return false; }
@@ -312,6 +320,42 @@ export default function Offerte() {
           </span>
         </button>
 
+        {/* Approvate */}
+        <button
+          onClick={() => setView('approvata')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-sm ${
+            view === 'approvata'
+              ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-200'
+              : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-700'
+          }`}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          <span>Approvate</span>
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
+            view === 'approvata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+          }`}>
+            {tabCounts.approvata}
+          </span>
+        </button>
+
+        {/* Rifiutate */}
+        <button
+          onClick={() => setView('rifiutata')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-sm ${
+            view === 'rifiutata'
+              ? 'bg-rose-600 border-rose-600 text-white shadow-sm shadow-rose-200'
+              : 'bg-white border-slate-200 text-slate-500 hover:border-rose-300 hover:text-rose-700'
+          }`}
+        >
+          <XCircle className="w-3.5 h-3.5 shrink-0" />
+          <span>Rifiutate</span>
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
+            view === 'rifiutata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+          }`}>
+            {tabCounts.rifiutata}
+          </span>
+        </button>
+
         <div className="ml-auto">
           <YearSelector
             offers={offers}
@@ -431,7 +475,13 @@ export default function Offerte() {
                 <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">
                   {offers.length === 0
                     ? 'Nessuna offerta. Clicca "+ Nuova offerta" per iniziare.'
-                    : `Nessuna offerta ${view === 'in_lavorazione' ? 'in lavorazione' : view === 'presentata' ? 'presentata' : 'ferma'}${isFiltered ? ' corrisponde ai filtri' : ''}.`}
+                    : `Nessuna offerta ${
+                        view === 'in_lavorazione' ? 'in lavorazione'
+                        : view === 'presentata' ? 'presentata'
+                        : view === 'ferma' ? 'ferma'
+                        : view === 'approvata' ? 'approvata'
+                        : 'rifiutata'
+                      }${isFiltered ? ' corrisponde ai filtri' : ''}.`}
                 </td></tr>
               ) : visibleOffers.map((o) => {
                 const pm = o.project_manager_id ? pmById.get(o.project_manager_id) : undefined;
@@ -469,7 +519,13 @@ export default function Offerte() {
         </div>
         {visibleOffers.length > 0 && (
           <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
-            <p className="text-xs text-slate-400">{visibleOffers.length} di {tabCounts[view]} offerte {view === 'in_lavorazione' ? 'in lavorazione' : view === 'presentata' ? 'presentate' : 'ferme'}</p>
+            <p className="text-xs text-slate-400">{visibleOffers.length} di {tabCounts[view]} offerte {
+              view === 'in_lavorazione' ? 'in lavorazione'
+              : view === 'presentata' ? 'presentate'
+              : view === 'ferma' ? 'ferme'
+              : view === 'approvata' ? 'approvate'
+              : 'rifiutate'
+            }</p>
           </div>
         )}
       </div>

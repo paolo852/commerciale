@@ -280,6 +280,31 @@ export default function Scrivania() {
         <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">Caricamento…</div>
       ) : (
         <>
+          {/* Risultati anno — banner prominente */}
+          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-6 py-4 flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-4 flex-1 min-w-[160px]">
+              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                <Trophy className="w-6 h-6 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 opacity-80">Approvate {currentYear}</p>
+                <p className="text-4xl font-black tabular-nums text-emerald-700 leading-tight">{approvedThisYear.length}</p>
+                <p className="text-xs text-emerald-600 opacity-70">progetti vinti</p>
+              </div>
+            </div>
+            <div className="hidden sm:block w-px h-12 bg-emerald-200 shrink-0" />
+            <div className="flex items-center gap-4 flex-1 min-w-[160px]">
+              <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
+                <TrendingUp className="w-6 h-6 text-teal-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 opacity-80">Ricavo {currentYear}</p>
+                <p className="text-4xl font-black tabular-nums text-teal-700 leading-tight">{compactEUR(revenueThisYear)}</p>
+                <p className="text-xs text-teal-600 opacity-70">da offerte approvate</p>
+              </div>
+            </div>
+          </div>
+
           {/* KPI strip */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {kpis.map(({ label, value, sub, color, iconColor, Icon }) => (
@@ -292,26 +317,6 @@ export default function Scrivania() {
                 </div>
               </div>
             ))}
-          </div>
-
-          {/* Risultati anno */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border px-4 py-3.5 flex items-center gap-3 bg-emerald-50 text-emerald-700 border-emerald-100">
-              <Trophy className="w-5 h-5 shrink-0 text-emerald-500" />
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70 truncate">Approvate {currentYear}</p>
-                <p className="text-2xl font-extrabold tabular-nums leading-tight">{approvedThisYear.length}</p>
-                <p className="text-[11px] opacity-60 truncate">progetti vinti</p>
-              </div>
-            </div>
-            <div className="rounded-2xl border px-4 py-3.5 flex items-center gap-3 bg-teal-50 text-teal-700 border-teal-100">
-              <TrendingUp className="w-5 h-5 shrink-0 text-teal-500" />
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70 truncate">Ricavo {currentYear}</p>
-                <p className="text-2xl font-extrabold tabular-nums leading-tight">{compactEUR(revenueThisYear)}</p>
-                <p className="text-[11px] opacity-60 truncate">da offerte approvate</p>
-              </div>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
