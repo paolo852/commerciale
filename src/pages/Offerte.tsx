@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, PauseCircle, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, Trophy, X, XCircle } from 'lucide-react';
+import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, Trophy, X, XCircle } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
 import { offerYear } from '../lib/analytics';
@@ -18,7 +18,8 @@ import type { Offer, OfferOutcome, OfferStatus, OfferType } from '../types';
 
 type SortBy = 'deadline' | 'budget' | 'created_at' | 'name';
 type SortDir = 'asc' | 'desc';
-type ViewTab = 'in_lavorazione' | 'presentata' | 'ferma' | 'approvata' | 'rifiutata';
+type ViewTab = 'in_lavorazione' | 'presentata' | 'approvata' | 'rifiutata';
+const VALID_VIEWS: ViewTab[] = ['in_lavorazione', 'presentata', 'approvata', 'rifiutata'];
 
 interface Filters {
   search: string;
@@ -64,7 +65,8 @@ export default function Offerte() {
   const { offers, projectManagers, fundingCalls, loading, error, reload } = useOffersData();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const view = sp(searchParams, 'view', 'in_lavorazione') as ViewTab;
+  const rawView = sp(searchParams, 'view', 'in_lavorazione') as ViewTab;
+  const view: ViewTab = VALID_VIEWS.includes(rawView) ? rawView : 'in_lavorazione';
   const sortBy = sp(searchParams, 'sort', 'deadline') as SortBy;
   const sortDir = sp(searchParams, 'dir', 'asc') as SortDir;
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
@@ -138,7 +140,6 @@ export default function Offerte() {
   const tabCounts = useMemo(() => ({
     in_lavorazione: yearScopedOffers.filter((o) => o.status === 'in_lavorazione').length,
     presentata: yearScopedOffers.filter((o) => o.status === 'presentata').length,
-    ferma: yearScopedOffers.filter((o) => o.status === 'ferma').length,
     approvata: yearScopedOffers.filter((o) => o.outcome === 'approvato').length,
     rifiutata: yearScopedOffers.filter((o) => o.outcome === 'rifiutato').length,
   }), [yearScopedOffers]);
@@ -302,37 +303,19 @@ export default function Offerte() {
           </span>
         </button>
 
-        {/* Ferma — smaller secondary button */}
-        <button
-          onClick={() => setView('ferma')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-sm ${
-            view === 'ferma'
-              ? 'bg-amber-500 border-amber-500 text-white shadow-sm shadow-amber-200'
-              : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-600'
-          }`}
-        >
-          <PauseCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>Ferma</span>
-          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
-            view === 'ferma' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-          }`}>
-            {tabCounts.ferma}
-          </span>
-        </button>
-
         {/* Approvate */}
         <button
           onClick={() => setView('approvata')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-sm ${
+          className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border-2 transition-all font-medium text-sm ${
             view === 'approvata'
-              ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-200'
-              : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-700'
+              ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-200'
+              : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300 hover:text-violet-700'
           }`}
         >
-          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-          <span>Approvate</span>
-          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
-            view === 'approvata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span className="font-semibold">Approvate</span>
+          <span className={`text-sm font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center tabular-nums ${
+            view === 'approvata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
             {tabCounts.approvata}
           </span>
@@ -341,16 +324,16 @@ export default function Offerte() {
         {/* Rifiutate */}
         <button
           onClick={() => setView('rifiutata')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-sm ${
+          className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border-2 transition-all font-medium text-sm ${
             view === 'rifiutata'
-              ? 'bg-rose-600 border-rose-600 text-white shadow-sm shadow-rose-200'
-              : 'bg-white border-slate-200 text-slate-500 hover:border-rose-300 hover:text-rose-700'
+              ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-200'
+              : 'bg-white border-slate-200 text-slate-600 hover:border-rose-300 hover:text-rose-700'
           }`}
         >
-          <XCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>Rifiutate</span>
-          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
-            view === 'rifiutata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+          <XCircle className="w-4 h-4 shrink-0" />
+          <span className="font-semibold">Rifiutate</span>
+          <span className={`text-sm font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center tabular-nums ${
+            view === 'rifiutata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
             {tabCounts.rifiutata}
           </span>
@@ -478,7 +461,6 @@ export default function Offerte() {
                     : `Nessuna offerta ${
                         view === 'in_lavorazione' ? 'in lavorazione'
                         : view === 'presentata' ? 'presentata'
-                        : view === 'ferma' ? 'ferma'
                         : view === 'approvata' ? 'approvata'
                         : 'rifiutata'
                       }${isFiltered ? ' corrisponde ai filtri' : ''}.`}
@@ -522,7 +504,6 @@ export default function Offerte() {
             <p className="text-xs text-slate-400">{visibleOffers.length} di {tabCounts[view]} offerte {
               view === 'in_lavorazione' ? 'in lavorazione'
               : view === 'presentata' ? 'presentate'
-              : view === 'ferma' ? 'ferme'
               : view === 'approvata' ? 'approvate'
               : 'rifiutate'
             }</p>
