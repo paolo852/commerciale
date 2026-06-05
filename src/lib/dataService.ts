@@ -1268,6 +1268,38 @@ export const conceptFieldCommentsService = {
 };
 
 // ----------------------------------------------------------------
+// Revenue targets
+// ----------------------------------------------------------------
+
+const DEMO_REVENUE_TARGETS_KEY = 'demo_revenue_targets';
+
+function demoGetTarget(year: number): number | null {
+  const raw = localStorage.getItem(DEMO_REVENUE_TARGETS_KEY);
+  const map: Record<number, number> = raw ? JSON.parse(raw) : {};
+  return map[year] ?? null;
+}
+function demoSetTarget(year: number, target: number): void {
+  const raw = localStorage.getItem(DEMO_REVENUE_TARGETS_KEY);
+  const map: Record<number, number> = raw ? JSON.parse(raw) : {};
+  map[year] = target;
+  localStorage.setItem(DEMO_REVENUE_TARGETS_KEY, JSON.stringify(map));
+}
+
+export const revenueTargetsService = {
+  async get(year: number): Promise<number | null> {
+    if (isDemoMode) return demoGetTarget(year);
+    const sb = ensureSb();
+    const { data } = await sb.from('revenue_targets').select('target').eq('year', year).maybeSingle();
+    return data ? Number(data.target) : null;
+  },
+  async set(year: number, target: number): Promise<void> {
+    if (isDemoMode) { demoSetTarget(year, target); return; }
+    const sb = ensureSb();
+    await sb.from('revenue_targets').upsert({ year, target });
+  },
+};
+
+// ----------------------------------------------------------------
 // Cross-table mention search
 // ----------------------------------------------------------------
 

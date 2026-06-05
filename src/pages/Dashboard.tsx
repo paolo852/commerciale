@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Clock, Euro, TrendingUp, Trophy } from 'lucide-react';
+import { CheckCircle, Clock, Euro, Pencil, TrendingUp, Trophy } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { useNotifications } from '../contexts/NotificationsContext';
-import { notificationsService } from '../lib/dataService';
+import { notificationsService, revenueTargetsService } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { computeKPIs, filterByYear } from '../lib/analytics';
 import { formatEUR } from '../lib/format';
@@ -18,6 +18,9 @@ export default function Dashboard() {
   const { notify, prefs } = useNotifications();
   const { user } = useAuth();
   const [year, setYear] = useState<number | 'all'>('all');
+  const [target, setTarget] = useState<number | null>(null);
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState('');
 
   // Fire deadline notifications once when offers load
   useEffect(() => {
@@ -48,6 +51,28 @@ export default function Dashboard() {
 
   const filteredOffers = useMemo(() => filterByYear(offers, year), [offers, year]);
   const kpis = useMemo(() => computeKPIs(filteredOffers), [filteredOffers]);
+
+  const targetYear = year !== 'all' ? year : new Date().getFullYear();
+
+  useEffect(() => {
+    void revenueTargetsService.get(targetYear).then((t) => {
+      setTarget(t);
+      setTargetInput(t !== null ? String(t) : '');
+    });
+  }, [targetYear]);
+
+  async function saveTarget() {
+    const val = Number(targetInput.replace(/\./g, '').replace(',', '.'));
+    if (!Number.isFinite(val) || val < 0) return;
+    await revenueTargetsService.set(targetYear, val);
+    setTarget(val);
+    setEditingTarget(false);
+  }
+
+  function startEditTarget() {
+    setTargetInput(target !== null ? String(target) : '');
+    setEditingTarget(true);
+  }
 
   function compactEUR(value: number): string {
     if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(1).replace('.', ',')}M`;
@@ -103,6 +128,72 @@ export default function Dashboard() {
             <p className="text-xs text-teal-600 opacity-70">da offerte approvate</p>
           </div>
         </div>
+      </div>
+
+      {/* Target fatturato */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Target fatturato · {yearLabel}</p>
+          </div>
+          {!editingTarget && (
+            <button
+              onClick={startEditTarget}
+              className="flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-600 transition"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              {target !== null ? 'Modifica' : 'Imposta target'}
+            </button>
+          )}
+        </div>
+
+        {editingTarget ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500">€</span>
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              value={targetInput}
+              onChange={(e) => setTargetInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void saveTarget(); if (e.key === 'Escape') setEditingTarget(false); }}
+              className="flex-1 px-3 py-1.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              autoFocus
+            />
+            <button onClick={() => void saveTarget()} className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
+              Salva
+            </button>
+            <button onClick={() => setEditingTarget(false)} className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+              Annulla
+            </button>
+          </div>
+        ) : target !== null ? (
+          <>
+            <div className="flex items-end justify-between mb-1.5">
+              <span className="text-2xl font-bold tabular-nums text-slate-900">
+                {Math.round(Math.min((kpis.ricavoApprovato / target) * 100, 100))}%
+              </span>
+              <span className="text-xs text-slate-400 tabular-nums">
+                {compactEUR(kpis.ricavoApprovato)} / {compactEUR(target)}
+              </span>
+            </div>
+            <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  kpis.ricavoApprovato >= target ? 'bg-emerald-500' :
+                  kpis.ricavoApprovato / target >= 0.6 ? 'bg-teal-500' :
+                  kpis.ricavoApprovato / target >= 0.3 ? 'bg-amber-400' : 'bg-slate-300'
+                }`}
+                style={{ width: `${Math.min((kpis.ricavoApprovato / target) * 100, 100)}%` }}
+              />
+            </div>
+            {kpis.ricavoApprovato >= target && (
+              <p className="mt-1.5 text-xs font-semibold text-emerald-600">🎯 Target raggiunto!</p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-slate-400 italic">Nessun target impostato per {yearLabel}.</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
