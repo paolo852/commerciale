@@ -498,30 +498,40 @@ export default function Offerte() {
                 );
               })}
             </tbody>
+            {!loading && visibleOffers.length > 0 && (
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 bg-slate-50/70">
+                  <td />
+                  <td colSpan={5} className="px-4 py-4 text-xs text-slate-400">
+                    {visibleOffers.length} di {tabCounts[view]} offerte {
+                      view === 'in_lavorazione' ? 'in lavorazione'
+                      : view === 'presentata' ? 'presentate'
+                      : view === 'approvata' ? 'approvate'
+                      : 'rifiutate'
+                    }
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-0.5">Totale</p>
+                    <p className="text-lg font-bold tabular-nums text-slate-900">
+                      {formatEUR(visibleOffers.reduce((s, o) => s + o.budget, 0))}
+                    </p>
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    {view !== 'approvata' && view !== 'rifiutata' && (
+                      <>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-0.5">Atteso</p>
+                        <p className="text-lg font-bold tabular-nums text-amber-600">
+                          {formatEUR(visibleOffers.reduce((s, o) => s + o.budget * (o.probability ?? 50) / 100, 0))}
+                        </p>
+                      </>
+                    )}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
-        {visibleOffers.length > 0 && (
-          <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-4 flex-wrap">
-            <p className="text-xs text-slate-400">{visibleOffers.length} di {tabCounts[view]} offerte {
-              view === 'in_lavorazione' ? 'in lavorazione'
-              : view === 'presentata' ? 'presentate'
-              : view === 'approvata' ? 'approvate'
-              : 'rifiutate'
-            }</p>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-slate-500">
-                Totale importi: <strong className="text-slate-700 tabular-nums">{formatEUR(visibleOffers.reduce((s, o) => s + o.budget, 0))}</strong>
-              </span>
-              {view !== 'approvata' && (
-                <span className="text-xs text-slate-500">
-                  Valore atteso: <strong className="text-slate-700 tabular-nums">
-                    {formatEUR(visibleOffers.reduce((s, o) => s + o.budget * (o.probability ?? 50) / 100, 0))}
-                  </strong>
-                </span>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <OfferFormModal open={formOpen} onClose={() => setFormOpen(false)} onSaved={reload}
