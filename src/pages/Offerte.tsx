@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, ChevronDown, ChevronUp, PauseCircle, Pencil, Plus, Search, Send, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, ChevronUp, PauseCircle, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, Trophy, X } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
 import { offerYear } from '../lib/analytics';
@@ -104,6 +104,24 @@ export default function Offerte() {
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
+
+  const currentYear = new Date().getFullYear();
+  const statsYear = filters.year !== 'all' ? filters.year : currentYear;
+
+  const approvedOffers = useMemo(
+    () => offers.filter((o) => o.outcome === 'approvato' && offerYear(o) === statsYear),
+    [offers, statsYear],
+  );
+  const approvedRevenue = useMemo(
+    () => approvedOffers.reduce((s, o) => s + o.budget, 0),
+    [approvedOffers],
+  );
+
+  function compactEUR(value: number): string {
+    if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(1).replace('.', ',')}M`;
+    if (value >= 1_000) return `€${Math.round(value / 1_000)}K`;
+    return formatEUR(value);
+  }
 
   const isFiltered =
     filters.search ||
@@ -217,6 +235,26 @@ export default function Offerte() {
       {error && (
         <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
+
+      {/* Stats strip */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border px-4 py-3 flex items-center gap-3 bg-emerald-50 text-emerald-700 border-emerald-100">
+          <Trophy className="w-5 h-5 shrink-0 text-emerald-500" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Approvate {statsYear}</p>
+            <p className="text-2xl font-extrabold tabular-nums leading-tight">{approvedOffers.length}</p>
+            <p className="text-[11px] opacity-60">progetti vinti</p>
+          </div>
+        </div>
+        <div className="rounded-2xl border px-4 py-3 flex items-center gap-3 bg-teal-50 text-teal-700 border-teal-100">
+          <TrendingUp className="w-5 h-5 shrink-0 text-teal-500" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Ricavo {statsYear}</p>
+            <p className="text-2xl font-extrabold tabular-nums leading-tight">{compactEUR(approvedRevenue)}</p>
+            <p className="text-[11px] opacity-60">da offerte approvate</p>
+          </div>
+        </div>
+      </div>
 
       {/* Status toggle buttons */}
       <div className="flex items-center gap-3 flex-wrap">

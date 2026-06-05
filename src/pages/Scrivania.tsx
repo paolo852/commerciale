@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AtSign, CalendarClock, CheckCircle2, CheckSquare,
-  FlaskConical, Square, UserSearch,
+  FlaskConical, Square, TrendingUp, Trophy, UserSearch,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
@@ -10,7 +10,8 @@ import {
   tasksService, conceptsService, leadCandidatesService,
   conceptDeadlinesService, findMentionsForPm, type MentionResult,
 } from '../lib/dataService';
-import { formatDate } from '../lib/format';
+import { offerYear } from '../lib/analytics';
+import { formatDate, formatEUR } from '../lib/format';
 import type { Concept, ConceptRevisionDeadline, LeadCandidate, Task } from '../types';
 
 // ── helpers ─────────────────────────────────────────────────────
@@ -26,6 +27,12 @@ function deadlineBadge(iso: string) {
   if (d <= 7)  return { cls: 'bg-amber-100 text-amber-700', label: `tra ${d} gg` };
   if (d <= 30) return { cls: 'bg-yellow-100 text-yellow-700', label: `tra ${d} gg` };
   return       { cls: 'bg-slate-100 text-slate-600',        label: `tra ${d} gg` };
+}
+
+function compactEUR(value: number): string {
+  if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(1).replace('.', ',')}M`;
+  if (value >= 1_000) return `€${Math.round(value / 1_000)}K`;
+  return formatEUR(value);
 }
 
 function greeting(name: string) {
@@ -63,7 +70,7 @@ function Section({ title, icon: Icon, count, children, empty }: {
 export default function Scrivania() {
   const navigate = useNavigate();
   const { currentPm, currentPmReady, user } = useAuth();
-  const { fundingCalls } = useOffersData();
+  const { fundingCalls, offers } = useOffersData();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [concepts, setConcepts] = useState<Concept[]>([]);
@@ -124,6 +131,17 @@ export default function Scrivania() {
   const myConceptIds = useMemo(() => new Set(myConcepts.map((c) => c.id)), [myConcepts]);
 
   const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
+
+  const currentYear = new Date().getFullYear();
+
+  const approvedThisYear = useMemo(
+    () => offers.filter((o) => o.outcome === 'approvato' && offerYear(o) === currentYear),
+    [offers, currentYear],
+  );
+  const revenueThisYear = useMemo(
+    () => approvedThisYear.reduce((s, o) => s + o.budget, 0),
+    [approvedThisYear],
+  );
 
   // all upcoming deadlines relevant to me
   const upcomingDeadlines = useMemo(() => {
@@ -274,6 +292,26 @@ export default function Scrivania() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Risultati anno */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border px-4 py-3.5 flex items-center gap-3 bg-emerald-50 text-emerald-700 border-emerald-100">
+              <Trophy className="w-5 h-5 shrink-0 text-emerald-500" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70 truncate">Approvate {currentYear}</p>
+                <p className="text-2xl font-extrabold tabular-nums leading-tight">{approvedThisYear.length}</p>
+                <p className="text-[11px] opacity-60 truncate">progetti vinti</p>
+              </div>
+            </div>
+            <div className="rounded-2xl border px-4 py-3.5 flex items-center gap-3 bg-teal-50 text-teal-700 border-teal-100">
+              <TrendingUp className="w-5 h-5 shrink-0 text-teal-500" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70 truncate">Ricavo {currentYear}</p>
+                <p className="text-2xl font-extrabold tabular-nums leading-tight">{compactEUR(revenueThisYear)}</p>
+                <p className="text-[11px] opacity-60 truncate">da offerte approvate</p>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
