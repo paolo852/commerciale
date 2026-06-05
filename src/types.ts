@@ -272,6 +272,8 @@ export interface DashboardKPIs {
   inLavorazione: number;        // count offerte in_lavorazione
   inAttesaEsito: number;        // count offerte presentate senza esito
   tassoSuccesso: number | null; // approvati / (approvati + rifiutati), null se nessun dato
+  approvati: number;            // count offerte con outcome=approvato
+  ricavoApprovato: number;      // somma budget offerte approvate
 }
 
 export interface MonthlyStats {

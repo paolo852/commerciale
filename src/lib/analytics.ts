@@ -42,6 +42,7 @@ export function computeKPIs(offers: Offer[]): DashboardKPIs {
   let inAttesaEsito = 0;
   let approvati = 0;
   let rifiutati = 0;
+  let ricavoApprovato = 0;
 
   for (const o of offers) {
     if (o.status === 'presentata' && o.outcome !== 'rifiutato') {
@@ -49,14 +50,14 @@ export function computeKPIs(offers: Offer[]): DashboardKPIs {
     }
     if (o.status === 'in_lavorazione') inLavorazione++;
     if (o.status === 'presentata' && o.outcome === 'nessuno') inAttesaEsito++;
-    if (o.outcome === 'approvato') approvati++;
+    if (o.outcome === 'approvato') { approvati++; ricavoApprovato += o.budget; }
     if (o.outcome === 'rifiutato') rifiutati++;
   }
 
   const decisi = approvati + rifiutati;
   const tassoSuccesso = decisi === 0 ? null : approvati / decisi;
 
-  return { totalInOfferta, inLavorazione, inAttesaEsito, tassoSuccesso };
+  return { totalInOfferta, inLavorazione, inAttesaEsito, tassoSuccesso, approvati, ricavoApprovato };
 }
 
 // ----------------------------------------------------------------

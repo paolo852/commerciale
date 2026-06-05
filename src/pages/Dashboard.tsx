@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Clock, Euro, TrendingUp } from 'lucide-react';
+import { CheckCircle, Clock, Euro, TrendingUp, Trophy } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { notificationsService } from '../lib/dataService';
@@ -49,6 +49,14 @@ export default function Dashboard() {
   const filteredOffers = useMemo(() => filterByYear(offers, year), [offers, year]);
   const kpis = useMemo(() => computeKPIs(filteredOffers), [filteredOffers]);
 
+  function compactEUR(value: number): string {
+    if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(1).replace('.', ',')}M`;
+    if (value >= 1_000) return `€${Math.round(value / 1_000)}K`;
+    return formatEUR(value);
+  }
+
+  const yearLabel = year !== 'all' ? String(year) : 'tutti gli anni';
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -67,6 +75,35 @@ export default function Dashboard() {
           {error}
         </div>
       )}
+
+      {/* Risultati banner */}
+      <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-6 py-4 flex items-center gap-6 flex-wrap">
+        <div className="flex items-center gap-4 flex-1 min-w-[160px]">
+          <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+            <Trophy className="w-6 h-6 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 opacity-80">Approvate · {yearLabel}</p>
+            <p className="text-4xl font-black tabular-nums text-emerald-700 leading-tight">
+              {loading ? '…' : kpis.approvati}
+            </p>
+            <p className="text-xs text-emerald-600 opacity-70">progetti vinti</p>
+          </div>
+        </div>
+        <div className="hidden sm:block w-px h-12 bg-emerald-200 shrink-0" />
+        <div className="flex items-center gap-4 flex-1 min-w-[160px]">
+          <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
+            <TrendingUp className="w-6 h-6 text-teal-600" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 opacity-80">Ricavo · {yearLabel}</p>
+            <p className="text-4xl font-black tabular-nums text-teal-700 leading-tight">
+              {loading ? '…' : compactEUR(kpis.ricavoApprovato)}
+            </p>
+            <p className="text-xs text-teal-600 opacity-70">da offerte approvate</p>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard
