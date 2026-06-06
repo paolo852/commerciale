@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, Edit3, Euro, Percent, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Edit3, Euro, Percent, Trash2, User, XCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
@@ -25,6 +25,8 @@ export default function OfferDetail() {
   const [toDelete, setToDelete] = useState(false);
   const [toApprove, setToApprove] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [toReject, setToReject] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -61,6 +63,24 @@ export default function OfferDetail() {
     } finally {
       setApproving(false);
       setToApprove(false);
+    }
+  }
+
+  async function handleReject() {
+    if (!offer) return;
+    setRejecting(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const updated = await offersService.update(offer.id, {
+        outcome: 'rifiutato',
+        decided_at: today,
+        ...(offer.status === 'in_lavorazione' ? { status: 'presentata', submitted_at: offer.submitted_at ?? today } : {}),
+      });
+      setOffer(updated);
+      void reloadList();
+    } finally {
+      setRejecting(false);
+      setToReject(false);
     }
   }
 
@@ -112,12 +132,20 @@ export default function OfferDetail() {
 
           <div className="flex items-center gap-2 flex-wrap">
             {offer.outcome === 'nessuno' && (
-              <button
-                onClick={() => setToApprove(true)}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 border border-emerald-600 rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm shadow-emerald-200"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" /> Approva
-              </button>
+              <>
+                <button
+                  onClick={() => setToApprove(true)}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 border border-emerald-600 rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm shadow-emerald-200"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Approva
+                </button>
+                <button
+                  onClick={() => setToReject(true)}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 border border-rose-600 rounded-lg hover:bg-rose-700 transition flex items-center gap-1.5 shadow-sm shadow-rose-200"
+                >
+                  <XCircle className="w-3.5 h-3.5" /> Rifiuta
+                </button>
+              </>
             )}
             <button
               onClick={() => setEditOpen(true)}
@@ -250,6 +278,16 @@ export default function OfferDetail() {
         variant="default"
         onConfirm={() => void handleApprove()}
         onCancel={() => setToApprove(false)}
+      />
+
+      <ConfirmDialog
+        open={toReject}
+        title="Rifiutare l'offerta?"
+        message={`Verrà registrata la data odierna come data di esito e l'offerta risulterà rifiutata.`}
+        confirmLabel={rejecting ? 'Rifiuto…' : 'Rifiuta'}
+        variant="danger"
+        onConfirm={() => void handleReject()}
+        onCancel={() => setToReject(false)}
       />
     </div>
   );
