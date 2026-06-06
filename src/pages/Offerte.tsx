@@ -107,15 +107,6 @@ export default function Offerte() {
 
   const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
 
-  const approvedRevenue = useMemo(
-    () => yearScopedOffers.filter((o) => o.outcome === 'approvato').reduce((s, o) => s + o.budget, 0),
-    [yearScopedOffers],
-  );
-  const inAttesa = useMemo(
-    () => yearScopedOffers.filter((o) => o.status === 'presentata' && o.outcome === 'nessuno').length,
-    [yearScopedOffers],
-  );
-
   function compactEUR(value: number): string {
     if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(1).replace('.', ',')}M`;
     if (value >= 1_000) return `€${Math.round(value / 1_000)}K`;
@@ -140,6 +131,15 @@ export default function Offerte() {
     approvata: yearScopedOffers.filter((o) => o.outcome === 'approvato').length,
     rifiutata: yearScopedOffers.filter((o) => o.outcome === 'rifiutato').length,
   }), [yearScopedOffers]);
+
+  const approvedRevenue = useMemo(
+    () => yearScopedOffers.filter((o) => o.outcome === 'approvato').reduce((s, o) => s + o.budget, 0),
+    [yearScopedOffers],
+  );
+  const inAttesa = useMemo(
+    () => yearScopedOffers.filter((o) => o.status === 'presentata' && o.outcome === 'nessuno').length,
+    [yearScopedOffers],
+  );
 
   const visibleOffers = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
