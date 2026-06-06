@@ -132,13 +132,17 @@ export default function Offerte() {
     rifiutata: yearScopedOffers.filter((o) => o.outcome === 'rifiutato').length,
   }), [yearScopedOffers]);
 
-  const approvedRevenue = useMemo(
-    () => yearScopedOffers.filter((o) => o.outcome === 'approvato').reduce((s, o) => s + o.budget, 0),
+  // Sottoinsiemi coerenti: tutti derivano da status==='presentata' così la somma torna sempre
+  const presentateOffers = useMemo(
+    () => yearScopedOffers.filter((o) => o.status === 'presentata'),
     [yearScopedOffers],
   );
-  const inAttesa = useMemo(
-    () => yearScopedOffers.filter((o) => o.status === 'presentata' && o.outcome === 'nessuno').length,
-    [yearScopedOffers],
+  const statsApprovate = useMemo(() => presentateOffers.filter((o) => o.outcome === 'approvato').length, [presentateOffers]);
+  const statsRifiutate = useMemo(() => presentateOffers.filter((o) => o.outcome === 'rifiutato').length, [presentateOffers]);
+  const inAttesa = useMemo(() => presentateOffers.filter((o) => o.outcome === 'nessuno').length, [presentateOffers]);
+  const approvedRevenue = useMemo(
+    () => presentateOffers.filter((o) => o.outcome === 'approvato').reduce((s, o) => s + o.budget, 0),
+    [presentateOffers],
   );
 
   const visibleOffers = useMemo(() => {
@@ -274,14 +278,14 @@ export default function Offerte() {
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 opacity-80">Approvate</p>
-                <p className="text-lg font-bold tabular-nums text-emerald-700">{tabCounts.approvata}</p>
+                <p className="text-lg font-bold tabular-nums text-emerald-700">{statsApprovate}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2">
               <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600 opacity-80">Rifiutate</p>
-                <p className="text-lg font-bold tabular-nums text-rose-700">{tabCounts.rifiutata}</p>
+                <p className="text-lg font-bold tabular-nums text-rose-700">{statsRifiutate}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-teal-50 border border-teal-100 px-3 py-2">
