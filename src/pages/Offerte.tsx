@@ -132,17 +132,17 @@ export default function Offerte() {
     rifiutata: yearScopedOffers.filter((o) => o.outcome === 'rifiutato').length,
   }), [yearScopedOffers]);
 
-  // Sottoinsiemi coerenti: tutti derivano da status==='presentata' così la somma torna sempre
-  const presentateOffers = useMemo(
-    () => yearScopedOffers.filter((o) => o.status === 'presentata'),
+  // Sottoinsiemi del pannello stats:
+  // - approvate/rifiutate: filtrano solo per outcome (senza vincolo su status)
+  // - inAttesa: status=presentata e outcome=nessuno
+  // - totale mostrato = inAttesa + approvate + rifiutate (matematicamente garantito)
+  const inAttesa = useMemo(
+    () => yearScopedOffers.filter((o) => o.status === 'presentata' && o.outcome === 'nessuno').length,
     [yearScopedOffers],
   );
-  const statsApprovate = useMemo(() => presentateOffers.filter((o) => o.outcome === 'approvato').length, [presentateOffers]);
-  const statsRifiutate = useMemo(() => presentateOffers.filter((o) => o.outcome === 'rifiutato').length, [presentateOffers]);
-  const inAttesa = useMemo(() => presentateOffers.filter((o) => o.outcome === 'nessuno').length, [presentateOffers]);
   const approvedRevenue = useMemo(
-    () => presentateOffers.filter((o) => o.outcome === 'approvato').reduce((s, o) => s + o.budget, 0),
-    [presentateOffers],
+    () => yearScopedOffers.filter((o) => o.outcome === 'approvato').reduce((s, o) => s + o.budget, 0),
+    [yearScopedOffers],
   );
 
   const visibleOffers = useMemo(() => {
@@ -259,7 +259,7 @@ export default function Offerte() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 Presentate{filters.year !== 'all' ? ` · ${filters.year}` : ''}
               </p>
-              <p className="text-3xl font-black tabular-nums text-slate-900 leading-none">{tabCounts.presentata}</p>
+              <p className="text-3xl font-black tabular-nums text-slate-900 leading-none">{inAttesa + tabCounts.approvata + tabCounts.rifiutata}</p>
             </div>
           </div>
 
@@ -278,14 +278,14 @@ export default function Offerte() {
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 opacity-80">Approvate</p>
-                <p className="text-lg font-bold tabular-nums text-emerald-700">{statsApprovate}</p>
+                <p className="text-lg font-bold tabular-nums text-emerald-700">{tabCounts.approvata}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2">
               <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600 opacity-80">Rifiutate</p>
-                <p className="text-lg font-bold tabular-nums text-rose-700">{statsRifiutate}</p>
+                <p className="text-lg font-bold tabular-nums text-rose-700">{tabCounts.rifiutata}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-teal-50 border border-teal-100 px-3 py-2">
