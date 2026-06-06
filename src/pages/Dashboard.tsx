@@ -83,8 +83,6 @@ export default function Dashboard() {
     return formatEUR(value);
   }
 
-  const yearLabel = year !== 'all' ? String(year) : 'tutti gli anni';
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
