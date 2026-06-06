@@ -5,6 +5,7 @@ import {
   BookOpen,
   Camera,
   ChevronRight,
+  Download,
   FileText,
   FlaskConical,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { projectManagersService } from '../lib/dataService';
+import { exportAllData } from '../lib/exportData';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
 
@@ -74,6 +76,13 @@ function UserAvatarUpload() {
 
 function Sidebar({ onClose }: { onClose?: () => void }) {
   const { user, currentPm, signOut, isDemoMode } = useAuth();
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try { await exportAllData(); }
+    finally { setExporting(false); }
+  }
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200/80">
@@ -129,6 +138,18 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             <p className="text-xs text-amber-700 mt-0.5">Dati salvati nel browser</p>
           </div>
         )}
+        <button
+          onClick={() => void handleExport()}
+          disabled={exporting}
+          title="Esporta backup dati (JSON)"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition disabled:opacity-50 mb-0.5"
+        >
+          {exporting
+            ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+            : <Download className="w-4 h-4 shrink-0" />}
+          <span>{exporting ? 'Esportazione…' : 'Esporta dati'}</span>
+        </button>
+
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 group">
           <UserAvatarUpload />
           <div className="flex-1 min-w-0">
