@@ -47,6 +47,8 @@ import type {
   ConceptFile,
   ConceptFieldComment,
   CreateConceptFieldCommentForm,
+  ActivityLogEntry,
+  ActivityAction,
 } from '../types';
 
 // ============================================================
@@ -1338,3 +1340,56 @@ export async function findMentionsForPm(pmName: string): Promise<MentionResult[]
   ];
   return results.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
 }
+
+// ============================================================
+// Activity log
+// ============================================================
+
+const DEMO_ACTIVITY_KEY = 'demo_activity_log';
+
+function demoActivityList(): ActivityLogEntry[] {
+  try { return JSON.parse(localStorage.getItem(DEMO_ACTIVITY_KEY) ?? '[]') as ActivityLogEntry[]; }
+  catch { return []; }
+}
+function demoActivitySave(entries: ActivityLogEntry[]) {
+  localStorage.setItem(DEMO_ACTIVITY_KEY, JSON.stringify(entries));
+}
+
+export const activityLogService = {
+  async add(entry: {
+    user_email: string;
+    user_name: string | null;
+    action: ActivityAction;
+    entity_type: string;
+    entity_id: string | null;
+    entity_name: string;
+  }): Promise<void> {
+    try {
+      if (isDemoMode) {
+        const entries = demoActivityList();
+        const newEntry: ActivityLogEntry = {
+          id: crypto.randomUUID(),
+          created_at: new Date().toISOString(),
+          ...entry,
+        };
+        demoActivitySave([newEntry, ...entries].slice(0, 500));
+        return;
+      }
+      const sb = ensureSb();
+      await sb.from('activity_log').insert(entry);
+    } catch {
+      // Il log non deve mai bloccare l'operazione principale
+    }
+  },
+
+  async list(limit = 100): Promise<ActivityLogEntry[]> {
+    if (isDemoMode) return demoActivityList().slice(0, limit);
+    const sb = ensureSb();
+    const { data } = await sb
+      .from('activity_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    return (data ?? []) as ActivityLogEntry[];
+  },
+};

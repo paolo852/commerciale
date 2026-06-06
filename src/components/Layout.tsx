@@ -5,6 +5,7 @@ import {
   BookOpen,
   Camera,
   ChevronRight,
+  Clock,
   Download,
   FileText,
   FlaskConical,
@@ -32,6 +33,7 @@ const navItems = [
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/team', label: 'Team', icon: Users },
   { to: '/anagrafiche', label: 'Anagrafiche', icon: BookOpen },
+  { to: '/attivita', label: 'Attività', icon: Clock },
 ];
 
 function UserAvatarUpload() {

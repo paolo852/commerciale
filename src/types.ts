@@ -401,3 +401,16 @@ export interface LeadUpdate {
   attachment_name: string | null;
   created_at: string;
 }
+
+export type ActivityAction = 'created' | 'updated' | 'approved' | 'rejected' | 'deleted';
+
+export interface ActivityLogEntry {
+  id: string;
+  created_at: string;
+  user_email: string;
+  user_name: string | null;
+  action: ActivityAction;
+  entity_type: string;
+  entity_id: string | null;
+  entity_name: string;
+}

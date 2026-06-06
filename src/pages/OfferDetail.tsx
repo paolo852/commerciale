@@ -4,7 +4,7 @@ import { ArrowLeft, Calendar, CheckCircle2, Edit3, Euro, Percent, Trash2, User, 
 import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
-import { offersService } from '../lib/dataService';
+import { offersService, activityLogService } from '../lib/dataService';
 import { formatDate, formatEUR } from '../lib/format';
 import { StatusBadge, OutcomeBadge, TypeBadge } from '../components/Badges';
 import OfferFormModal from '../components/offerte/OfferFormModal';
@@ -45,6 +45,14 @@ export default function OfferDetail() {
   async function handleDelete() {
     if (!offer) return;
     await offersService.remove(offer.id);
+    void activityLogService.add({
+      user_email: user?.email ?? '',
+      user_name: null,
+      action: 'deleted',
+      entity_type: 'offer',
+      entity_id: offer.id,
+      entity_name: offer.name,
+    });
     navigate('/offerte');
   }
 
@@ -60,6 +68,14 @@ export default function OfferDetail() {
       });
       setOffer(updated);
       void reloadList();
+      void activityLogService.add({
+        user_email: user?.email ?? '',
+        user_name: null,
+        action: 'approved',
+        entity_type: 'offer',
+        entity_id: offer.id,
+        entity_name: offer.name,
+      });
     } finally {
       setApproving(false);
       setToApprove(false);
@@ -78,6 +94,14 @@ export default function OfferDetail() {
       });
       setOffer(updated);
       void reloadList();
+      void activityLogService.add({
+        user_email: user?.email ?? '',
+        user_name: null,
+        action: 'rejected',
+        entity_type: 'offer',
+        entity_id: offer.id,
+        entity_name: offer.name,
+      });
     } finally {
       setRejecting(false);
       setToReject(false);

@@ -16,6 +16,7 @@ import Analytics from './pages/Analytics';
 import Anagrafiche from './pages/Anagrafiche';
 import Team from './pages/Team';
 import Scrivania from './pages/Scrivania';
+import ActivityLog from './pages/ActivityLog';
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/anagrafiche" element={<Anagrafiche />} />
             <Route path="/team" element={<Team />} />
+            <Route path="/attivita" element={<ActivityLog />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Clock, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, X, XCircle } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
-import { offersService } from '../lib/dataService';
+import { offersService, activityLogService } from '../lib/dataService';
+import { useAuth } from '../contexts/AuthContext';
 import { offerYear } from '../lib/analytics';
 import YearSelector from '../components/YearSelector';
 import { formatDate, formatEUR } from '../lib/format';
@@ -61,6 +62,7 @@ function applyFilters(params: URLSearchParams, f: Filters): URLSearchParams {
 
 export default function Offerte() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { offers, projectManagers, fundingCalls, loading, error, reload } = useOffersData();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -189,6 +191,14 @@ export default function Offerte() {
   async function handleDelete() {
     if (!toDelete) return;
     await offersService.remove(toDelete.id);
+    void activityLogService.add({
+      user_email: user?.email ?? '',
+      user_name: null,
+      action: 'deleted',
+      entity_type: 'offer',
+      entity_id: toDelete.id,
+      entity_name: toDelete.name,
+    });
     setToDelete(null);
     setSelected((p) => { const n = new Set(p); n.delete(toDelete.id); return n; });
     await reload();
@@ -564,8 +574,27 @@ export default function Offerte() {
         </div>
       </div>
 
-      <OfferFormModal open={formOpen} onClose={() => setFormOpen(false)} onSaved={reload}
-        offer={editing} projectManagers={projectManagers} fundingCalls={fundingCalls} offers={offers} />
+      <OfferFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onSaved={async (saved) => {
+          if (saved) {
+            void activityLogService.add({
+              user_email: user?.email ?? '',
+              user_name: null,
+              action: editing ? 'updated' : 'created',
+              entity_type: 'offer',
+              entity_id: saved.id,
+              entity_name: saved.name,
+            });
+          }
+          await reload();
+        }}
+        offer={editing}
+        projectManagers={projectManagers}
+        fundingCalls={fundingCalls}
+        offers={offers}
+      />
       <ConfirmDialog open={!!toDelete} title="Eliminare l'offerta?"
         message={toDelete ? `"${toDelete.name}" verrà rimossa definitivamente.` : ''}
         confirmLabel="Elimina" variant="danger"
