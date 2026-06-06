@@ -7,7 +7,6 @@ import { offerYear } from '../lib/analytics';
 import YearSelector from '../components/YearSelector';
 import { formatDate, formatEUR } from '../lib/format';
 import {
-  OutcomeBadge,
   TypeBadge,
   OUTCOME_OPTIONS,
   TYPE_OPTIONS,
@@ -154,7 +153,7 @@ export default function Offerte() {
         if (o.outcome !== 'rifiutato') return false;
       } else {
         if (o.status !== view) return false;
-        if (view === 'in_lavorazione' && o.outcome !== 'nessuno') return false;
+        if (o.outcome !== 'nessuno') return false;
         if (filters.outcome !== 'all' && o.outcome !== filters.outcome) return false;
       }
       if (filters.year !== 'all' && offerYear(o) !== filters.year) return false;
@@ -481,15 +480,14 @@ export default function Offerte() {
                   <button onClick={() => toggleSort('budget')} className="inline-flex items-center gap-1.5 ml-auto">Importo <SortIcon col="budget" /></button>
                 </th>
                 <th className={`${thClass} text-right`}>Prob.</th>
-                <th className={thClass}>Esito</th>
                 <th className={`${thClass} text-right`} />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
+                <tr><td colSpan={9} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
               ) : visibleOffers.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">
+                <tr><td colSpan={9} className="text-center py-12 text-slate-400 text-sm">
                   {offers.length === 0
                     ? 'Nessuna offerta. Clicca "+ Nuova offerta" per iniziare.'
                     : `Nessuna offerta ${
@@ -523,7 +521,6 @@ export default function Offerte() {
                         (o.probability ?? 50) >= 40 ? 'text-amber-600' : 'text-red-500'
                       }`}>{o.probability ?? 50}%</span>
                     </td>
-                    <td className="px-4 py-3.5"><OutcomeBadge value={o.outcome} /></td>
                     <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => setToDelete(o)} className="text-xs text-slate-400 hover:text-red-600 transition">Elimina</button>
                     </td>
@@ -559,7 +556,7 @@ export default function Offerte() {
                       </>
                     )}
                   </td>
-                  <td colSpan={2} />
+                  <td />
                 </tr>
               </tfoot>
             )}
