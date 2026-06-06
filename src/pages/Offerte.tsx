@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, Trophy, X, XCircle } from 'lucide-react';
+import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Clock, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, X, XCircle } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService } from '../lib/dataService';
 import { offerYear } from '../lib/analytics';
@@ -107,16 +107,13 @@ export default function Offerte() {
 
   const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
 
-  const currentYear = new Date().getFullYear();
-  const statsYear = filters.year !== 'all' ? filters.year : currentYear;
-
-  const approvedOffers = useMemo(
-    () => offers.filter((o) => o.outcome === 'approvato' && offerYear(o) === statsYear),
-    [offers, statsYear],
-  );
   const approvedRevenue = useMemo(
-    () => approvedOffers.reduce((s, o) => s + o.budget, 0),
-    [approvedOffers],
+    () => yearScopedOffers.filter((o) => o.outcome === 'approvato').reduce((s, o) => s + o.budget, 0),
+    [yearScopedOffers],
+  );
+  const inAttesa = useMemo(
+    () => yearScopedOffers.filter((o) => o.status === 'presentata' && o.outcome === 'nessuno').length,
+    [yearScopedOffers],
   );
 
   function compactEUR(value: number): string {
@@ -247,21 +244,53 @@ export default function Offerte() {
       )}
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border px-4 py-3 flex items-center gap-3 bg-emerald-50 text-emerald-700 border-emerald-100">
-          <Trophy className="w-5 h-5 shrink-0 text-emerald-500" />
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Approvate {statsYear}</p>
-            <p className="text-2xl font-extrabold tabular-nums leading-tight">{approvedOffers.length}</p>
-            <p className="text-[11px] opacity-60">progetti vinti</p>
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
+        <div className="flex items-start gap-5 flex-wrap">
+          {/* Totale presentate */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
+              <Send className="w-4 h-4 text-slate-500" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Presentate{filters.year !== 'all' ? ` · ${filters.year}` : ''}
+              </p>
+              <p className="text-3xl font-black tabular-nums text-slate-900 leading-none">{tabCounts.presentata}</p>
+            </div>
           </div>
-        </div>
-        <div className="rounded-2xl border px-4 py-3 flex items-center gap-3 bg-teal-50 text-teal-700 border-teal-100">
-          <TrendingUp className="w-5 h-5 shrink-0 text-teal-500" />
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Ricavo {statsYear}</p>
-            <p className="text-2xl font-extrabold tabular-nums leading-tight">{compactEUR(approvedRevenue)}</p>
-            <p className="text-[11px] opacity-60">da offerte approvate</p>
+
+          <div className="hidden sm:block w-px self-stretch bg-slate-100 shrink-0" />
+
+          {/* Sottoinsiemi */}
+          <div className="flex items-center gap-3 flex-wrap flex-1">
+            <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2">
+              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 opacity-80">In attesa</p>
+                <p className="text-lg font-bold tabular-nums text-amber-700">{inAttesa}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 opacity-80">Approvate</p>
+                <p className="text-lg font-bold tabular-nums text-emerald-700">{tabCounts.approvata}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2">
+              <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600 opacity-80">Rifiutate</p>
+                <p className="text-lg font-bold tabular-nums text-rose-700">{tabCounts.rifiutata}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-teal-50 border border-teal-100 px-3 py-2">
+              <TrendingUp className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-600 opacity-80">Ricavo approvate</p>
+                <p className="text-lg font-bold tabular-nums text-teal-700">{compactEUR(approvedRevenue)}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
