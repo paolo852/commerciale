@@ -53,6 +53,9 @@ export default function Dashboard() {
   const kpis = useMemo(() => computeKPIs(filteredOffers), [filteredOffers]);
 
   const targetYear = year !== 'all' ? year : new Date().getFullYear();
+  // Banner and target always use the specific reference year (never "all")
+  const yearOffers = useMemo(() => filterByYear(offers, targetYear), [offers, targetYear]);
+  const kpisYear = useMemo(() => computeKPIs(yearOffers), [yearOffers]);
 
   useEffect(() => {
     void revenueTargetsService.get(targetYear).then((t) => {
@@ -108,9 +111,9 @@ export default function Dashboard() {
             <Trophy className="w-6 h-6 text-emerald-600" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 opacity-80">Approvate · {yearLabel}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 opacity-80">Approvate · {targetYear}</p>
             <p className="text-4xl font-black tabular-nums text-emerald-700 leading-tight">
-              {loading ? '…' : kpis.approvati}
+              {loading ? '…' : kpisYear.approvati}
             </p>
             <p className="text-xs text-emerald-600 opacity-70">progetti vinti</p>
           </div>
@@ -121,9 +124,9 @@ export default function Dashboard() {
             <TrendingUp className="w-6 h-6 text-teal-600" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 opacity-80">Ricavo · {yearLabel}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 opacity-80">Ricavo · {targetYear}</p>
             <p className="text-4xl font-black tabular-nums text-teal-700 leading-tight">
-              {loading ? '…' : compactEUR(kpis.ricavoApprovato)}
+              {loading ? '…' : compactEUR(kpisYear.ricavoApprovato)}
             </p>
             <p className="text-xs text-teal-600 opacity-70">da offerte approvate</p>
           </div>
@@ -134,7 +137,7 @@ export default function Dashboard() {
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Target fatturato · {yearLabel}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Target fatturato · {targetYear}</p>
           </div>
           {!editingTarget && (
             <button
@@ -171,28 +174,28 @@ export default function Dashboard() {
           <>
             <div className="flex items-end justify-between mb-1.5">
               <span className="text-2xl font-bold tabular-nums text-slate-900">
-                {Math.round(Math.min((kpis.ricavoApprovato / target) * 100, 100))}%
+                {Math.round(Math.min((kpisYear.ricavoApprovato / target) * 100, 100))}%
               </span>
               <span className="text-xs text-slate-400 tabular-nums">
-                {compactEUR(kpis.ricavoApprovato)} / {compactEUR(target)}
+                {compactEUR(kpisYear.ricavoApprovato)} / {compactEUR(target)}
               </span>
             </div>
             <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  kpis.ricavoApprovato >= target ? 'bg-emerald-500' :
-                  kpis.ricavoApprovato / target >= 0.6 ? 'bg-teal-500' :
-                  kpis.ricavoApprovato / target >= 0.3 ? 'bg-amber-400' : 'bg-slate-300'
+                  kpisYear.ricavoApprovato >= target ? 'bg-emerald-500' :
+                  kpisYear.ricavoApprovato / target >= 0.6 ? 'bg-teal-500' :
+                  kpisYear.ricavoApprovato / target >= 0.3 ? 'bg-amber-400' : 'bg-slate-300'
                 }`}
-                style={{ width: `${Math.min((kpis.ricavoApprovato / target) * 100, 100)}%` }}
+                style={{ width: `${Math.min((kpisYear.ricavoApprovato / target) * 100, 100)}%` }}
               />
             </div>
-            {kpis.ricavoApprovato >= target && (
+            {kpisYear.ricavoApprovato >= target && (
               <p className="mt-1.5 text-xs font-semibold text-emerald-600">🎯 Target raggiunto!</p>
             )}
           </>
         ) : (
-          <p className="text-sm text-slate-400 italic">Nessun target impostato per {yearLabel}.</p>
+          <p className="text-sm text-slate-400 italic">Nessun target impostato per {targetYear}.</p>
         )}
       </div>
 
