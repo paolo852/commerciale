@@ -29,9 +29,10 @@ export async function exportAllData(): Promise<void> {
     );
   } else {
     if (!supabase) throw new Error('Supabase non inizializzato');
+    const sb = supabase;
     const results = await Promise.all(
       TABLES.map(async (table) => {
-        const { data, error } = await supabase.from(table).select('*');
+        const { data, error } = await sb.from(table).select('*');
         if (error) throw new Error(`Errore export ${table}: ${error.message}`);
         return [table, data ?? []] as [string, unknown[]];
       }),
