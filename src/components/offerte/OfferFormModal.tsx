@@ -4,7 +4,7 @@ import Modal from '../Modal';
 import { useAuth } from '../../contexts/AuthContext';
 import { offersService, fundingCallsService } from '../../lib/dataService';
 import { toDateInputValue } from '../../lib/format';
-import { STATUS_OPTIONS, OUTCOME_OPTIONS } from '../Badges';
+import { STATUS_OPTIONS } from '../Badges';
 import type {
   Offer, OfferStatus, OfferOutcome, OfferType, ProjectManager, FundingCall,
 } from '../../types';
@@ -201,9 +201,6 @@ export default function OfferFormModal({
     if (!user) return;
     if (form.status === 'presentata' && !form.submitted_at) {
       setError('Per le offerte presentate è obbligatoria la data di presentazione.'); return;
-    }
-    if (form.outcome !== 'nessuno' && !form.decided_at) {
-      setError("Per registrare un esito è obbligatoria la data dell'esito."); return;
     }
     if (form.type === 'financed' && !form.funding_call) {
       setError('Per le offerte finanziate è obbligatorio il bando.'); return;
@@ -438,28 +435,11 @@ export default function OfferFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Esito *</label>
-            <select value={form.outcome} onChange={(e) => update('outcome', e.target.value as OfferOutcome)} className={selectClass}>
-              {OUTCOME_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               Data presentazione{form.status === 'presentata' ? ' *' : ''}
             </label>
             <input type="date" required={form.status === 'presentata'} disabled={form.status !== 'presentata'}
               value={form.submitted_at} onChange={(e) => update('submitted_at', e.target.value)}
-              className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-400`} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Data esito{form.outcome !== 'nessuno' ? ' *' : ''}
-            </label>
-            <input type="date" required={form.outcome !== 'nessuno'} disabled={form.outcome === 'nessuno'}
-              value={form.decided_at} onChange={(e) => update('decided_at', e.target.value)}
               className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-400`} />
           </div>
         </div>
