@@ -1,17 +1,17 @@
 import { useMemo } from 'react';
-import type { Offer } from '../../types';
+import type { FundingCall, Offer } from '../../types';
 import { computeFundingCallStats } from '../../lib/analytics';
 import SuccessRateBars from './SuccessRateBars';
 
-export default function SuccessByFundingCall({ offers }: { offers: Offer[] }) {
-  const stats = useMemo(() => computeFundingCallStats(offers), [offers]);
+export default function SuccessByFundingCall({ offers, fundingCalls = [] }: { offers: Offer[]; fundingCalls?: FundingCall[] }) {
+  const stats = useMemo(() => computeFundingCallStats(offers, fundingCalls), [offers, fundingCalls]);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-200">
         <h2 className="text-base font-semibold text-slate-900">Tasso di successo per bando</h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Solo offerte finanziate con esito definito
+          Offerte finanziate e consulenze collegate a un bando
         </p>
       </div>
 

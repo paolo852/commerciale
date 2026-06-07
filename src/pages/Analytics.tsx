@@ -10,7 +10,7 @@ import SuccessByProjectManager from '../components/analytics/SuccessByProjectMan
 import YearSelector from '../components/YearSelector';
 
 export default function Analytics() {
-  const { offers, projectManagers, loading, error } = useOffersData();
+  const { offers, projectManagers, fundingCalls, loading, error } = useOffersData();
   const [year, setYear] = useState<number | 'all'>('all');
 
   const filteredOffers = useMemo(() => filterByYear(offers, year), [offers, year]);
@@ -54,7 +54,7 @@ export default function Analytics() {
       <TypeComparison offers={filteredOffers} />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SuccessByFundingCall offers={filteredOffers} />
+        <SuccessByFundingCall offers={filteredOffers} fundingCalls={fundingCalls} />
         <SuccessByProjectManager offers={filteredOffers} projectManagers={projectManagers} />
       </div>
     </div>

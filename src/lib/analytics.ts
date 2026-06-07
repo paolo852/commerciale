@@ -320,11 +320,19 @@ export function computeStatusDistribution(offers: Offer[]): StatusDistribution {
 // Statistiche per funding call e project manager
 // ----------------------------------------------------------------
 
-export function computeFundingCallStats(offers: Offer[]): FundingCallStats[] {
+export function computeFundingCallStats(offers: Offer[], fundingCalls: { id: string; code: string }[] = []): FundingCallStats[] {
+  const codeById = new Map(fundingCalls.map((f) => [f.id, f.code]));
   const map = new Map<string, FundingCallStats>();
   for (const o of offers) {
-    if (o.type !== 'financed' || !o.funding_call) continue;
-    const key = o.funding_call;
+    // Determina il codice bando: per finanziate usa funding_call,
+    // per consulenze collegate usa consulting_call_id → codice
+    let key: string | null = null;
+    if (o.type === 'financed' && o.funding_call) {
+      key = o.funding_call;
+    } else if (o.type === 'consulting' && o.consulting_call_id) {
+      key = codeById.get(o.consulting_call_id) ?? null;
+    }
+    if (!key) continue;
     const cur = map.get(key) ?? {
       funding_call: key,
       totale: 0,
