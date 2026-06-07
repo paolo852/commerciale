@@ -50,12 +50,13 @@ function actionBg(action: ActivityAction): string {
 export default function ActivityLog() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void activityLogService.list(200).then((data) => {
-      setEntries(data);
-      setLoading(false);
-    });
+    activityLogService.list(200)
+      .then((data) => { setEntries(data); })
+      .catch((e: unknown) => { setError((e as { message?: string })?.message ?? 'Errore caricamento log'); })
+      .finally(() => { setLoading(false); });
   }, []);
 
   // Group by day
@@ -78,6 +79,15 @@ export default function ActivityLog() {
 
       {loading ? (
         <div className="text-center py-16 text-slate-400 text-sm">Caricamento…</div>
+      ) : error ? (
+        <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm space-y-1">
+          <p className="font-semibold">Impossibile caricare il log delle attività.</p>
+          <p className="text-xs">{error}</p>
+          <p className="text-xs text-red-500 mt-2">
+            Probabilmente la tabella <code className="bg-red-100 px-1 rounded">activity_log</code> non è ancora stata creata.
+            Esegui la migrazione <strong>migrate_v30_activity_log.sql</strong> nel SQL Editor di Supabase.
+          </p>
+        </div>
       ) : entries.length === 0 ? (
         <div className="text-center py-16 text-slate-400 text-sm">
           Nessuna attività registrata.<br />

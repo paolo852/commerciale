@@ -1385,11 +1385,12 @@ export const activityLogService = {
   async list(limit = 100): Promise<ActivityLogEntry[]> {
     if (isDemoMode) return demoActivityList().slice(0, limit);
     const sb = ensureSb();
-    const { data } = await sb
+    const { data, error } = await sb
       .from('activity_log')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(limit);
+    if (error) throw new Error(error.message);
     return (data ?? []) as ActivityLogEntry[];
   },
 };
