@@ -338,7 +338,7 @@ export default function Offerte() {
           }`}
         >
           <Send className="w-4 h-4 shrink-0" />
-          <span className="font-semibold">Presentate</span>
+          <span className="font-semibold">In attesa</span>
           <span className={`text-sm font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center tabular-nums ${
             view === 'presentata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
@@ -502,7 +502,7 @@ export default function Offerte() {
                     ? 'Nessuna offerta. Clicca "+ Nuova offerta" per iniziare.'
                     : `Nessuna offerta ${
                         view === 'in_lavorazione' ? 'in lavorazione'
-                        : view === 'presentata' ? 'presentata'
+                        : view === 'presentata' ? 'in attesa'
                         : view === 'approvata' ? 'approvata'
                         : 'rifiutata'
                       }${isFiltered ? ' corrisponde ai filtri' : ''}.`}
@@ -545,7 +545,7 @@ export default function Offerte() {
                   <td colSpan={5} className="px-4 py-4 text-xs text-slate-400">
                     {visibleOffers.length} di {tabCounts[view]} offerte {
                       view === 'in_lavorazione' ? 'in lavorazione'
-                      : view === 'presentata' ? 'presentate'
+                      : view === 'presentata' ? 'in attesa'
                       : view === 'approvata' ? 'approvate'
                       : 'rifiutate'
                     }
