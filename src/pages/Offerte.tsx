@@ -342,7 +342,7 @@ export default function Offerte() {
           <span className={`text-sm font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center tabular-nums ${
             view === 'presentata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
-            {tabCounts.presentata}
+            {inAttesa}
           </span>
         </button>
 
