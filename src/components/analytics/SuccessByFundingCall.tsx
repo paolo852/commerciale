@@ -38,21 +38,37 @@ export default function SuccessByFundingCall({ offers, fundingCalls = [] }: { of
                   <th className="text-right px-4 py-2.5 font-medium">Totale</th>
                   <th className="text-right px-4 py-2.5 font-medium">Approvate</th>
                   <th className="text-right px-4 py-2.5 font-medium">Rifiutate</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Successo</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Nostro</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Bando</th>
                 </tr>
               </thead>
               <tbody>
-                {stats.map((s) => (
-                  <tr key={s.funding_call} className="border-t border-slate-100">
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{s.funding_call}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{s.totale}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700">{s.approvate}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-red-700">{s.rifiutate}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-medium">
-                      {s.tassoSuccesso === null ? '—' : `${Math.round(s.tassoSuccesso * 100)}%`}
-                    </td>
-                  </tr>
-                ))}
+                {stats.map((s) => {
+                  const nostro = s.tassoSuccesso;
+                  const bando  = s.probabilitaBando != null ? s.probabilitaBando / 100 : null;
+                  const diff   = nostro != null && bando != null ? nostro - bando : null;
+                  return (
+                    <tr key={s.funding_call} className="border-t border-slate-100">
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{s.funding_call}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{s.totale}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700">{s.approvate}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-red-700">{s.rifiutate}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">
+                        <span className={nostro == null ? 'text-slate-400' : nostro >= 0.6 ? 'text-emerald-700' : nostro >= 0.3 ? 'text-amber-600' : 'text-red-600'}>
+                          {nostro == null ? '—' : `${Math.round(nostro * 100)}%`}
+                        </span>
+                        {diff != null && (
+                          <span className={`ml-1.5 text-[11px] font-semibold ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                            {diff > 0 ? `+${Math.round(diff * 100)}` : Math.round(diff * 100)}pp
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
+                        {bando == null ? '—' : `${Math.round(bando * 100)}%`}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -290,6 +290,7 @@ export interface FundingCallStats {
   approvate: number;
   rifiutate: number;
   tassoSuccesso: number | null;
+  probabilitaBando: number | null; // probability impostata nella scheda bando
 }
 
 export interface ProjectManagerStats {

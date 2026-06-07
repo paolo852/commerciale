@@ -320,8 +320,9 @@ export function computeStatusDistribution(offers: Offer[]): StatusDistribution {
 // Statistiche per funding call e project manager
 // ----------------------------------------------------------------
 
-export function computeFundingCallStats(offers: Offer[], fundingCalls: { id: string; code: string }[] = []): FundingCallStats[] {
-  const codeById = new Map(fundingCalls.map((f) => [f.id, f.code]));
+export function computeFundingCallStats(offers: Offer[], fundingCalls: { id: string; code: string; probability?: number }[] = []): FundingCallStats[] {
+  const callByCode = new Map(fundingCalls.map((f) => [f.code, f]));
+  const codeById  = new Map(fundingCalls.map((f) => [f.id,   f.code]));
   const map = new Map<string, FundingCallStats>();
   for (const o of offers) {
     // Determina il codice bando: per finanziate usa funding_call,
@@ -333,12 +334,14 @@ export function computeFundingCallStats(offers: Offer[], fundingCalls: { id: str
       key = codeById.get(o.consulting_call_id) ?? null;
     }
     if (!key) continue;
+    const probabilitaBando = callByCode.get(key)?.probability ?? null;
     const cur = map.get(key) ?? {
       funding_call: key,
       totale: 0,
       approvate: 0,
       rifiutate: 0,
       tassoSuccesso: null,
+      probabilitaBando: probabilitaBando !== undefined ? probabilitaBando : null,
     };
     cur.totale++;
     if (o.outcome === 'approvato') cur.approvate++;
