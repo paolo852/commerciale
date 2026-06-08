@@ -16,7 +16,11 @@ function timeAgo(iso: string): string {
 }
 
 function actionLabel(action: ActivityAction, entityType: string): string {
-  const entity = entityType === 'offer' ? "l'offerta" : entityType;
+  const entity =
+    entityType === 'offer'   ? "l'offerta" :
+    entityType === 'concept' ? 'il concept' :
+    entityType === 'lead'    ? 'il lead' :
+    entityType;
   switch (action) {
     case 'created':  return `ha creato ${entity}`;
     case 'updated':  return `ha modificato ${entity}`;

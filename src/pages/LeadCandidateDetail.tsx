@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { useOffersData } from '../hooks/useOffersData';
-import { leadCandidatesService, leadUpdatesService, conceptsService, offersService } from '../lib/dataService';
+import { leadCandidatesService, leadUpdatesService, conceptsService, offersService, activityLogService } from '../lib/dataService';
 import { formatDate } from '../lib/format';
 import LeadCandidateFormModal from '../components/leads/LeadCandidateFormModal';
 import OfferFormModal from '../components/offerte/OfferFormModal';
@@ -81,12 +81,14 @@ export default function LeadCandidateDetail() {
 
   async function handleDelete() {
     if (!lead) return;
+    void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'deleted', entity_type: 'lead', entity_id: lead.id, entity_name: lead.researcher_name });
     await leadCandidatesService.remove(lead.id);
     navigate('/leads');
   }
 
   async function handleOfferCreated(offer?: Offer) {
     if (lead && offer) {
+      void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'approved', entity_type: 'lead', entity_id: lead.id, entity_name: lead.researcher_name });
       await leadCandidatesService.update(lead.id, { status: 'promosso', promoted_offer_id: offer.id });
       setPromoteOfferOpen(false);
       await reload();
@@ -129,6 +131,7 @@ export default function LeadCandidateDetail() {
 
   async function handleArchive() {
     if (!lead) return;
+    void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'updated', entity_type: 'lead', entity_id: lead.id, entity_name: lead.researcher_name });
     await leadCandidatesService.update(lead.id, { status: 'archiviato' });
     await reload();
   }
@@ -145,6 +148,7 @@ export default function LeadCandidateDetail() {
         status: 'in_valutazione',
         notes: null,
       }, user.id);
+      void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'approved', entity_type: 'lead', entity_id: lead.id, entity_name: lead.researcher_name });
       await leadCandidatesService.update(lead.id, {
         status: 'promosso',
         promoted_concept_id: concept.id,

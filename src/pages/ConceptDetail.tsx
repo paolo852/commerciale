@@ -11,7 +11,7 @@ import { useOffersData } from '../hooks/useOffersData';
 import {
   conceptsService, conceptAssigneesService,
   conceptDeadlinesService, conceptFilesService,
-  leadCandidatesService, offersService,
+  leadCandidatesService, offersService, activityLogService,
 } from '../lib/dataService';
 import { isDemoMode, supabase } from '../lib/supabase';
 import EntityTasks from '../components/EntityTasks';
@@ -114,12 +114,14 @@ export default function ConceptDetail() {
 
   async function handleDelete() {
     if (!concept) return;
+    void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'deleted', entity_type: 'concept', entity_id: concept.id, entity_name: concept.name });
     await conceptsService.remove(concept.id);
     navigate('/concepts');
   }
 
   async function handleOfferSaved(offer?: Offer) {
     if (concept && offer) {
+      void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'approved', entity_type: 'concept', entity_id: concept.id, entity_name: concept.name });
       await conceptsService.update(concept.id, { status: 'promosso', promoted_offer_id: offer.id });
     }
     setPromoteOpen(false);
@@ -432,7 +434,11 @@ export default function ConceptDetail() {
       <ConceptFormModal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        onSaved={() => { setEditOpen(false); void reload(); }}
+        onSaved={() => {
+          void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'updated', entity_type: 'concept', entity_id: concept.id, entity_name: concept.name });
+          setEditOpen(false);
+          void reload();
+        }}
         concept={concept}
         projectManagers={projectManagers}
       />

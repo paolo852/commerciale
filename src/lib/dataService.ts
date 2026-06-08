@@ -1414,9 +1414,10 @@ export const activityLogService = {
         return;
       }
       const sb = ensureSb();
-      await sb.from('activity_log').insert(entry);
-    } catch {
-      // Il log non deve mai bloccare l'operazione principale
+      const { error } = await sb.from('activity_log').insert(entry);
+      if (error) console.warn('[ActivityLog] insert failed:', error.message, error.code);
+    } catch (e) {
+      console.warn('[ActivityLog] unexpected error:', e);
     }
   },
 
@@ -1477,14 +1478,14 @@ export const navCountsService = {
     if (isDemoMode) {
       return {
         leads:    demoLeadCandidates.list().length,
-        concepts: demoConcepts.list().length,
+        concepts: demoConcepts.list().filter((c) => c.status === 'in_valutazione').length,
         offers:   demoOffers.list().length,
       };
     }
     const sb = ensureSb();
     const [l, c, o] = await Promise.all([
       sb.from('lead_candidates').select('id', { count: 'exact', head: true }),
-      sb.from('concepts').select('id', { count: 'exact', head: true }),
+      sb.from('concepts').select('id', { count: 'exact', head: true }).eq('status', 'in_valutazione'),
       sb.from('offers').select('id', { count: 'exact', head: true }),
     ]);
     return {
