@@ -297,7 +297,7 @@ export default function OfferDetail() {
       )}
 
       {/* Comments */}
-      <EntityComments entityType="offer" entityId={offer.id} />
+      <EntityComments entityType="offer" entityId={offer.id} projectManagers={projectManagers} />
 
       <OfferFormModal
         open={editOpen}

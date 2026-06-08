@@ -1,23 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { MessageSquare, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { entityCommentsService } from '../lib/dataService';
+import { sendMentionNotifications } from '../lib/mentionNotify';
 import { formatDate } from '../lib/format';
-import type { EntityComment } from '../types';
+import MentionTextarea from './MentionTextarea';
+import type { EntityComment, ProjectManager } from '../types';
 
 interface Props {
   entityType: 'concept' | 'offer' | 'lead';
   entityId: string;
+  projectManagers: ProjectManager[];
 }
 
-export default function EntityComments({ entityType, entityId }: Props) {
+export default function EntityComments({ entityType, entityId, projectManagers }: Props) {
   const { user } = useAuth();
   const [comments, setComments] = useState<EntityComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
+  const [mentions, setMentions] = useState<string[]>([]);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -33,17 +36,22 @@ export default function EntityComments({ entityType, entityId }: Props) {
     if (!body.trim() || !user) return;
     setPosting(true); setError(null);
     try {
+      const authorName =
+        projectManagers.find((p) => p.email === user.email)?.name ?? user.email ?? 'Anonimo';
       await entityCommentsService.create({
         user_id: user.id,
         entity_type: entityType,
         entity_id: entityId,
-        author_name: user.email ?? 'Anonimo',
+        author_name: authorName,
         body: body.trim(),
       });
+      const pmById = new Map(projectManagers.map((p) => [p.id, p]));
+      void sendMentionNotifications(mentions, pmById, authorName, body.trim(), window.location.href);
       setBody('');
+      setMentions([]);
       await load();
     } catch (e) {
-      setError((e as { message?: string })?.message ?? 'Errore durante l\'invio');
+      setError((e as { message?: string })?.message ?? "Errore durante l'invio");
     } finally {
       setPosting(false);
     }
@@ -52,13 +60,6 @@ export default function EntityComments({ entityType, entityId }: Props) {
   async function remove(id: string) {
     await entityCommentsService.remove(id);
     setComments((prev) => prev.filter((c) => c.id !== id));
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      void post();
-    }
   }
 
   return (
@@ -74,14 +75,17 @@ export default function EntityComments({ entityType, entityId }: Props) {
       {/* Input */}
       {user && (
         <div className="mb-4">
-          <textarea
-            ref={textareaRef}
+          <MentionTextarea
             value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Scrivi un commento… (Ctrl+Enter per inviare)"
+            onChange={setBody}
+            mentions={mentions}
+            onMentionsChange={setMentions}
+            projectManagers={projectManagers}
+            placeholder="Scrivi un commento… usa @ per menzionare (Ctrl+Enter per inviare)"
             rows={3}
             className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+            disabled={posting}
+            onEnter={() => void post()}
           />
           {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
           <div className="flex justify-end mt-2">

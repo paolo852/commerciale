@@ -377,7 +377,7 @@ export default function ConceptDetail() {
       )}
 
       {/* Comments */}
-      <EntityComments entityType="concept" entityId={concept.id} />
+      <EntityComments entityType="concept" entityId={concept.id} projectManagers={projectManagers} />
 
       {/* Product Concept Template */}
       <ConceptTemplatePanel
