@@ -225,6 +225,7 @@ export default function LeadCandidates() {
   function LeadCard({ lead, showAssign }: { lead: LeadCandidate; showAssign: boolean }) {
     const isAssigning = assigningId === lead.id;
     const lastUpdate = lastLeadUpdate.get(lead.id);
+    const isNew = Date.now() - new Date(lead.created_at).getTime() < 14 * 24 * 60 * 60 * 1000;
     return (
       <div
         onClick={() => !isAssigning && navigate(`/leads/${lead.id}`)}
@@ -237,7 +238,14 @@ export default function LeadCandidates() {
               <p className="text-xs text-slate-500 truncate mt-0.5">{lead.institution}</p>
             )}
           </div>
-          <StatusBadge value={lead.status} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isNew && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                New
+              </span>
+            )}
+            <StatusBadge value={lead.status} />
+          </div>
         </div>
 
         {lead.call_type && lead.call_type !== 'Non classificato' && !lead.funding_call_id && (
