@@ -27,6 +27,11 @@ function StatusBadge({ value }: { value: LeadCandidateStatus }) {
   );
 }
 
+const NEW_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
+function isNewLead(lead: LeadCandidate): boolean {
+  return Date.now() - new Date(lead.created_at).getTime() < NEW_THRESHOLD_MS;
+}
+
 type FilterTab = 'all' | 'attivo' | 'promosso' | 'archiviato';
 const TABS: { id: FilterTab; label: string }[] = [
   { id: 'all', label: 'Tutti' },
@@ -225,11 +230,15 @@ export default function LeadCandidates() {
   function LeadCard({ lead, showAssign }: { lead: LeadCandidate; showAssign: boolean }) {
     const isAssigning = assigningId === lead.id;
     const lastUpdate = lastLeadUpdate.get(lead.id);
-    const isNew = Date.now() - new Date(lead.created_at).getTime() < 14 * 24 * 60 * 60 * 1000;
+    const leadIsNew = isNewLead(lead);
     return (
       <div
         onClick={() => !isAssigning && navigate(`/leads/${lead.id}`)}
-        className={`bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-200 transition p-3.5 flex flex-col gap-2 ${isAssigning ? 'cursor-default' : 'cursor-pointer'}`}
+        className={`rounded-xl border shadow-sm hover:shadow-md transition p-3.5 flex flex-col gap-2 ${
+          leadIsNew
+            ? 'bg-indigo-50/70 border-indigo-200 hover:border-indigo-400'
+            : 'bg-white border-slate-200/80 hover:border-indigo-200'
+        } ${isAssigning ? 'cursor-default' : 'cursor-pointer'}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -239,8 +248,8 @@ export default function LeadCandidates() {
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {isNew && (
-              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+            {leadIsNew && (
+              <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-600 text-white shadow-sm shadow-indigo-300">
                 New
               </span>
             )}
@@ -588,7 +597,7 @@ export default function LeadCandidates() {
 
                       {!isCollapsed && (
                         <div className="px-3 pb-3 space-y-2 border-t border-slate-100 pt-2 bg-slate-50/40">
-                          {groupLeads.map((lead) => (
+                          {[...groupLeads].sort((a, b) => +isNewLead(b) - +isNewLead(a)).map((lead) => (
                             <LeadCard key={lead.id} lead={lead} showAssign={false} />
                           ))}
                         </div>
@@ -625,7 +634,7 @@ export default function LeadCandidates() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {leadsWithoutBando.map((lead) => (
+                    {[...leadsWithoutBando].sort((a, b) => +isNewLead(b) - +isNewLead(a)).map((lead) => (
                       <LeadCard key={lead.id} lead={lead} showAssign />
                     ))}
                   </div>
