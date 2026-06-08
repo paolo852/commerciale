@@ -4,14 +4,15 @@ import { ArrowLeft, Calendar, CheckCircle2, Edit3, Euro, Percent, Trash2, User, 
 import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
-import { offersService, activityLogService } from '../lib/dataService';
+import { offersService, activityLogService, conceptsService, leadCandidatesService } from '../lib/dataService';
 import { formatDate, formatEUR } from '../lib/format';
 import { StatusBadge, OutcomeBadge, TypeBadge } from '../components/Badges';
 import OfferFormModal from '../components/offerte/OfferFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EntityTasks from '../components/EntityTasks';
 import EntityComments from '../components/EntityComments';
-import type { Offer } from '../types';
+import ProjectPipelineCard from '../components/ProjectPipelineCard';
+import type { Concept, LeadCandidate, Offer } from '../types';
 
 export default function OfferDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,8 @@ export default function OfferDetail() {
   const { projectManagers, fundingCalls, offers, reload: reloadList } = useOffersData();
 
   const [offer, setOffer] = useState<Offer | null>(null);
+  const [pipelineConcept, setPipelineConcept] = useState<Concept | null>(null);
+  const [pipelineLead, setPipelineLead] = useState<LeadCandidate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -34,8 +37,16 @@ export default function OfferDetail() {
     setLoading(true); setError(null);
     try {
       const o = await offersService.get(id);
-      if (!o) setError('Offerta non trovata.');
-      else setOffer(o);
+      if (!o) { setError('Offerta non trovata.'); }
+      else {
+        setOffer(o);
+        const concept = await conceptsService.findByPromotedOfferId(o.id);
+        setPipelineConcept(concept);
+        const lead = concept
+          ? await leadCandidatesService.findByPromotedConceptId(concept.id)
+          : await leadCandidatesService.findByPromotedOfferId(o.id);
+        setPipelineLead(lead);
+      }
     } catch (e) {
       setError((e as { message?: string })?.message ?? 'Errore caricamento');
     } finally { setLoading(false); }
@@ -136,6 +147,14 @@ export default function OfferDetail() {
       <button onClick={() => navigate('/offerte')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1">
         <ArrowLeft className="w-3.5 h-3.5" /> Torna alle offerte
       </button>
+
+      {/* Pipeline */}
+      <ProjectPipelineCard
+        current="offer"
+        lead={pipelineLead    ? { id: pipelineLead.id,    label: pipelineLead.researcher_name } : null}
+        concept={pipelineConcept ? { id: pipelineConcept.id, label: pipelineConcept.name }      : null}
+        offer={{ id: offer.id, label: offer.name }}
+      />
 
       {/* Header card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">

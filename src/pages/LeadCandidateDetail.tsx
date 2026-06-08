@@ -7,14 +7,16 @@ import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { useOffersData } from '../hooks/useOffersData';
-import { leadCandidatesService, leadUpdatesService, conceptsService } from '../lib/dataService';
+import { leadCandidatesService, leadUpdatesService, conceptsService, offersService } from '../lib/dataService';
 import { formatDate } from '../lib/format';
 import LeadCandidateFormModal from '../components/leads/LeadCandidateFormModal';
+import OfferFormModal from '../components/offerte/OfferFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EntityTasks from '../components/EntityTasks';
 import MentionTextarea from '../components/MentionTextarea';
+import ProjectPipelineCard from '../components/ProjectPipelineCard';
 import { sendMentionNotifications } from '../lib/mentionNotify';
-import type { LeadCandidate, LeadCandidateStatus, LeadUpdate, ProjectManager } from '../types';
+import type { Concept, LeadCandidate, LeadCandidateStatus, LeadUpdate, Offer, ProjectManager } from '../types';
 
 const STATUS_MAP: Record<LeadCandidateStatus, { label: string; cls: string; Icon: typeof Clock }> = {
   attivo:    { label: 'Attivo',    cls: 'bg-sky-50 text-sky-700 border-sky-200',           Icon: Clock },
@@ -31,11 +33,14 @@ export default function LeadCandidateDetail() {
 
   const [lead, setLead] = useState<LeadCandidate | null>(null);
   const [updates, setUpdates] = useState<LeadUpdate[]>([]);
+  const [pipelineConcept, setPipelineConcept] = useState<Concept | null>(null);
+  const [pipelineOffer, setPipelineOffer] = useState<Offer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [toDelete, setToDelete] = useState(false);
   const [promoting, setPromoting] = useState(false);
+  const [promoteOfferOpen, setPromoteOfferOpen] = useState(false);
 
   // New update form
   const [newBody, setNewBody] = useState('');
@@ -57,7 +62,15 @@ export default function LeadCandidateDetail() {
         leadUpdatesService.list(id),
       ]);
       if (!l) { setError('Lead non trovato.'); }
-      else { setLead(l); }
+      else {
+        setLead(l);
+        const [pc, po] = await Promise.all([
+          l.promoted_concept_id ? conceptsService.get(l.promoted_concept_id) : Promise.resolve(null),
+          l.promoted_offer_id   ? offersService.get(l.promoted_offer_id)     : Promise.resolve(null),
+        ]);
+        setPipelineConcept(pc);
+        setPipelineOffer(po);
+      }
       setUpdates(u);
     } catch (e) {
       setError((e as { message?: string })?.message ?? 'Errore caricamento');
@@ -70,6 +83,17 @@ export default function LeadCandidateDetail() {
     if (!lead) return;
     await leadCandidatesService.remove(lead.id);
     navigate('/leads');
+  }
+
+  async function handleOfferCreated(offer?: Offer) {
+    if (lead && offer) {
+      await leadCandidatesService.update(lead.id, { status: 'promosso', promoted_offer_id: offer.id });
+      setPromoteOfferOpen(false);
+      await reload();
+      navigate(`/offerte/${offer.id}`);
+    } else {
+      setPromoteOfferOpen(false);
+    }
   }
 
   async function postUpdate() {
@@ -160,6 +184,16 @@ export default function LeadCandidateDetail() {
       <button onClick={() => navigate('/leads')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1">
         <ArrowLeft className="w-3.5 h-3.5" /> Torna ai lead
       </button>
+
+      {/* Pipeline */}
+      <ProjectPipelineCard
+        current="lead"
+        lead={{ id: lead.id, label: lead.researcher_name }}
+        concept={pipelineConcept ? { id: pipelineConcept.id, label: pipelineConcept.name } : null}
+        offer={pipelineOffer   ? { id: pipelineOffer.id,    label: pipelineOffer.name }    : null}
+        onCreateConcept={lead.status === 'attivo' && !lead.promoted_concept_id ? () => void promoteToConc() : undefined}
+        onCreateOffer={lead.status === 'attivo' && !lead.promoted_offer_id ? () => setPromoteOfferOpen(true) : undefined}
+      />
 
       {/* Header */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
@@ -393,6 +427,16 @@ export default function LeadCandidateDetail() {
         message={`"${lead.researcher_name}" e tutto lo storico delle interazioni verranno rimossi definitivamente.`}
         confirmLabel="Elimina" variant="danger"
         onConfirm={handleDelete} onCancel={() => setToDelete(false)}
+      />
+
+      <OfferFormModal
+        open={promoteOfferOpen}
+        onClose={() => setPromoteOfferOpen(false)}
+        onSaved={handleOfferCreated}
+        offer={null}
+        projectManagers={projectManagers}
+        fundingCalls={fundingCalls}
+        initial={{ name: lead.researcher_name, pi: lead.researcher_name, ente: lead.institution ?? undefined }}
       />
     </div>
   );

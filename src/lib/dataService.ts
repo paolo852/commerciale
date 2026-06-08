@@ -433,6 +433,14 @@ export const conceptsService = {
     const { error } = await ensureSb().from('concepts').delete().eq('id', id);
     if (error) throw error;
   },
+
+  async findByPromotedOfferId(offerId: string): Promise<Concept | null> {
+    if (isDemoMode) return demoConcepts.list().find((c) => c.promoted_offer_id === offerId) ?? null;
+    const { data, error } = await ensureSb()
+      .from('concepts').select('*').eq('promoted_offer_id', offerId).maybeSingle();
+    if (error) throw error;
+    return data as Concept | null;
+  },
 };
 
 // ----------------------------------------------------------------
@@ -869,7 +877,7 @@ export const leadCandidatesService = {
   },
 
   async create(input: CreateLeadCandidateForm, userId: string): Promise<LeadCandidate> {
-    if (isDemoMode) return demoLeadCandidates.create({ ...input, promoted_concept_id: null });
+    if (isDemoMode) return demoLeadCandidates.create({ ...input, promoted_concept_id: null, promoted_offer_id: null });
     const { data, error } = await ensureSb()
       .from('lead_candidates')
       .insert({ ...input, user_id: userId })
@@ -912,6 +920,22 @@ export const leadCandidatesService = {
     if (error) throw error;
     const types = [...new Set((data ?? []).map((r: { call_type: string }) => r.call_type))];
     return types.sort();
+  },
+
+  async findByPromotedConceptId(conceptId: string): Promise<LeadCandidate | null> {
+    if (isDemoMode) return demoLeadCandidates.list().find((l) => l.promoted_concept_id === conceptId) ?? null;
+    const { data, error } = await ensureSb()
+      .from('lead_candidates').select('*').eq('promoted_concept_id', conceptId).maybeSingle();
+    if (error) throw error;
+    return data as LeadCandidate | null;
+  },
+
+  async findByPromotedOfferId(offerId: string): Promise<LeadCandidate | null> {
+    if (isDemoMode) return demoLeadCandidates.list().find((l) => l.promoted_offer_id === offerId) ?? null;
+    const { data, error } = await ensureSb()
+      .from('lead_candidates').select('*').eq('promoted_offer_id', offerId).maybeSingle();
+    if (error) throw error;
+    return data as LeadCandidate | null;
   },
 };
 

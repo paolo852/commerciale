@@ -11,10 +11,12 @@ import { useOffersData } from '../hooks/useOffersData';
 import {
   conceptsService, conceptAssigneesService,
   conceptDeadlinesService, conceptFilesService,
+  leadCandidatesService, offersService,
 } from '../lib/dataService';
 import { isDemoMode, supabase } from '../lib/supabase';
 import EntityTasks from '../components/EntityTasks';
 import EntityComments from '../components/EntityComments';
+import ProjectPipelineCard from '../components/ProjectPipelineCard';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
 import ConceptTemplatePanel from '../components/concepts/ConceptTemplatePanel';
@@ -22,7 +24,7 @@ import OfferFormModal from '../components/offerte/OfferFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type {
   Concept, ConceptAssignee, ConceptStatus,
-  ConceptRevisionDeadline, ConceptFile, Offer, ProjectManager,
+  ConceptRevisionDeadline, ConceptFile, Offer, ProjectManager, LeadCandidate,
 } from '../types';
 
 const STATUS_MAP: Record<ConceptStatus, { label: string; cls: string; Icon: typeof Clock }> = {
@@ -39,6 +41,8 @@ export default function ConceptDetail() {
   const { projectManagers, fundingCalls, offers, reload: reloadOffers } = useOffersData();
 
   const [concept, setConcept] = useState<Concept | null>(null);
+  const [pipelineLead, setPipelineLead] = useState<LeadCandidate | null>(null);
+  const [pipelineOffer, setPipelineOffer] = useState<Offer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -70,6 +74,12 @@ export default function ConceptDetail() {
         setError('Concept non trovato.');
       } else {
         setConcept(c);
+        const [pl, po] = await Promise.all([
+          leadCandidatesService.findByPromotedConceptId(c.id),
+          c.promoted_offer_id ? offersService.get(c.promoted_offer_id) : Promise.resolve(null),
+        ]);
+        setPipelineLead(pl);
+        setPipelineOffer(po);
       }
       setAssignees(a);
       setDeadlines(d);
@@ -138,6 +148,15 @@ export default function ConceptDetail() {
       <button onClick={() => navigate('/concepts')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1">
         <ArrowLeft className="w-3.5 h-3.5" /> Torna ai concept
       </button>
+
+      {/* Pipeline */}
+      <ProjectPipelineCard
+        current="concept"
+        lead={pipelineLead    ? { id: pipelineLead.id,  label: pipelineLead.researcher_name } : null}
+        concept={{ id: concept.id, label: concept.name }}
+        offer={pipelineOffer  ? { id: pipelineOffer.id, label: pipelineOffer.name }           : null}
+        onCreateOffer={concept.status !== 'promosso' ? () => setPromoteOpen(true) : undefined}
+      />
 
       {/* Header */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
