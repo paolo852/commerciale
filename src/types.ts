@@ -415,3 +415,19 @@ export interface ActivityLogEntry {
   entity_id: string | null;
   entity_name: string;
 }
+
+// ============================================================
+// Entity Comments — commenti generici su concept / offerta / lead
+// ============================================================
+
+export interface EntityComment {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  entity_type: 'concept' | 'offer' | 'lead';
+  entity_id: string;
+  author_name: string;
+  body: string;
+}
+
+export type CreateEntityCommentForm = Omit<EntityComment, 'id' | 'created_at'>;

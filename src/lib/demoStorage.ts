@@ -3,7 +3,7 @@ import type {
   Concept, ConceptAssignee, ConceptVersion, ConceptVersionComment, ConceptRevisionDeadline,
   LeadCandidate, LeadUpdate,
   AppNotification, NotificationPreferences, NotificationType,
-  Task, ConceptFile, ConceptFieldComment,
+  Task, ConceptFile, ConceptFieldComment, EntityComment,
 } from '../types';
 
 // ============================================================
@@ -29,6 +29,7 @@ const KEYS = {
   tasks: 'commerciale.demo.tasks',
   conceptFiles: 'commerciale.demo.conceptFiles',
   conceptFieldComments: 'commerciale.demo.conceptFieldComments',
+  entityComments: 'commerciale.demo.entityComments',
 } as const;
 
 export interface DemoUser {
@@ -531,5 +532,22 @@ export const demoConceptFieldComments = {
     // also remove replies
     const toRemove = new Set([id, ...all.filter((c) => c.parent_id === id).map((c) => c.id)]);
     write(KEYS.conceptFieldComments, all.filter((c) => !toRemove.has(c.id)));
+  },
+};
+
+export const demoEntityComments = {
+  list(entityType: string, entityId: string): EntityComment[] {
+    return read<EntityComment[]>(KEYS.entityComments, [])
+      .filter((c) => c.entity_type === entityType && c.entity_id === entityId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  create(input: Omit<EntityComment, 'id' | 'created_at'>): EntityComment {
+    const all = read<EntityComment[]>(KEYS.entityComments, []);
+    const item: EntityComment = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    write(KEYS.entityComments, [item, ...all]);
+    return item;
+  },
+  remove(id: string): void {
+    write(KEYS.entityComments, read<EntityComment[]>(KEYS.entityComments, []).filter((c) => c.id !== id));
   },
 };

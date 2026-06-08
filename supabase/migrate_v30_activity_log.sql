@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS activity_log (
 
 ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allowed users read activity log"   ON activity_log;
+DROP POLICY IF EXISTS "Allowed users insert activity log" ON activity_log;
+
 CREATE POLICY "Allowed users read activity log"
   ON activity_log FOR SELECT
   USING (is_allowed_user());

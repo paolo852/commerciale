@@ -14,6 +14,7 @@ import {
 } from '../lib/dataService';
 import { isDemoMode, supabase } from '../lib/supabase';
 import EntityTasks from '../components/EntityTasks';
+import EntityComments from '../components/EntityComments';
 import { formatDate } from '../lib/format';
 import ConceptFormModal from '../components/concepts/ConceptFormModal';
 import ConceptTemplatePanel from '../components/concepts/ConceptTemplatePanel';
@@ -353,6 +354,9 @@ export default function ConceptDetail() {
           userId={user.id}
         />
       )}
+
+      {/* Comments */}
+      <EntityComments entityType="concept" entityId={concept.id} />
 
       {/* Product Concept Template */}
       <ConceptTemplatePanel

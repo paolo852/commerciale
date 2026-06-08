@@ -16,6 +16,7 @@ import {
   demoTasks,
   demoConceptFiles,
   demoConceptFieldComments,
+  demoEntityComments,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -49,6 +50,8 @@ import type {
   CreateConceptFieldCommentForm,
   ActivityLogEntry,
   ActivityAction,
+  EntityComment,
+  CreateEntityCommentForm,
 } from '../types';
 
 // ============================================================
@@ -1392,5 +1395,40 @@ export const activityLogService = {
       .limit(limit);
     if (error) throw new Error(error.message);
     return (data ?? []) as ActivityLogEntry[];
+  },
+};
+
+// ----------------------------------------------------------------
+// Entity Comments
+// ----------------------------------------------------------------
+
+export const entityCommentsService = {
+  async list(entityType: string, entityId: string): Promise<EntityComment[]> {
+    if (isDemoMode) return demoEntityComments.list(entityType, entityId);
+    const { data, error } = await ensureSb()
+      .from('entity_comments')
+      .select('*')
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as EntityComment[];
+  },
+
+  async create(input: CreateEntityCommentForm): Promise<EntityComment> {
+    if (isDemoMode) return demoEntityComments.create(input);
+    const { data, error } = await ensureSb()
+      .from('entity_comments')
+      .insert(input)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data as EntityComment;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoEntityComments.remove(id); return; }
+    const { error } = await ensureSb().from('entity_comments').delete().eq('id', id);
+    if (error) throw new Error(error.message);
   },
 };

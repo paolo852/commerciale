@@ -10,6 +10,7 @@ import { StatusBadge, OutcomeBadge, TypeBadge } from '../components/Badges';
 import OfferFormModal from '../components/offerte/OfferFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EntityTasks from '../components/EntityTasks';
+import EntityComments from '../components/EntityComments';
 import type { Offer } from '../types';
 
 export default function OfferDetail() {
@@ -275,6 +276,9 @@ export default function OfferDetail() {
           userId={user.id}
         />
       )}
+
+      {/* Comments */}
+      <EntityComments entityType="offer" entityId={offer.id} />
 
       <OfferFormModal
         open={editOpen}
