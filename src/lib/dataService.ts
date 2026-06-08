@@ -1095,6 +1095,17 @@ export const notificationPrefsService = {
     return data as NotificationPreferences;
   },
 
+  // Legge le prefs di un utente specifico (senza auto-creare), usato per controllare
+  // le preferenze del destinatario prima di inviare email (es. menzioni).
+  async getForUser(userId: string): Promise<NotificationPreferences | null> {
+    if (isDemoMode) {
+      try { return demoNotificationPrefs.get(userId); } catch { return null; }
+    }
+    const { data } = await ensureSb()
+      .from('notification_preferences').select('*').eq('user_id', userId).maybeSingle();
+    return data as NotificationPreferences | null;
+  },
+
   async update(userId: string, patch: Partial<NotificationPreferences>): Promise<NotificationPreferences> {
     if (isDemoMode) return demoNotificationPrefs.update(userId, patch);
     const { data, error } = await ensureSb()

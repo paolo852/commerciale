@@ -106,22 +106,28 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [user, refresh]);
 
   const notify = useCallback(async (input: NotifyInput) => {
-    if (!user || !prefs) return;
+    if (!user) return;
     const keys = PREF_KEY[input.type];
-    if (!prefs[keys.in_app]) return;
+    // Se prefs non è ancora caricato usa i default (tutti in_app=true, tutti email=false)
+    // evitando di perdere notifiche per race condition al mount
+    const inAppEnabled = prefs ? !!prefs[keys.in_app] : true;
+    const emailEnabled  = prefs ? !!prefs[keys.email]  : false;
+    if (!inAppEnabled) return;
 
-    const notif = await notificationsService.create({
-      user_id: user.id,
-      type: input.type,
-      title: input.title,
-      body: input.body ?? null,
-      entity_id: input.entity_id ?? null,
-      entity_type: input.entity_type ?? null,
-      read: false,
-    });
-    setNotifications((prev) => [notif, ...prev]);
+    try {
+      const notif = await notificationsService.create({
+        user_id: user.id,
+        type: input.type,
+        title: input.title,
+        body: input.body ?? null,
+        entity_id: input.entity_id ?? null,
+        entity_type: input.entity_type ?? null,
+        read: false,
+      });
+      setNotifications((prev) => [notif, ...prev]);
+    } catch { /* non-critical: non deve bloccare l'azione principale */ }
 
-    if (prefs[keys.email] && !isDemoMode && supabase) {
+    if (emailEnabled && !isDemoMode && supabase) {
       const pathMap: Record<string, string> = { lead: '/leads', concept: '/concepts', offer: '/offerte' };
       const entityPath = input.entity_type && input.entity_id
         ? `${pathMap[input.entity_type] ?? ''}/${input.entity_id}`
