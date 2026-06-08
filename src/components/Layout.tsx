@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   BarChart3,
@@ -19,7 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { projectManagersService } from '../lib/dataService';
+import { projectManagersService, navCountsService } from '../lib/dataService';
 import { exportAllData } from '../lib/exportData';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
@@ -79,6 +79,11 @@ function UserAvatarUpload() {
 function Sidebar({ onClose }: { onClose?: () => void }) {
   const { user, currentPm, signOut, isDemoMode } = useAuth();
   const [exporting, setExporting] = useState(false);
+  const [counts, setCounts] = useState<{ leads: number; concepts: number; offers: number } | null>(null);
+
+  useEffect(() => {
+    navCountsService.get().then(setCounts).catch(() => {});
+  }, []);
 
   async function handleExport() {
     setExporting(true);
@@ -107,29 +112,43 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            onClick={onClose}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                isActive
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                <span className="flex-1">{label}</span>
-                {isActive && <ChevronRight className="w-3.5 h-3.5 text-indigo-400" />}
-              </>
-            )}
-          </NavLink>
-        ))}
+        {navItems.map(({ to, label, icon: Icon, end }) => {
+          const count =
+            to === '/leads'    ? counts?.leads    :
+            to === '/concepts' ? counts?.concepts :
+            to === '/offerte'  ? counts?.offers   :
+            undefined;
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  <span className="flex-1">{label}</span>
+                  {count != null && (
+                    <span className={`text-[11px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center ${
+                      isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                  {isActive && count == null && <ChevronRight className="w-3.5 h-3.5 text-indigo-400" />}
+                </>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Footer */}

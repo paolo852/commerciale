@@ -1467,3 +1467,30 @@ export const entityCommentsService = {
     if (error) throw new Error(error.message);
   },
 };
+
+// ----------------------------------------------------------------
+// Nav Counts — conteggi leggeri per la sidebar
+// ----------------------------------------------------------------
+
+export const navCountsService = {
+  async get(): Promise<{ leads: number; concepts: number; offers: number }> {
+    if (isDemoMode) {
+      return {
+        leads:    demoLeadCandidates.list().length,
+        concepts: demoConcepts.list().length,
+        offers:   demoOffers.list().length,
+      };
+    }
+    const sb = ensureSb();
+    const [l, c, o] = await Promise.all([
+      sb.from('lead_candidates').select('id', { count: 'exact', head: true }),
+      sb.from('concepts').select('id', { count: 'exact', head: true }),
+      sb.from('offers').select('id', { count: 'exact', head: true }),
+    ]);
+    return {
+      leads:    l.count ?? 0,
+      concepts: c.count ?? 0,
+      offers:   o.count ?? 0,
+    };
+  },
+};
