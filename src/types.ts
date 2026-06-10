@@ -61,6 +61,7 @@ export interface Offer {
   decided_at: string | null;    // ISO date string
   notes: string | null;
   created_at: string;
+  reference_year: number | null;
 
   // Relazione opzionale (join)
   project_manager?: ProjectManager | null;
@@ -106,6 +107,7 @@ interface OfferFormBase {
   submitted_at: string | null;
   decided_at: string | null;
   notes: string | null;
+  reference_year?: number | null;
 }
 
 export interface FinancedOfferForm extends OfferFormBase {

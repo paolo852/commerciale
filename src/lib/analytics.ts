@@ -17,6 +17,7 @@ import type {
 // ----------------------------------------------------------------
 
 export function offerYear(o: Offer): number | null {
+  if (o.reference_year != null) return o.reference_year;
   const y = o.deadline?.slice(0, 4);
   const n = Number(y);
   return Number.isFinite(n) ? n : null;

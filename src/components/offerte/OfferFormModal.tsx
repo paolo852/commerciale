@@ -34,6 +34,7 @@ interface FormState {
   client: string;
   consulting_call_id: string;
   deadline: string;
+  reference_year: string;
   budget: string;
   probability: number;
   project_manager_id: string;
@@ -48,18 +49,21 @@ interface FormState {
 
 const emptyForm: FormState = {
   name: '', type: 'financed', funding_call: '', client: '', consulting_call_id: '',
-  deadline: '', budget: '', probability: 50,
+  deadline: '', reference_year: '', budget: '', probability: 50,
   project_manager_id: '', pi: '', ente: '',
   status: 'in_lavorazione',
   outcome: 'nessuno', submitted_at: '', decided_at: '', notes: '',
 };
 
 function fromOffer(o: Offer): FormState {
+  const deadlineYear = o.deadline?.slice(0, 4) ?? '';
   return {
     name: o.name, type: o.type,
     funding_call: o.funding_call ?? '', client: o.client ?? '',
     consulting_call_id: o.consulting_call_id ?? '',
-    deadline: toDateInputValue(o.deadline), budget: String(o.budget),
+    deadline: toDateInputValue(o.deadline),
+    reference_year: String(o.reference_year ?? deadlineYear),
+    budget: String(o.budget),
     probability: o.probability ?? 50,
     project_manager_id: o.project_manager_id ?? '',
     pi: o.pi ?? '', ente: o.ente ?? '',
@@ -220,7 +224,9 @@ export default function OfferFormModal({
         funding_call: form.type === 'financed' ? form.funding_call : null,
         client: form.type === 'consulting' ? form.client.trim() : null,
         consulting_call_id: form.type === 'consulting' ? (form.consulting_call_id || null) : null,
-        deadline: form.deadline, budget,
+        deadline: form.deadline,
+        reference_year: form.reference_year ? Number(form.reference_year) : null,
+        budget,
         probability: form.probability,
         project_manager_id: form.project_manager_id || null,
         pi: form.pi.trim() || null,
@@ -365,10 +371,35 @@ export default function OfferFormModal({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Scadenza *</label>
-            <input type="date" required value={form.deadline} onChange={(e) => update('deadline', e.target.value)} className={inputClass} />
+            <input
+              type="date" required value={form.deadline}
+              onChange={(e) => {
+                const d = e.target.value;
+                const autoYear = d?.slice(0, 4) ?? '';
+                setForm((f) => ({
+                  ...f,
+                  deadline: d,
+                  reference_year: f.reference_year ? f.reference_year : autoYear,
+                }));
+              }}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Anno rif.
+              <span className="ml-1 text-xs font-normal text-slate-400">(previsione)</span>
+            </label>
+            <input
+              type="number" min="2000" max="2099" step="1"
+              value={form.reference_year}
+              placeholder={form.deadline?.slice(0, 4) || 'AAAA'}
+              onChange={(e) => update('reference_year', e.target.value)}
+              className={inputClass}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Importo (€) *</label>
