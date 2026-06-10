@@ -180,6 +180,7 @@ export default function ExportTab() {
         project_manager_id: o.project_manager_id, pi: o.pi ?? null, ente: o.ente ?? null,
         status: o.status, outcome: o.outcome,
         submitted_at: o.submitted_at, decided_at: o.decided_at, notes: o.notes,
+        reference_year: (o as { reference_year?: number | null }).reference_year ?? null,
       }, user.id)));
 
       setMsg({ type: 'ok', text: `Ripristino completato: +${newOffers.length} offerte, +${newPMs.length} PM, +${newFCs.length} bandi importati (duplicati ignorati).` });
