@@ -166,7 +166,7 @@ function LeadRow({
             <Clock className="w-3 h-3 text-slate-300 shrink-0" />
             <span className="text-xs text-slate-400">{formatDate(lastUpdate.created_at)}</span>
           </div>
-        ) : <div className="hidden lg:block w-24 shrink-0" />}
+        ) : <div className="shrink-0 w-24 shrink-0" />}
 
         {lead.keywords && lead.keywords.length > 0 && (
           <div className="hidden xl:flex items-center gap-1 max-w-36 shrink-0">
@@ -200,10 +200,10 @@ function TableHeader() {
       <div className="w-5 shrink-0" />
       <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Bando</div>
       <div className="w-36 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Fase lead</div>
-      <div className="w-14 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 hidden lg:block">Concept</div>
-      <div className="w-16 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 hidden lg:block">Offerte</div>
-      <div className="w-36 text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 hidden lg:block">Scadenza bando</div>
-      <div className="w-14 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 hidden lg:block">Tasso</div>
+      <div className="w-14 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Concept</div>
+      <div className="w-16 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Offerte</div>
+      <div className="w-40 text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Scadenza bando</div>
+      <div className="w-14 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Tasso</div>
       <div className="w-5 shrink-0" />
     </div>
   );
@@ -466,7 +466,8 @@ export default function LeadCandidates() {
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+        <div className="min-w-[780px]">
           <TableHeader />
 
           {/* ── Bando rows ── */}
@@ -507,24 +508,24 @@ export default function LeadCandidates() {
                     <LeadStatsPills attivo={stats.attivo} promosso={stats.promosso} archiviato={stats.archiviato} />
                   </div>
 
-                  <div className="w-14 text-center shrink-0 hidden lg:block">
+                  <div className="w-14 text-center shrink-0">
                     <span className={`text-sm font-bold tabular-nums ${conceptCount > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
                       {conceptCount > 0 ? conceptCount : '—'}
                     </span>
                   </div>
 
-                  <div className="w-16 text-center shrink-0 hidden lg:block">
+                  <div className="w-16 text-center shrink-0">
                     <span className={`text-sm font-bold tabular-nums ${offerCount > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
                       {offerCount > 0 ? offerCount : '—'}
                     </span>
                     {target != null && <span className="text-xs text-slate-400"> /{target}</span>}
                   </div>
 
-                  <div className="w-36 shrink-0 hidden lg:block">
+                  <div className="w-40 shrink-0">
                     {fc?.deadline ? <DeadlinePill isoDate={fc.deadline} /> : <span className="text-slate-300 text-xs">—</span>}
                   </div>
 
-                  <div className="w-14 text-center shrink-0 hidden lg:block">
+                  <div className="w-14 text-center shrink-0">
                     {successRate !== null
                       ? <span className={`text-sm font-bold tabular-nums ${successRate >= 50 ? 'text-emerald-600' : 'text-amber-600'}`}>{successRate}%</span>
                       : <span className="text-slate-300 text-xs">—</span>}
@@ -579,10 +580,10 @@ export default function LeadCandidates() {
                 <div className="w-36 shrink-0">
                   <LeadStatsPills attivo={noBandoStats.attivo} promosso={noBandoStats.promosso} archiviato={noBandoStats.archiviato} />
                 </div>
-                <div className="w-14 hidden lg:block shrink-0" />
-                <div className="w-16 hidden lg:block shrink-0" />
-                <div className="w-36 hidden lg:block shrink-0" />
-                <div className="w-14 hidden lg:block shrink-0" />
+                <div className="w-14 shrink-0" />
+                <div className="w-16 shrink-0" />
+                <div className="w-40 shrink-0" />
+                <div className="w-14 shrink-0" />
                 <div className="w-5 shrink-0" />
               </button>
 
@@ -609,6 +610,7 @@ export default function LeadCandidates() {
               )}
             </div>
           )}
+        </div>
         </div>
       )}
 
