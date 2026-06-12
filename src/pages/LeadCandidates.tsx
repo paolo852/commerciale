@@ -194,15 +194,36 @@ function LeadRow({
 }
 
 // ── Table column header ───────────────────────────────────────────────────────
-function TableHeader() {
+interface TableHeaderProps {
+  totals: { attivo: number; promosso: number; archiviato: number; concepts: number; offers: number };
+}
+
+function TableHeader({ totals }: TableHeaderProps) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
       <div className="w-5 shrink-0" />
-      <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Bando</div>
-      <div className="w-36 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Fase lead</div>
-      <div className="w-14 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Concept</div>
-      <div className="w-16 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Offerte</div>
-      <div className="w-40 text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Scadenza bando</div>
+      <div className="flex-1 text-xs font-semibold text-slate-500">Bando</div>
+
+      <div className="w-36 shrink-0 flex flex-col items-center gap-1">
+        <span className="text-xs font-semibold text-slate-500">Fase lead</span>
+        <LeadStatsPills attivo={totals.attivo} promosso={totals.promosso} archiviato={totals.archiviato} />
+      </div>
+
+      <div className="w-14 shrink-0 flex flex-col items-center gap-0.5">
+        <span className="text-xs font-semibold text-slate-500">Concept</span>
+        {totals.concepts > 0
+          ? <span className="text-sm font-bold tabular-nums text-emerald-600">{totals.concepts}</span>
+          : <span className="text-slate-300 text-xs">—</span>}
+      </div>
+
+      <div className="w-16 shrink-0 flex flex-col items-center gap-0.5">
+        <span className="text-xs font-semibold text-slate-500">Offerte</span>
+        {totals.offers > 0
+          ? <span className="text-sm font-bold tabular-nums text-indigo-600">{totals.offers}</span>
+          : <span className="text-slate-300 text-xs">—</span>}
+      </div>
+
+      <div className="w-40 shrink-0 text-xs font-semibold text-slate-500">Scadenza bando</div>
       <div className="w-5 shrink-0" />
     </div>
   );
@@ -351,6 +372,24 @@ export default function LeadCandidates() {
     };
   }, [leads]);
 
+  const tableTotals = useMemo(() => {
+    let totalConcepts = 0;
+    let totalOffers = 0;
+    for (const [fcId, stats] of callStats) {
+      const promotedConceptIds = new Set(stats.allLeads.map(l => l.promoted_concept_id).filter(Boolean));
+      const directConceptsList = concepts.filter(c => c.funding_call_id === fcId && !promotedConceptIds.has(c.id));
+      totalConcepts += promotedConceptIds.size + directConceptsList.length;
+      const fc = fcById.get(fcId);
+      if (fc) {
+        totalOffers += offers.filter(o =>
+          (o.funding_call && fc.code && o.funding_call.includes(fc.code)) ||
+          o.consulting_call_id === fc.id
+        ).length;
+      }
+    }
+    return { attivo: counts.attivo, promosso: counts.promosso, archiviato: counts.archiviato, concepts: totalConcepts, offers: totalOffers };
+  }, [callStats, concepts, offers, fcById, counts]);
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -467,7 +506,7 @@ export default function LeadCandidates() {
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
         <div className="min-w-[780px]">
-          <TableHeader />
+          <TableHeader totals={tableTotals} />
 
           {/* ── Bando rows ── */}
           {bandoGroups.map(({ fcId, fc, subLeads }) => {
