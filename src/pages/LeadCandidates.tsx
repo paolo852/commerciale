@@ -200,31 +200,37 @@ interface TableHeaderProps {
 
 function TableHeader({ totals }: TableHeaderProps) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-      <div className="w-5 shrink-0" />
-      <div className="flex-1 text-xs font-semibold text-slate-500">Bando</div>
-
-      <div className="w-36 shrink-0 flex flex-col items-center gap-1">
-        <span className="text-xs font-semibold text-slate-500">Fase lead</span>
-        <LeadStatsPills attivo={totals.attivo} promosso={totals.promosso} archiviato={totals.archiviato} />
+    <div className="bg-slate-50 border-b border-slate-200">
+      {/* Column titles */}
+      <div className="flex items-center gap-3 px-4 pt-3 pb-1">
+        <div className="w-5 shrink-0" />
+        <div className="flex-1 text-sm font-semibold text-slate-700">Bando</div>
+        <div className="w-36 text-center text-sm font-semibold text-slate-700 shrink-0">Fase lead</div>
+        <div className="w-14 text-center text-sm font-semibold text-slate-700 shrink-0">Concept</div>
+        <div className="w-16 text-center text-sm font-semibold text-slate-700 shrink-0">Offerte</div>
+        <div className="w-40 text-sm font-semibold text-slate-700 shrink-0">Scadenza bando</div>
+        <div className="w-5 shrink-0" />
       </div>
-
-      <div className="w-14 shrink-0 flex flex-col items-center gap-0.5">
-        <span className="text-xs font-semibold text-slate-500">Concept</span>
-        {totals.concepts > 0
-          ? <span className="text-sm font-bold tabular-nums text-emerald-600">{totals.concepts}</span>
-          : <span className="text-slate-300 text-xs">—</span>}
+      {/* Totals summary row */}
+      <div className="flex items-center gap-3 px-4 pb-2.5">
+        <div className="w-5 shrink-0" />
+        <div className="flex-1" />
+        <div className="w-36 shrink-0 flex justify-center">
+          <LeadStatsPills attivo={totals.attivo} promosso={totals.promosso} archiviato={totals.archiviato} />
+        </div>
+        <div className="w-14 text-center shrink-0">
+          <span className={`text-sm font-bold tabular-nums ${totals.concepts > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
+            {totals.concepts > 0 ? totals.concepts : '—'}
+          </span>
+        </div>
+        <div className="w-16 text-center shrink-0">
+          <span className={`text-sm font-bold tabular-nums ${totals.offers > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
+            {totals.offers > 0 ? totals.offers : '—'}
+          </span>
+        </div>
+        <div className="w-40 shrink-0" />
+        <div className="w-5 shrink-0" />
       </div>
-
-      <div className="w-16 shrink-0 flex flex-col items-center gap-0.5">
-        <span className="text-xs font-semibold text-slate-500">Offerte</span>
-        {totals.offers > 0
-          ? <span className="text-sm font-bold tabular-nums text-indigo-600">{totals.offers}</span>
-          : <span className="text-slate-300 text-xs">—</span>}
-      </div>
-
-      <div className="w-40 shrink-0 text-xs font-semibold text-slate-500">Scadenza bando</div>
-      <div className="w-5 shrink-0" />
     </div>
   );
 }
