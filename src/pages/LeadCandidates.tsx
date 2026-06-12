@@ -203,7 +203,6 @@ function TableHeader() {
       <div className="w-14 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Concept</div>
       <div className="w-16 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Offerte</div>
       <div className="w-40 text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Scadenza bando</div>
-      <div className="w-14 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">Tasso</div>
       <div className="w-5 shrink-0" />
     </div>
   );
@@ -473,8 +472,6 @@ export default function LeadCandidates() {
           {/* ── Bando rows ── */}
           {bandoGroups.map(({ fcId, fc, subLeads }) => {
             const stats = callStats.get(fcId) ?? { attivo: 0, promosso: 0, archiviato: 0, allLeads: [] };
-            const concluded = stats.promosso + stats.archiviato;
-            const successRate = concluded > 0 ? Math.round(stats.promosso / concluded * 100) : null;
             const isExpanded = expandedCalls.has(fcId);
 
             const promotedConceptIds = new Set(stats.allLeads.map(l => l.promoted_concept_id).filter(Boolean));
@@ -523,12 +520,6 @@ export default function LeadCandidates() {
 
                   <div className="w-40 shrink-0">
                     {fc?.deadline ? <DeadlinePill isoDate={fc.deadline} /> : <span className="text-slate-300 text-xs">—</span>}
-                  </div>
-
-                  <div className="w-14 text-center shrink-0">
-                    {successRate !== null
-                      ? <span className={`text-sm font-bold tabular-nums ${successRate >= 50 ? 'text-emerald-600' : 'text-amber-600'}`}>{successRate}%</span>
-                      : <span className="text-slate-300 text-xs">—</span>}
                   </div>
 
                   <div className="w-5 shrink-0" />
@@ -583,7 +574,6 @@ export default function LeadCandidates() {
                 <div className="w-14 shrink-0" />
                 <div className="w-16 shrink-0" />
                 <div className="w-40 shrink-0" />
-                <div className="w-14 shrink-0" />
                 <div className="w-5 shrink-0" />
               </button>
 
