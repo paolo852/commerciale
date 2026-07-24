@@ -14,7 +14,7 @@ import {
 } from '../components/Badges';
 import OfferFormModal from '../components/offerte/OfferFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { Offer, OfferOutcome, OfferStatus, OfferType } from '../types';
+import type { Offer, OfferOutcome, OfferStatus, OfferType, PartnerRole } from '../types';
 
 type SortBy = 'deadline' | 'budget' | 'created_at' | 'name';
 type SortDir = 'asc' | 'desc';
@@ -25,6 +25,7 @@ interface Filters {
   search: string;
   outcome: OfferOutcome | 'all';
   type: OfferType | 'all';
+  partnerRole: PartnerRole | 'all';
   projectManagerId: string | 'all';
   fundingCall: string | 'all';
   year: number | 'all';
@@ -43,6 +44,7 @@ function filtersFromParams(params: URLSearchParams): Filters {
     search: sp(params, 'q', ''),
     outcome: sp(params, 'outcome', 'all') as Filters['outcome'],
     type: sp(params, 'type', 'all') as Filters['type'],
+    partnerRole: sp(params, 'role', 'all') as Filters['partnerRole'],
     projectManagerId: sp(params, 'pm', 'all'),
     fundingCall: sp(params, 'call', 'all'),
     year: year && year !== 'all' ? Number(year) : 'all',
@@ -54,6 +56,7 @@ function applyFilters(params: URLSearchParams, f: Filters): URLSearchParams {
   f.search ? next.set('q', f.search) : next.delete('q');
   f.outcome !== 'all' ? next.set('outcome', f.outcome) : next.delete('outcome');
   f.type !== 'all' ? next.set('type', f.type) : next.delete('type');
+  f.partnerRole !== 'all' ? next.set('role', f.partnerRole) : next.delete('role');
   f.projectManagerId !== 'all' ? next.set('pm', f.projectManagerId) : next.delete('pm');
   f.fundingCall !== 'all' ? next.set('call', f.fundingCall) : next.delete('call');
   f.year !== 'all' ? next.set('year', String(f.year)) : next.delete('year');
@@ -81,7 +84,7 @@ export default function Offerte() {
   function clearFilters() {
     setSearchParams((p) => {
       const n = new URLSearchParams(p);
-      ['q', 'outcome', 'type', 'pm', 'call', 'year'].forEach((k) => n.delete(k));
+      ['q', 'outcome', 'type', 'role', 'pm', 'call', 'year'].forEach((k) => n.delete(k));
       return n;
     }, { replace: true });
   }
@@ -118,6 +121,7 @@ export default function Offerte() {
     filters.search ||
     filters.outcome !== 'all' ||
     filters.type !== 'all' ||
+    filters.partnerRole !== 'all' ||
     filters.projectManagerId !== 'all' ||
     filters.fundingCall !== 'all';
 
@@ -161,6 +165,7 @@ export default function Offerte() {
       if (filters.year !== 'all' && offerYear(o) !== filters.year) return false;
       if (search && !o.name.toLowerCase().includes(search)) return false;
       if (filters.type !== 'all' && o.type !== filters.type) return false;
+      if (filters.partnerRole !== 'all' && (o.partner_role ?? 'leader') !== filters.partnerRole) return false;
       if (filters.projectManagerId !== 'all') {
         if (filters.projectManagerId === '__none__') { if (o.project_manager_id) return false; }
         else if (o.project_manager_id !== filters.projectManagerId) return false;
@@ -415,7 +420,7 @@ export default function Offerte() {
           Filtri
           {isFiltered && (
             <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center font-medium">
-              {[filters.outcome, filters.type, filters.projectManagerId, filters.fundingCall]
+              {[filters.outcome, filters.type, filters.partnerRole, filters.projectManagerId, filters.fundingCall]
                 .filter((v) => v !== 'all').length}
             </span>
           )}
@@ -425,7 +430,7 @@ export default function Offerte() {
       {/* Filter panel */}
       {filtersOpen && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             <select value={filters.outcome} onChange={(e) => setFilters({ ...filters, outcome: e.target.value as Filters['outcome'] })} className={selectClass}>
               <option value="all">Tutti gli esiti</option>
               {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -433,6 +438,11 @@ export default function Offerte() {
             <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters['type'] })} className={selectClass}>
               <option value="all">Tutte le tipologie</option>
               {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <select value={filters.partnerRole} onChange={(e) => setFilters({ ...filters, partnerRole: e.target.value as Filters['partnerRole'] })} className={selectClass}>
+              <option value="all">Leader e Invitato</option>
+              <option value="leader">Solo Leader</option>
+              <option value="invited">Solo Invitato</option>
             </select>
             <select value={filters.projectManagerId} onChange={(e) => setFilters({ ...filters, projectManagerId: e.target.value })} className={selectClass}>
               <option value="all">Tutti i PM</option>
@@ -518,10 +528,14 @@ export default function Offerte() {
                       <input type="checkbox" checked={sel} onChange={() => toggleOne(o.id)}
                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
                     </td>
-                    <td className="px-4 py-3.5 max-w-[220px]">
+                    <td className="px-4 py-3.5 max-w-[240px]">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-slate-900 truncate">{o.name}</span>
-                        {(o.partner_role ?? 'leader') === 'invited' && (
+                        {(o.partner_role ?? 'leader') === 'leader' ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                            Leader
+                          </span>
+                        ) : (
                           <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                             Invitato
                           </span>
