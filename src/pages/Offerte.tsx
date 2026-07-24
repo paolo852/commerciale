@@ -489,15 +489,16 @@ export default function Offerte() {
                 <th className={`${thClass} text-right`}>
                   <button onClick={() => toggleSort('budget')} className="inline-flex items-center gap-1.5 ml-auto">Importo <SortIcon col="budget" /></button>
                 </th>
+                <th className={thClass}>Avanzamento</th>
                 <th className={`${thClass} text-right`}>Prob.</th>
                 <th className={`${thClass} text-right`} />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr><td colSpan={9} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
+                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
               ) : visibleOffers.length === 0 ? (
-                <tr><td colSpan={9} className="text-center py-12 text-slate-400 text-sm">
+                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">
                   {offers.length === 0
                     ? 'Nessuna offerta. Clicca "+ Nuova offerta" per iniziare.'
                     : `Nessuna offerta ${
@@ -525,6 +526,21 @@ export default function Offerte() {
                     <td className="px-4 py-3.5 text-sm text-slate-600">{pm?.name ?? <span className="text-slate-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-700 tabular-nums">{formatDate(o.deadline)}</td>
                     <td className="px-4 py-3.5 text-sm text-right tabular-nums font-medium text-slate-900">{formatEUR(o.budget)}</td>
+                    <td className="px-4 py-3.5 min-w-[140px]">
+                      {(() => {
+                        const p = Math.max(0, Math.min(100, o.document_progress ?? 0));
+                        const barColor = p >= 80 ? 'bg-emerald-500' : p >= 40 ? 'bg-indigo-500' : p > 0 ? 'bg-slate-400' : 'bg-slate-200';
+                        const textColor = p >= 80 ? 'text-emerald-600' : p >= 40 ? 'text-indigo-600' : 'text-slate-500';
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${p}%` }} />
+                            </div>
+                            <span className={`text-xs font-semibold tabular-nums w-9 text-right shrink-0 ${textColor}`}>{p}%</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3.5 text-right">
                       <span className={`text-sm font-semibold tabular-nums ${
                         (o.probability ?? 50) >= 70 ? 'text-emerald-600' :
@@ -555,6 +571,16 @@ export default function Offerte() {
                     <p className="text-lg font-bold tabular-nums text-slate-900">
                       {formatEUR(visibleOffers.reduce((s, o) => s + o.budget, 0))}
                     </p>
+                  </td>
+                  <td className="px-4 py-4">
+                    {view === 'in_lavorazione' && (
+                      <>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-0.5">Avanz. medio</p>
+                        <p className="text-lg font-bold tabular-nums text-indigo-600">
+                          {Math.round(visibleOffers.reduce((s, o) => s + (o.document_progress ?? 0), 0) / visibleOffers.length)}%
+                        </p>
+                      </>
+                    )}
                   </td>
                   <td className="px-4 py-4 text-right">
                     {view !== 'approvata' && view !== 'rifiutata' && (

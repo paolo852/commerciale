@@ -62,6 +62,7 @@ export interface Offer {
   notes: string | null;
   created_at: string;
   reference_year: number | null;
+  document_progress: number; // 0-100, percentuale completamento documento offerta
 
   // Relazione opzionale (join)
   project_manager?: ProjectManager | null;
@@ -108,6 +109,7 @@ interface OfferFormBase {
   decided_at: string | null;
   notes: string | null;
   reference_year?: number | null;
+  document_progress?: number;
 }
 
 export interface FinancedOfferForm extends OfferFormBase {

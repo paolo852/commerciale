@@ -45,6 +45,7 @@ interface FormState {
   submitted_at: string;
   decided_at: string;
   notes: string;
+  document_progress: number;
 }
 
 const emptyForm: FormState = {
@@ -53,6 +54,7 @@ const emptyForm: FormState = {
   project_manager_id: '', pi: '', ente: '',
   status: 'in_lavorazione',
   outcome: 'nessuno', submitted_at: '', decided_at: '', notes: '',
+  document_progress: 0,
 };
 
 function fromOffer(o: Offer): FormState {
@@ -71,6 +73,7 @@ function fromOffer(o: Offer): FormState {
     submitted_at: toDateInputValue(o.submitted_at),
     decided_at: toDateInputValue(o.decided_at),
     notes: o.notes ?? '',
+    document_progress: o.document_progress ?? 0,
   };
 }
 
@@ -83,6 +86,17 @@ function sliderTrack(p: number): string {
   if (p >= 70) return 'accent-emerald-500';
   if (p >= 40) return 'accent-amber-500';
   return 'accent-red-500';
+}
+
+function progressColor(p: number): string {
+  if (p >= 80) return 'text-emerald-600';
+  if (p >= 40) return 'text-indigo-600';
+  return 'text-slate-500';
+}
+function progressTrack(p: number): string {
+  if (p >= 80) return 'accent-emerald-500';
+  if (p >= 40) return 'accent-indigo-500';
+  return 'accent-slate-400';
 }
 
 const inputClass =
@@ -235,6 +249,7 @@ export default function OfferFormModal({
         submitted_at: form.status === 'presentata' ? form.submitted_at : null,
         decided_at: form.outcome !== 'nessuno' ? form.decided_at : null,
         notes: form.notes.trim() || null,
+        document_progress: form.document_progress,
       };
       const saved = offer
         ? await offersService.update(offer.id, payload)
@@ -456,6 +471,28 @@ export default function OfferFormModal({
               </strong>
             </p>
           )}
+        </div>
+
+        {/* Avanzamento documento offerta */}
+        <div className="bg-slate-50 rounded-xl px-4 py-3.5 border border-slate-200">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-slate-700">Avanzamento documento offerta</label>
+            <span className={`text-lg font-bold tabular-nums ${progressColor(form.document_progress)}`}>
+              {form.document_progress}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0" max="100" step="5"
+            value={form.document_progress}
+            onChange={(e) => update('document_progress', Number(e.target.value))}
+            className={`w-full h-2 rounded-full cursor-pointer ${progressTrack(form.document_progress)}`}
+          />
+          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span>0% — da iniziare</span>
+            <span>50% — in corso</span>
+            <span>100% — completato</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
