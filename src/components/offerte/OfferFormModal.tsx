@@ -6,7 +6,7 @@ import { offersService, fundingCallsService } from '../../lib/dataService';
 import { toDateInputValue } from '../../lib/format';
 import { STATUS_OPTIONS } from '../Badges';
 import type {
-  Offer, OfferStatus, OfferOutcome, OfferType, ProjectManager, FundingCall,
+  Offer, OfferStatus, OfferOutcome, OfferType, PartnerRole, ProjectManager, FundingCall,
 } from '../../types';
 
 interface NewCallDraft {
@@ -46,6 +46,7 @@ interface FormState {
   decided_at: string;
   notes: string;
   document_progress: number;
+  partner_role: PartnerRole;
 }
 
 const emptyForm: FormState = {
@@ -55,6 +56,7 @@ const emptyForm: FormState = {
   status: 'in_lavorazione',
   outcome: 'nessuno', submitted_at: '', decided_at: '', notes: '',
   document_progress: 0,
+  partner_role: 'leader',
 };
 
 function fromOffer(o: Offer): FormState {
@@ -74,6 +76,7 @@ function fromOffer(o: Offer): FormState {
     decided_at: toDateInputValue(o.decided_at),
     notes: o.notes ?? '',
     document_progress: o.document_progress ?? 0,
+    partner_role: o.partner_role ?? 'leader',
   };
 }
 
@@ -250,6 +253,7 @@ export default function OfferFormModal({
         decided_at: form.outcome !== 'nessuno' ? form.decided_at : null,
         notes: form.notes.trim() || null,
         document_progress: form.document_progress,
+        partner_role: form.partner_role,
       };
       const saved = offer
         ? await offersService.update(offer.id, payload)
@@ -385,6 +389,32 @@ export default function OfferFormModal({
             </select>
           </div>
         )}
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Ruolo nel consorzio *</label>
+          <div className="inline-flex bg-slate-100 p-1 rounded-xl">
+            <button type="button"
+              onClick={() => update('partner_role', 'leader')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                form.partner_role === 'leader'
+                  ? 'bg-white text-indigo-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Leader
+            </button>
+            <button type="button"
+              onClick={() => update('partner_role', 'invited')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                form.partner_role === 'invited'
+                  ? 'bg-white text-amber-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Invitato
+            </button>
+          </div>
+        </div>
 
         <div className="grid grid-cols-4 gap-4">
           <div>

@@ -8,6 +8,8 @@ export type OfferStatus = 'in_lavorazione' | 'presentata' | 'ferma';
 
 export type OfferOutcome = 'nessuno' | 'approvato' | 'rifiutato';
 
+export type PartnerRole = 'leader' | 'invited';
+
 // ============================================================
 // Entità database
 // ============================================================
@@ -63,6 +65,7 @@ export interface Offer {
   created_at: string;
   reference_year: number | null;
   document_progress: number; // 0-100, percentuale completamento documento offerta
+  partner_role: PartnerRole; // ruolo nel consorzio: leader (capofila) o invited (invitato)
 
   // Relazione opzionale (join)
   project_manager?: ProjectManager | null;
@@ -110,6 +113,7 @@ interface OfferFormBase {
   notes: string | null;
   reference_year?: number | null;
   document_progress?: number;
+  partner_role?: PartnerRole;
 }
 
 export interface FinancedOfferForm extends OfferFormBase {

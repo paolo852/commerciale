@@ -518,7 +518,16 @@ export default function Offerte() {
                       <input type="checkbox" checked={sel} onChange={() => toggleOne(o.id)}
                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
                     </td>
-                    <td className="px-4 py-3.5 text-sm font-medium text-slate-900 max-w-[200px] truncate">{o.name}</td>
+                    <td className="px-4 py-3.5 max-w-[220px]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-900 truncate">{o.name}</span>
+                        {(o.partner_role ?? 'leader') === 'invited' && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                            Invitato
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3.5"><TypeBadge value={o.type} /></td>
                     <td className="px-4 py-3.5 text-sm text-slate-600 max-w-[160px] truncate">
                       {o.type === 'financed' ? o.funding_call : o.client}
