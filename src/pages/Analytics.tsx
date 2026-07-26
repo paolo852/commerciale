@@ -5,6 +5,7 @@ import { computeAvgDecisionTime, filterByYear } from '../lib/analytics';
 import KpiCard from '../components/dashboard/KpiCard';
 import MonthlyTrend from '../components/analytics/MonthlyTrend';
 import TypeComparison from '../components/analytics/TypeComparison';
+import RoleComparison from '../components/analytics/RoleComparison';
 import SuccessByFundingCall from '../components/analytics/SuccessByFundingCall';
 import SuccessByProjectManager from '../components/analytics/SuccessByProjectManager';
 import YearSelector from '../components/YearSelector';
@@ -51,7 +52,11 @@ export default function Analytics() {
       </div>
 
       <MonthlyTrend offers={filteredOffers} year={year === 'all' ? undefined : year} />
-      <TypeComparison offers={filteredOffers} />
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <TypeComparison offers={filteredOffers} />
+        <RoleComparison offers={filteredOffers} />
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <SuccessByFundingCall offers={filteredOffers} fundingCalls={fundingCalls} />
