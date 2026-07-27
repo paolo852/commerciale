@@ -4,6 +4,7 @@ import {
   Download, FileCheck, HelpCircle, Loader2, MessageSquare, Save, Send, Trash2, Unlock, Upload,
 } from 'lucide-react';
 import { parseConceptDocx } from '../../lib/conceptParser';
+import { downloadConceptDocx } from '../../lib/conceptExporter';
 import { conceptFieldCommentsService } from '../../lib/dataService';
 import AvatarImg from '../Avatar';
 import MentionTextarea from '../MentionTextarea';
@@ -12,6 +13,7 @@ import type { ConceptFieldComment, ConceptTemplateData, ProjectManager } from '.
 
 interface Props {
   conceptId: string;
+  conceptName: string;
   data: ConceptTemplateData | null;
   onSave: (data: ConceptTemplateData) => Promise<void>;
   projectManagers?: ProjectManager[];
@@ -617,7 +619,7 @@ function SectionPanel({
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function ConceptTemplatePanel({ conceptId, data, onSave, projectManagers = [], currentUserName }: Props) {
+export default function ConceptTemplatePanel({ conceptId, conceptName, data, onSave, projectManagers = [], currentUserName }: Props) {
   const [form, setForm] = useState<ConceptTemplateData>({
     ...EMPTY,
     ...(data ?? {}),
@@ -628,8 +630,20 @@ export default function ConceptTemplatePanel({ conceptId, data, onSave, projectM
   const [locked, setLocked] = useState<Set<string>>(new Set(data?.locked_fields ?? []));
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [parseMsg, setParseMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await downloadConceptDocx(conceptName, { ...form, locked_fields: Array.from(locked) });
+    } catch (e) {
+      setParseMsg({ type: 'err', text: (e as { message?: string })?.message ?? 'Errore export documento' });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const [comments, setComments] = useState<Record<string, ConceptFieldComment[]>>({});
   const [authorName, setAuthorName] = useState(() => localStorage.getItem('concept_comment_author') ?? '');
@@ -766,6 +780,15 @@ export default function ConceptTemplatePanel({ conceptId, data, onSave, projectM
             <Download className="w-3.5 h-3.5" />
             Scarica template
           </a>
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            disabled={exporting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-60 transition"
+          >
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            {exporting ? 'Export…' : 'Scarica compilato'}
+          </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}

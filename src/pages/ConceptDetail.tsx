@@ -112,6 +112,15 @@ export default function ConceptDetail() {
     setConceptFiles((prev) => prev.filter((f) => f.id !== id));
   }
 
+  async function handleFileOpen(f: ConceptFile) {
+    const url = await conceptFilesService.signedUrl(f.file_path);
+    if (!url) {
+      alert('Impossibile aprire il file. Riprova più tardi.');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
   async function handleDelete() {
     if (!concept) return;
     void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'deleted', entity_type: 'concept', entity_id: concept.id, entity_name: concept.name });
@@ -382,6 +391,7 @@ export default function ConceptDetail() {
       {/* Product Concept Template */}
       <ConceptTemplatePanel
         conceptId={concept.id}
+        conceptName={concept.name}
         data={concept.concept_data ?? null}
         onSave={async (templateData) => {
           await conceptsService.update(concept.id, { concept_data: templateData });
@@ -416,10 +426,10 @@ export default function ConceptDetail() {
             {conceptFiles.map((f) => (
               <li key={f.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50">
                 <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
-                <a href={f.file_url} target="_blank" rel="noreferrer"
-                  className="flex-1 text-sm text-indigo-600 hover:underline truncate min-w-0">
+                <button type="button" onClick={() => void handleFileOpen(f)}
+                  className="flex-1 text-left text-sm text-indigo-600 hover:underline truncate min-w-0">
                   {f.filename}
-                </a>
+                </button>
                 <span className="text-[11px] text-slate-400 shrink-0">{formatDate(f.created_at)}</span>
                 <button onClick={() => void handleFileRemove(f.id, f.file_path)}
                   className="text-slate-300 hover:text-red-500 transition shrink-0">

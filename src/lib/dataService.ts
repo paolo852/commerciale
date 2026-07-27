@@ -1233,6 +1233,8 @@ export const conceptFilesService = {
     const path = `${conceptId}/${Date.now()}-${file.name}`;
     const { error: upErr } = await sb.storage.from('concept-files').upload(path, file);
     if (upErr) throw upErr;
+    // Il bucket è privato: file_url viene rigenerato on-demand via signedUrl().
+    // Conserviamo comunque publicUrl per compat con eventuali record legacy.
     const { data: { publicUrl } } = sb.storage.from('concept-files').getPublicUrl(path);
     const { data, error } = await sb
       .from('concept_files')
@@ -1240,6 +1242,18 @@ export const conceptFilesService = {
       .select().single();
     if (error) throw error;
     return data as ConceptFile;
+  },
+
+  async signedUrl(filePath: string): Promise<string | null> {
+    if (isDemoMode) {
+      // In demo, file_path è già una data URL utilizzabile direttamente.
+      return filePath;
+    }
+    const { data, error } = await ensureSb()
+      .storage.from('concept-files')
+      .createSignedUrl(filePath, 60 * 10);
+    if (error) return null;
+    return data?.signedUrl ?? null;
   },
 
   async remove(id: string, filePath: string): Promise<void> {
