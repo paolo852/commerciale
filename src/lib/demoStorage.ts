@@ -4,6 +4,7 @@ import type {
   LeadCandidate, LeadUpdate,
   AppNotification, NotificationPreferences, NotificationType,
   Task, ConceptFile, ConceptFieldComment, EntityComment,
+  OfferFile, OfferReview,
 } from '../types';
 
 // ============================================================
@@ -30,6 +31,8 @@ const KEYS = {
   conceptFiles: 'commerciale.demo.conceptFiles',
   conceptFieldComments: 'commerciale.demo.conceptFieldComments',
   entityComments: 'commerciale.demo.entityComments',
+  offerFiles: 'commerciale.demo.offerFiles',
+  offerReviews: 'commerciale.demo.offerReviews',
 } as const;
 
 export interface DemoUser {
@@ -505,6 +508,57 @@ export const demoConceptFiles = {
   },
   remove(id: string): void {
     write(KEYS.conceptFiles, read<ConceptFile[]>(KEYS.conceptFiles, []).filter((f) => f.id !== id));
+  },
+};
+
+// ============================================================
+// Offer Files
+// ============================================================
+
+export const demoOfferFiles = {
+  list(offerId: string): OfferFile[] {
+    return read<OfferFile[]>(KEYS.offerFiles, [])
+      .filter((f) => f.offer_id === offerId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  create(input: Omit<OfferFile, 'id' | 'created_at'>): OfferFile {
+    const all = read<OfferFile[]>(KEYS.offerFiles, []);
+    const item: OfferFile = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    write(KEYS.offerFiles, [item, ...all]);
+    return item;
+  },
+  remove(id: string): void {
+    write(KEYS.offerFiles, read<OfferFile[]>(KEYS.offerFiles, []).filter((f) => f.id !== id));
+  },
+};
+
+// ============================================================
+// Offer Reviews
+// ============================================================
+
+export const demoOfferReviews = {
+  list(offerId: string): OfferReview[] {
+    return read<OfferReview[]>(KEYS.offerReviews, [])
+      .filter((r) => r.offer_id === offerId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  createMany(rows: Omit<OfferReview, 'id' | 'created_at' | 'reviewer'>[]): OfferReview[] {
+    const all = read<OfferReview[]>(KEYS.offerReviews, []);
+    const now = new Date().toISOString();
+    const items: OfferReview[] = rows.map((r) => ({ ...r, id: uuid(), created_at: now }));
+    write(KEYS.offerReviews, [...items, ...all]);
+    return items;
+  },
+  update(id: string, patch: Partial<OfferReview>): OfferReview | null {
+    const all = read<OfferReview[]>(KEYS.offerReviews, []);
+    const idx = all.findIndex((r) => r.id === id);
+    if (idx < 0) return null;
+    all[idx] = { ...all[idx], ...patch };
+    write(KEYS.offerReviews, all);
+    return all[idx];
+  },
+  remove(id: string): void {
+    write(KEYS.offerReviews, read<OfferReview[]>(KEYS.offerReviews, []).filter((r) => r.id !== id));
   },
 };
 

@@ -370,7 +370,8 @@ export type NotificationType =
   | 'offer_deadline'
   | 'concept_status_changed'
   | 'task_assigned'
-  | 'comment_mention';
+  | 'comment_mention'
+  | 'offer_review_requested';
 
 export interface AppNotification {
   id: string;
@@ -440,3 +441,40 @@ export interface EntityComment {
 }
 
 export type CreateEntityCommentForm = Omit<EntityComment, 'id' | 'created_at'>;
+
+// ============================================================
+// Offer Files & Reviews
+// ============================================================
+
+export interface OfferFile {
+  id: string;
+  offer_id: string;
+  user_id: string;
+  filename: string;
+  file_path: string;
+  created_at: string;
+}
+
+export type OfferReviewStatus = 'pending' | 'completed';
+
+export interface OfferReview {
+  id: string;
+  offer_id: string;
+  reviewer_pm_id: string;
+  requester_email: string;
+  requester_name: string | null;
+  note: string | null;
+  status: OfferReviewStatus;
+  completed_note: string | null;
+  completed_at: string | null;
+  created_at: string;
+  reviewer?: ProjectManager | null;
+}
+
+export interface CreateOfferReviewInput {
+  offer_id: string;
+  reviewer_pm_ids: string[];
+  requester_email: string;
+  requester_name: string | null;
+  note: string | null;
+}

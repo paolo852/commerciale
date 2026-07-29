@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bell, BellRing, CheckCheck, Clock, FileText, FlaskConical, Settings, UserSearch, X,
+  Bell, BellRing, CheckCheck, ClipboardCheck, Clock, FileText, FlaskConical, Settings, UserSearch, X,
 } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { formatDate } from '../lib/format';
@@ -15,6 +15,7 @@ const TYPE_CONFIG: Record<NotificationType, { Icon: typeof Bell; color: string }
   concept_status_changed: { Icon: FlaskConical,  color: 'bg-indigo-100 text-indigo-600' },
   task_assigned:          { Icon: CheckCheck,    color: 'bg-violet-100 text-violet-600' },
   comment_mention:        { Icon: Clock,         color: 'bg-sky-100 text-sky-600' },
+  offer_review_requested: { Icon: ClipboardCheck, color: 'bg-indigo-100 text-indigo-600' },
 };
 
 function NotifRow({ n, onRead, onClose }: { n: AppNotification; onRead: (id: string) => void; onClose: () => void }) {

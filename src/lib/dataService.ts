@@ -17,6 +17,8 @@ import {
   demoConceptFiles,
   demoConceptFieldComments,
   demoEntityComments,
+  demoOfferFiles,
+  demoOfferReviews,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -52,6 +54,9 @@ import type {
   ActivityAction,
   EntityComment,
   CreateEntityCommentForm,
+  OfferFile,
+  OfferReview,
+  CreateOfferReviewInput,
 } from '../types';
 
 // ============================================================
@@ -1507,5 +1512,136 @@ export const navCountsService = {
       concepts: c.count ?? 0,
       offers:   o.count ?? 0,
     };
+  },
+};
+
+// ----------------------------------------------------------------
+// Offer Files (bucket privato → signed URL on-demand)
+// ----------------------------------------------------------------
+
+export const offerFilesService = {
+  async list(offerId: string): Promise<OfferFile[]> {
+    if (isDemoMode) return demoOfferFiles.list(offerId);
+    const { data, error } = await ensureSb()
+      .from('offer_files')
+      .select('*')
+      .eq('offer_id', offerId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as OfferFile[];
+  },
+
+  async upload(offerId: string, file: File, userId: string): Promise<OfferFile> {
+    if (isDemoMode) {
+      const url: string = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      return demoOfferFiles.create({
+        offer_id: offerId, user_id: userId,
+        filename: file.name, file_path: url,
+      });
+    }
+    const sb = ensureSb();
+    const path = `${offerId}/${Date.now()}-${file.name}`;
+    const { error: upErr } = await sb.storage.from('offer-files').upload(path, file);
+    if (upErr) throw upErr;
+    const { data, error } = await sb
+      .from('offer_files')
+      .insert({ offer_id: offerId, user_id: userId, filename: file.name, file_path: path })
+      .select().single();
+    if (error) throw error;
+    return data as OfferFile;
+  },
+
+  async signedUrl(filePath: string): Promise<string | null> {
+    if (isDemoMode) return filePath;
+    const { data, error } = await ensureSb()
+      .storage.from('offer-files')
+      .createSignedUrl(filePath, 60 * 10);
+    if (error) return null;
+    return data?.signedUrl ?? null;
+  },
+
+  async remove(id: string, filePath: string): Promise<void> {
+    if (isDemoMode) { demoOfferFiles.remove(id); return; }
+    const sb = ensureSb();
+    await sb.storage.from('offer-files').remove([filePath]);
+    const { error } = await sb.from('offer_files').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Offer Reviews (una riga per ogni PM invitato)
+// ----------------------------------------------------------------
+
+export const offerReviewsService = {
+  async list(offerId: string): Promise<OfferReview[]> {
+    if (isDemoMode) {
+      const rows = demoOfferReviews.list(offerId);
+      const pms = demoProjectManagers.list();
+      return rows.map((r) => ({ ...r, reviewer: pms.find((p) => p.id === r.reviewer_pm_id) ?? null }));
+    }
+    const { data, error } = await ensureSb()
+      .from('offer_reviews')
+      .select('*, reviewer:project_managers(*)')
+      .eq('offer_id', offerId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as OfferReview[];
+  },
+
+  async create(input: CreateOfferReviewInput): Promise<OfferReview[]> {
+    if (input.reviewer_pm_ids.length === 0) return [];
+    const rows = input.reviewer_pm_ids.map((pmId) => ({
+      offer_id: input.offer_id,
+      reviewer_pm_id: pmId,
+      requester_email: input.requester_email,
+      requester_name: input.requester_name,
+      note: input.note,
+      status: 'pending' as const,
+      completed_note: null,
+      completed_at: null,
+    }));
+    if (isDemoMode) {
+      const created = demoOfferReviews.createMany(rows);
+      const pms = demoProjectManagers.list();
+      return created.map((r) => ({ ...r, reviewer: pms.find((p) => p.id === r.reviewer_pm_id) ?? null }));
+    }
+    const { data, error } = await ensureSb()
+      .from('offer_reviews')
+      .insert(rows)
+      .select('*, reviewer:project_managers(*)');
+    if (error) throw error;
+    return (data ?? []) as OfferReview[];
+  },
+
+  async complete(id: string, note: string | null): Promise<OfferReview> {
+    const patch = {
+      status: 'completed' as const,
+      completed_note: note,
+      completed_at: new Date().toISOString(),
+    };
+    if (isDemoMode) {
+      const u = demoOfferReviews.update(id, patch);
+      if (!u) throw new Error('Revisione non trovata');
+      return u;
+    }
+    const { data, error } = await ensureSb()
+      .from('offer_reviews')
+      .update(patch)
+      .eq('id', id)
+      .select('*, reviewer:project_managers(*)')
+      .single();
+    if (error) throw error;
+    return data as OfferReview;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoOfferReviews.remove(id); return; }
+    const { error } = await ensureSb().from('offer_reviews').delete().eq('id', id);
+    if (error) throw error;
   },
 };

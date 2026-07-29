@@ -12,6 +12,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import EntityTasks from '../components/EntityTasks';
 import EntityComments from '../components/EntityComments';
 import ProjectPipelineCard from '../components/ProjectPipelineCard';
+import OfferFilesAndReviews from '../components/offerte/OfferFilesAndReviews';
 import type { Concept, LeadCandidate, Offer } from '../types';
 
 export default function OfferDetail() {
@@ -284,6 +285,13 @@ export default function OfferDetail() {
           </div>
         )}
       </div>
+
+      {/* Documenti e revisioni */}
+      <OfferFilesAndReviews
+        offerId={offer.id}
+        offerName={offer.name}
+        projectManagers={projectManagers}
+      />
 
       {/* Tasks */}
       {user && (
