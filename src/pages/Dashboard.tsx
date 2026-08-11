@@ -33,7 +33,7 @@ export default function Dashboard() {
     void (async () => {
       for (const offer of offers) {
         if (!offer.deadline) continue;
-        if (offer.outcome === 'approvato' || offer.outcome === 'rifiutato') continue;
+        if (offer.outcome !== 'nessuno') continue;
         if (offer.deadline < today || offer.deadline > cutoff.toISOString().slice(0, 10)) continue;
         const alreadySent = await notificationsService.has(user.id, 'offer_deadline', offer.id);
         if (alreadySent) continue;

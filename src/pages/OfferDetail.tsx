@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, Edit3, Euro, Percent, Trash2, User, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, Edit3, Euro, Percent, Trash2, User, XCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
@@ -32,6 +32,8 @@ export default function OfferDetail() {
   const [approving, setApproving] = useState(false);
   const [toReject, setToReject] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [toReserve, setToReserve] = useState(false);
+  const [reserving, setReserving] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -121,6 +123,32 @@ export default function OfferDetail() {
     }
   }
 
+  async function handleReserve() {
+    if (!offer) return;
+    setReserving(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const updated = await offersService.update(offer.id, {
+        outcome: 'riserva',
+        decided_at: today,
+        ...(offer.status === 'in_lavorazione' ? { status: 'presentata', submitted_at: offer.submitted_at ?? today } : {}),
+      });
+      setOffer(updated);
+      void reloadList();
+      void activityLogService.add({
+        user_email: user?.email ?? '',
+        user_name: null,
+        action: 'updated',
+        entity_type: 'offer',
+        entity_id: offer.id,
+        entity_name: offer.name,
+      });
+    } finally {
+      setReserving(false);
+      setToReserve(false);
+    }
+  }
+
   if (loading) return (
     <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">
       Caricamento…
@@ -183,6 +211,12 @@ export default function OfferDetail() {
                   className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 border border-emerald-600 rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm shadow-emerald-200"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Approva
+                </button>
+                <button
+                  onClick={() => setToReserve(true)}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-amber-500 border border-amber-500 rounded-lg hover:bg-amber-600 transition flex items-center gap-1.5 shadow-sm shadow-amber-200"
+                >
+                  <Clock className="w-3.5 h-3.5" /> Reserve list
                 </button>
                 <button
                   onClick={() => setToReject(true)}
@@ -343,6 +377,16 @@ export default function OfferDetail() {
         variant="danger"
         onConfirm={() => void handleReject()}
         onCancel={() => setToReject(false)}
+      />
+
+      <ConfirmDialog
+        open={toReserve}
+        title="Mettere l'offerta in reserve list?"
+        message={`Verrà registrata la data odierna come data di esito e l'offerta risulterà in reserve list (valutata ma in attesa che si liberino fondi).`}
+        confirmLabel={reserving ? 'Aggiornamento…' : 'Reserve list'}
+        variant="default"
+        onConfirm={() => void handleReserve()}
+        onCancel={() => setToReserve(false)}
       />
     </div>
   );

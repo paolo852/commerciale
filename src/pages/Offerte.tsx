@@ -18,8 +18,8 @@ import type { Offer, OfferOutcome, OfferStatus, OfferType, PartnerRole } from '.
 
 type SortBy = 'deadline' | 'budget' | 'created_at' | 'name';
 type SortDir = 'asc' | 'desc';
-type ViewTab = 'in_lavorazione' | 'presentata' | 'approvata' | 'rifiutata';
-const VALID_VIEWS: ViewTab[] = ['in_lavorazione', 'presentata', 'approvata', 'rifiutata'];
+type ViewTab = 'in_lavorazione' | 'presentata' | 'approvata' | 'riserva' | 'rifiutata';
+const VALID_VIEWS: ViewTab[] = ['in_lavorazione', 'presentata', 'approvata', 'riserva', 'rifiutata'];
 
 interface Filters {
   search: string;
@@ -134,6 +134,7 @@ export default function Offerte() {
     in_lavorazione: yearScopedOffers.filter((o) => o.status === 'in_lavorazione' && o.outcome === 'nessuno').length,
     presentata: yearScopedOffers.filter((o) => o.status === 'presentata').length,
     approvata: yearScopedOffers.filter((o) => o.outcome === 'approvato').length,
+    riserva: yearScopedOffers.filter((o) => o.outcome === 'riserva').length,
     rifiutata: yearScopedOffers.filter((o) => o.outcome === 'rifiutato').length,
   }), [yearScopedOffers]);
 
@@ -157,6 +158,8 @@ export default function Offerte() {
         if (o.outcome !== 'approvato') return false;
       } else if (view === 'rifiutata') {
         if (o.outcome !== 'rifiutato') return false;
+      } else if (view === 'riserva') {
+        if (o.outcome !== 'riserva') return false;
       } else {
         if (o.status !== view) return false;
         if (o.outcome !== 'nessuno') return false;
@@ -273,7 +276,7 @@ export default function Offerte() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 Presentate{filters.year !== 'all' ? ` · ${filters.year}` : ''}
               </p>
-              <p className="text-3xl font-black tabular-nums text-slate-900 leading-none">{inAttesa + tabCounts.approvata + tabCounts.rifiutata}</p>
+              <p className="text-3xl font-black tabular-nums text-slate-900 leading-none">{inAttesa + tabCounts.approvata + tabCounts.riserva + tabCounts.rifiutata}</p>
             </div>
           </div>
 
@@ -293,6 +296,13 @@ export default function Offerte() {
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 opacity-80">Approvate</p>
                 <p className="text-lg font-bold tabular-nums text-emerald-700">{tabCounts.approvata}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+              <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 opacity-80">Reserve list</p>
+                <p className="text-lg font-bold tabular-nums text-amber-800">{tabCounts.riserva}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2">
@@ -366,6 +376,24 @@ export default function Offerte() {
             view === 'approvata' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
             {tabCounts.approvata}
+          </span>
+        </button>
+
+        {/* Reserve list */}
+        <button
+          onClick={() => setView('riserva')}
+          className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border-2 transition-all font-medium text-sm ${
+            view === 'riserva'
+              ? 'bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-200'
+              : 'bg-white border-slate-200 text-slate-600 hover:border-amber-400 hover:text-amber-700'
+          }`}
+        >
+          <Clock className="w-4 h-4 shrink-0" />
+          <span className="font-semibold">Reserve list</span>
+          <span className={`text-sm font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center tabular-nums ${
+            view === 'riserva' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {tabCounts.riserva}
           </span>
         </button>
 
@@ -515,6 +543,7 @@ export default function Offerte() {
                         view === 'in_lavorazione' ? 'in lavorazione'
                         : view === 'presentata' ? 'in attesa'
                         : view === 'approvata' ? 'approvata'
+                        : view === 'riserva' ? 'in reserve list'
                         : 'rifiutata'
                       }${isFiltered ? ' corrisponde ai filtri' : ''}.`}
                 </td></tr>
@@ -586,6 +615,7 @@ export default function Offerte() {
                       view === 'in_lavorazione' ? 'in lavorazione'
                       : view === 'presentata' ? 'in attesa'
                       : view === 'approvata' ? 'approvate'
+                      : view === 'riserva' ? 'in reserve list'
                       : 'rifiutate'
                     }
                   </td>
@@ -606,7 +636,7 @@ export default function Offerte() {
                     )}
                   </td>
                   <td className="px-4 py-4 text-right">
-                    {view !== 'approvata' && view !== 'rifiutata' && (
+                    {view !== 'approvata' && view !== 'rifiutata' && view !== 'riserva' && (
                       <>
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-0.5">Atteso</p>
                         <p className="text-lg font-bold tabular-nums text-amber-600">

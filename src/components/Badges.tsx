@@ -20,12 +20,14 @@ const OUTCOME_LABELS: Record<OfferOutcome, string> = {
   nessuno: 'In attesa',
   approvato: 'Approvato',
   rifiutato: 'Rifiutato',
+  riserva: 'Reserve list',
 };
 
 const OUTCOME_CLASSES: Record<OfferOutcome, string> = {
   nessuno: 'bg-slate-50 text-slate-600 border-slate-200',
   approvato: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   rifiutato: 'bg-red-50 text-red-700 border-red-200',
+  riserva: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
 const TYPE_LABELS: Record<OfferType, string> = {
@@ -62,6 +64,7 @@ export const STATUS_OPTIONS: { value: OfferStatus; label: string }[] = [
 export const OUTCOME_OPTIONS: { value: OfferOutcome; label: string }[] = [
   { value: 'nessuno', label: OUTCOME_LABELS.nessuno },
   { value: 'approvato', label: OUTCOME_LABELS.approvato },
+  { value: 'riserva', label: OUTCOME_LABELS.riserva },
   { value: 'rifiutato', label: OUTCOME_LABELS.rifiutato },
 ];
 

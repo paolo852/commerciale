@@ -6,7 +6,7 @@ export type OfferType = 'financed' | 'consulting';
 
 export type OfferStatus = 'in_lavorazione' | 'presentata' | 'ferma';
 
-export type OfferOutcome = 'nessuno' | 'approvato' | 'rifiutato';
+export type OfferOutcome = 'nessuno' | 'approvato' | 'rifiutato' | 'riserva';
 
 export type PartnerRole = 'leader' | 'invited';
 
