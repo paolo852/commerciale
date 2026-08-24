@@ -13,6 +13,7 @@ import {
   TYPE_OPTIONS,
 } from '../components/Badges';
 import OfferFormModal from '../components/offerte/OfferFormModal';
+import OffersInPreparationSummary from '../components/offerte/OffersInPreparationSummary';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Offer, OfferOutcome, OfferStatus, OfferType, PartnerRole } from '../types';
 
@@ -322,6 +323,16 @@ export default function Offerte() {
           </div>
         </div>
       </div>
+
+      {/* Sommario offerte in preparazione per bando */}
+      <OffersInPreparationSummary
+        offers={yearScopedOffers}
+        fundingCalls={fundingCalls}
+        onSelectCall={(code) => {
+          setView('in_lavorazione');
+          setFilters({ ...filters, fundingCall: code ?? 'all' });
+        }}
+      />
 
       {/* Status toggle buttons */}
       <div className="flex items-center gap-3 flex-wrap">
