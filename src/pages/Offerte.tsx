@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Clock, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, X, XCircle } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService, activityLogService, offerAssigneesService } from '../lib/dataService';
-import TeamAvatarStack from '../components/offerte/TeamAvatarStack';
+import { TeamRoleCell, TeamMembersCell } from '../components/offerte/TeamAvatarStack';
 import { useAuth } from '../contexts/AuthContext';
 import { offerYear } from '../lib/analytics';
 import YearSelector from '../components/YearSelector';
@@ -539,6 +539,8 @@ export default function Offerte() {
                 </th>
                 <th className={thClass}>Tipo</th>
                 <th className={thClass}>Bando / Cliente</th>
+                <th className={thClass}>Responsabile</th>
+                <th className={thClass}>Fundraising</th>
                 <th className={thClass}>Team</th>
                 <th className={thClass}>
                   <button onClick={() => toggleSort('deadline')} className="inline-flex items-center gap-1.5">Scadenza <SortIcon col="deadline" /></button>
@@ -553,9 +555,9 @@ export default function Offerte() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
+                <tr><td colSpan={12} className="text-center py-12 text-slate-400 text-sm">Caricamento…</td></tr>
               ) : visibleOffers.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-12 text-slate-400 text-sm">
+                <tr><td colSpan={12} className="text-center py-12 text-slate-400 text-sm">
                   {offers.length === 0
                     ? 'Nessuna offerta. Clicca "+ Nuova offerta" per iniziare.'
                     : `Nessuna offerta ${
@@ -594,14 +596,25 @@ export default function Offerte() {
                     <td className="px-4 py-3.5 text-sm text-slate-600 max-w-[160px] truncate">
                       {o.type === 'financed' ? o.funding_call : o.client}
                     </td>
-                    <td className="px-4 py-3.5">
-                      <TeamAvatarStack
-                        assignees={assigneesByOffer.get(o.id) ?? []}
-                        pmById={pmById}
-                        fallbackPm={pm ?? null}
-                        maxVisible={4}
-                      />
-                    </td>
+                    {(() => {
+                      const teamRows = assigneesByOffer.get(o.id) ?? [];
+                      const lead = teamRows.find((a) => a.role === 'responsabile');
+                      const fund = teamRows.find((a) => a.role === 'fundraising');
+                      const members = teamRows.filter((a) => a.role === 'membro');
+                      return (
+                        <>
+                          <td className="px-4 py-3.5">
+                            <TeamRoleCell assignee={lead} pmById={pmById} fallbackPm={pm ?? null} fallbackItalic />
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <TeamRoleCell assignee={fund} pmById={pmById} />
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <TeamMembersCell assignees={members} pmById={pmById} maxVisible={3} />
+                          </td>
+                        </>
+                      );
+                    })()}
                     <td className="px-4 py-3.5 text-sm text-slate-700 tabular-nums">{formatDate(o.deadline)}</td>
                     <td className="px-4 py-3.5 text-sm text-right tabular-nums font-medium text-slate-900">{formatEUR(o.budget)}</td>
                     <td className="px-4 py-3.5 min-w-[140px]">
@@ -636,7 +649,7 @@ export default function Offerte() {
               <tfoot>
                 <tr className="border-t-2 border-slate-200 bg-slate-50/70">
                   <td />
-                  <td colSpan={5} className="px-4 py-4 text-xs text-slate-400">
+                  <td colSpan={7} className="px-4 py-4 text-xs text-slate-400">
                     {visibleOffers.length} di {tabCounts[view]} offerte {
                       view === 'in_lavorazione' ? 'in lavorazione'
                       : view === 'presentata' ? 'in attesa'
