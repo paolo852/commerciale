@@ -209,7 +209,7 @@ function TableHeader({ totals }: TableHeaderProps) {
         <div className="w-14 text-center text-sm font-semibold text-slate-700 shrink-0">Concept</div>
         <div className="w-16 text-center text-sm font-semibold text-slate-700 shrink-0">Offerte</div>
         <div className="w-40 text-sm font-semibold text-slate-700 shrink-0">Scadenza bando</div>
-        <div className="w-5 shrink-0" />
+        <div className="w-6 shrink-0" />
       </div>
       {/* Totals summary row */}
       <div className="flex items-center gap-3 px-4 pb-2.5">
@@ -252,6 +252,7 @@ export default function LeadCandidates() {
   const [expandedCalls, setExpandedCalls] = useState<Set<string>>(new Set());
   const [expandedNoBando, setExpandedNoBando] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [formPresetFcId, setFormPresetFcId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<LeadCandidate | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignFcId, setAssignFcId] = useState('');
@@ -407,7 +408,7 @@ export default function LeadCandidates() {
           </p>
         </div>
         <button
-          onClick={() => setFormOpen(true)}
+          onClick={() => { setFormPresetFcId(null); setFormOpen(true); }}
           className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition"
         >
           <Plus className="w-4 h-4" />
@@ -530,11 +531,13 @@ export default function LeadCandidates() {
             const target = fc?.target_offers ?? null;
 
             return (
-              <div key={fcId} className="border-b border-slate-100 last:border-b-0">
+              <div key={fcId} className="border-b border-slate-100 last:border-b-0 group/bando">
                 {/* Bando row */}
-                <button
+                <div
+                  role="button" tabIndex={0}
                   onClick={() => toggleCall(fcId)}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/80 transition text-left"
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCall(fcId); } }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/80 transition text-left cursor-pointer"
                 >
                   <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`} />
 
@@ -567,8 +570,23 @@ export default function LeadCandidates() {
                     {fc?.deadline ? <DeadlinePill isoDate={fc.deadline} /> : <span className="text-slate-300 text-xs">—</span>}
                   </div>
 
-                  <div className="w-5 shrink-0" />
-                </button>
+                  {/* + Aggiungi lead a questo bando */}
+                  {fc && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFormPresetFcId(fc.id);
+                        setFormOpen(true);
+                      }}
+                      title="Aggiungi un lead a questo bando"
+                      className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-indigo-500 opacity-40 hover:opacity-100 hover:bg-indigo-50 hover:text-indigo-700 transition group-hover/bando:opacity-100"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
+                  {!fc && <div className="w-6 shrink-0" />}
+                </div>
 
                 {/* Expanded lead sub-rows */}
                 {isExpanded && (
@@ -619,7 +637,7 @@ export default function LeadCandidates() {
                 <div className="w-14 shrink-0" />
                 <div className="w-16 shrink-0" />
                 <div className="w-40 shrink-0" />
-                <div className="w-5 shrink-0" />
+                <div className="w-6 shrink-0" />
               </button>
 
               {expandedNoBando && (
@@ -651,11 +669,17 @@ export default function LeadCandidates() {
 
       <LeadCandidateFormModal
         open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onSaved={(created) => { setFormOpen(false); void reload(); navigate(`/leads/${created.id}`); }}
+        onClose={() => { setFormOpen(false); setFormPresetFcId(null); }}
+        onSaved={(created) => {
+          setFormOpen(false);
+          setFormPresetFcId(null);
+          void reload();
+          navigate(`/leads/${created.id}`);
+        }}
         lead={null}
         fundingCalls={fundingCalls}
         projectManagers={projectManagers}
+        presetFundingCallId={formPresetFcId}
       />
 
       <ConfirmDialog

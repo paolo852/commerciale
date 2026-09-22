@@ -12,6 +12,7 @@ interface Props {
   lead: LeadCandidate | null;
   fundingCalls: FundingCall[];
   projectManagers: ProjectManager[];
+  presetFundingCallId?: string | null;   // se valorizzato: pre-seleziona il bando nel form
 }
 
 interface FormState {
@@ -82,7 +83,7 @@ const inputClass =
   'w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition';
 
 export default function LeadCandidateFormModal({
-  open, onClose, onSaved, lead, fundingCalls, projectManagers,
+  open, onClose, onSaved, lead, fundingCalls, projectManagers, presetFundingCallId,
 }: Props) {
   const { user } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
@@ -90,8 +91,14 @@ export default function LeadCandidateFormModal({
   const [extraCalls, setExtraCalls] = useState<FundingCall[]>([]);
   const activeCalls = useMemo(() => {
     const all = [...fundingCalls, ...extraCalls];
-    return all.filter((fc) => !fc.deadline || fc.deadline >= today);
-  }, [fundingCalls, extraCalls, today]);
+    return all.filter((fc) => {
+      // Includi sempre il bando presetato o quello già associato al lead in modifica,
+      // anche se scaduto
+      if (presetFundingCallId && fc.id === presetFundingCallId) return true;
+      if (lead?.funding_call_id && fc.id === lead.funding_call_id) return true;
+      return !fc.deadline || fc.deadline >= today;
+    });
+  }, [fundingCalls, extraCalls, today, presetFundingCallId, lead?.funding_call_id]);
 
   const [form, setForm] = useState<FormState>({
     researcher_name: '', institution: '', call_type: '',
@@ -125,13 +132,19 @@ export default function LeadCandidateFormModal({
         pm_id: lead.pm_id ?? '',
       });
     } else {
+      // Nuovo lead — se abbiamo un preset del bando, pre-riempi funding_call_id e call_type
+      const presetFc = presetFundingCallId
+        ? [...fundingCalls, ...extraCalls].find((fc) => fc.id === presetFundingCallId) ?? null
+        : null;
       setForm({
-        researcher_name: '', institution: '', call_type: '',
-        funding_call_id: '', potential_project: '', keywords: [], status: 'attivo', pm_id: '',
+        researcher_name: '', institution: '',
+        call_type: presetFc ? (presetFc.body ?? presetFc.name) : '',
+        funding_call_id: presetFc ? presetFc.id : '',
+        potential_project: '', keywords: [], status: 'attivo', pm_id: '',
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, lead]);
+  }, [open, lead, presetFundingCallId]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
