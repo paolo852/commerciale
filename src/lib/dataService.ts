@@ -19,6 +19,7 @@ import {
   demoEntityComments,
   demoOfferFiles,
   demoOfferReviews,
+  demoOfferAssignees,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -57,6 +58,8 @@ import type {
   OfferFile,
   OfferReview,
   CreateOfferReviewInput,
+  OfferAssignee,
+  OfferAssigneeRole,
 } from '../types';
 
 // ============================================================
@@ -1642,6 +1645,54 @@ export const offerReviewsService = {
   async remove(id: string): Promise<void> {
     if (isDemoMode) { demoOfferReviews.remove(id); return; }
     const { error } = await ensureSb().from('offer_reviews').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Offer Assignees (team di lavoro dell'offerta)
+// ----------------------------------------------------------------
+
+export const offerAssigneesService = {
+  async list(offerId: string): Promise<OfferAssignee[]> {
+    if (isDemoMode) {
+      const all = demoOfferAssignees.list(offerId);
+      const pms = demoProjectManagers.list();
+      return all.map((a) => ({ ...a, project_manager: pms.find((p) => p.id === a.project_manager_id) ?? null }));
+    }
+    const { data, error } = await ensureSb()
+      .from('offer_assignees')
+      .select('*, project_manager:project_managers(*)')
+      .eq('offer_id', offerId);
+    if (error) throw error;
+    return (data ?? []) as OfferAssignee[];
+  },
+
+  async add(offerId: string, projectManagerId: string, role: OfferAssigneeRole = 'membro'): Promise<void> {
+    if (isDemoMode) { demoOfferAssignees.add(offerId, projectManagerId, role); return; }
+    const { error } = await ensureSb()
+      .from('offer_assignees')
+      .insert({ offer_id: offerId, project_manager_id: projectManagerId, role });
+    if (error && error.code !== '23505') throw error;
+  },
+
+  async setRole(offerId: string, projectManagerId: string, role: OfferAssigneeRole): Promise<void> {
+    if (isDemoMode) { demoOfferAssignees.setRole(offerId, projectManagerId, role); return; }
+    const { error } = await ensureSb()
+      .from('offer_assignees')
+      .update({ role })
+      .eq('offer_id', offerId)
+      .eq('project_manager_id', projectManagerId);
+    if (error) throw error;
+  },
+
+  async remove(offerId: string, projectManagerId: string): Promise<void> {
+    if (isDemoMode) { demoOfferAssignees.remove(offerId, projectManagerId); return; }
+    const { error } = await ensureSb()
+      .from('offer_assignees')
+      .delete()
+      .eq('offer_id', offerId)
+      .eq('project_manager_id', projectManagerId);
     if (error) throw error;
   },
 };

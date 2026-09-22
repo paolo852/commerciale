@@ -4,7 +4,7 @@ import type {
   LeadCandidate, LeadUpdate,
   AppNotification, NotificationPreferences, NotificationType,
   Task, ConceptFile, ConceptFieldComment, EntityComment,
-  OfferFile, OfferReview,
+  OfferFile, OfferReview, OfferAssignee, OfferAssigneeRole,
 } from '../types';
 
 // ============================================================
@@ -33,6 +33,7 @@ const KEYS = {
   entityComments: 'commerciale.demo.entityComments',
   offerFiles: 'commerciale.demo.offerFiles',
   offerReviews: 'commerciale.demo.offerReviews',
+  offerAssignees: 'commerciale.demo.offerAssignees',
 } as const;
 
 export interface DemoUser {
@@ -603,5 +604,42 @@ export const demoEntityComments = {
   },
   remove(id: string): void {
     write(KEYS.entityComments, read<EntityComment[]>(KEYS.entityComments, []).filter((c) => c.id !== id));
+  },
+};
+
+// ============================================================
+// Offer Assignees
+// ============================================================
+
+export const demoOfferAssignees = {
+  list(offerId: string): OfferAssignee[] {
+    return read<OfferAssignee[]>(KEYS.offerAssignees, []).filter((a) => a.offer_id === offerId);
+  },
+  add(offerId: string, pmId: string, role: OfferAssigneeRole = 'membro'): OfferAssignee {
+    const all = read<OfferAssignee[]>(KEYS.offerAssignees, []);
+    const existing = all.find((a) => a.offer_id === offerId && a.project_manager_id === pmId);
+    if (existing) return existing;
+    const item: OfferAssignee = {
+      offer_id: offerId,
+      project_manager_id: pmId,
+      role,
+      added_at: new Date().toISOString(),
+    };
+    all.push(item);
+    write(KEYS.offerAssignees, all);
+    return item;
+  },
+  setRole(offerId: string, pmId: string, role: OfferAssigneeRole): void {
+    const all = read<OfferAssignee[]>(KEYS.offerAssignees, []);
+    const idx = all.findIndex((a) => a.offer_id === offerId && a.project_manager_id === pmId);
+    if (idx >= 0) { all[idx] = { ...all[idx], role }; write(KEYS.offerAssignees, all); }
+  },
+  remove(offerId: string, pmId: string): void {
+    write(
+      KEYS.offerAssignees,
+      read<OfferAssignee[]>(KEYS.offerAssignees, []).filter(
+        (a) => !(a.offer_id === offerId && a.project_manager_id === pmId),
+      ),
+    );
   },
 };

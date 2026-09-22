@@ -53,7 +53,7 @@ export default function Concepts() {
   const { concepts, loading, error, reload } = useConceptsData();
   const { projectManagers, fundingCalls } = useOffersData();
 
-  const [view, setView] = useState<ViewTab>('all');
+  const [view, setView] = useState<ViewTab>('in_valutazione');
   const [formOpen, setFormOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Concept | null>(null);
   const [filterPmId, setFilterPmId] = useState<string | null>(null);

@@ -13,6 +13,7 @@ import EntityTasks from '../components/EntityTasks';
 import EntityComments from '../components/EntityComments';
 import ProjectPipelineCard from '../components/ProjectPipelineCard';
 import OfferFilesAndReviews from '../components/offerte/OfferFilesAndReviews';
+import OfferTeamPanel from '../components/offerte/OfferTeamPanel';
 import type { Concept, LeadCandidate, Offer } from '../types';
 
 export default function OfferDetail() {
@@ -319,6 +320,12 @@ export default function OfferDetail() {
           </div>
         )}
       </div>
+
+      {/* Team di lavoro */}
+      <OfferTeamPanel
+        offerId={offer.id}
+        projectManagers={projectManagers}
+      />
 
       {/* Documenti e revisioni */}
       <OfferFilesAndReviews

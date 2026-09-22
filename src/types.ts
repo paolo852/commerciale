@@ -478,3 +478,17 @@ export interface CreateOfferReviewInput {
   requester_name: string | null;
   note: string | null;
 }
+
+// ============================================================
+// Offer Assignees — team di lavoro dell'offerta
+// ============================================================
+
+export type OfferAssigneeRole = 'responsabile' | 'membro' | 'fundraising';
+
+export interface OfferAssignee {
+  offer_id: string;
+  project_manager_id: string;
+  role: OfferAssigneeRole;
+  added_at: string;
+  project_manager?: ProjectManager | null;
+}
