@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Clock, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, X, XCircle } from 'lucide-react';
+import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Clock, Pencil, Plus, Search, Send, TrendingUp, X, XCircle } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
 import { offersService, activityLogService, offerAssigneesService } from '../lib/dataService';
 import { TeamRoleCell, TeamMembersCell } from '../components/offerte/TeamAvatarStack';
@@ -8,15 +8,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { offerYear } from '../lib/analytics';
 import YearSelector from '../components/YearSelector';
 import { formatDate, formatEUR } from '../lib/format';
-import {
-  TypeBadge,
-  OUTCOME_OPTIONS,
-  TYPE_OPTIONS,
-} from '../components/Badges';
+import { TypeBadge } from '../components/Badges';
 import OfferFormModal from '../components/offerte/OfferFormModal';
 import OffersInPreparationSummary from '../components/offerte/OffersInPreparationSummary';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { Offer, OfferAssignee, OfferOutcome, OfferStatus, OfferType, PartnerRole } from '../types';
+import type { Offer, OfferAssignee, OfferStatus, OfferType, PartnerRole } from '../types';
 
 type SortBy = 'deadline' | 'budget' | 'created_at' | 'name';
 type SortDir = 'asc' | 'desc';
@@ -25,12 +21,12 @@ const VALID_VIEWS: ViewTab[] = ['in_lavorazione', 'presentata', 'approvata', 'ri
 
 interface Filters {
   search: string;
-  outcome: OfferOutcome | 'all';
   type: OfferType | 'all';
   partnerRole: PartnerRole | 'all';
   projectManagerId: string | 'all';
   fundingCall: string | 'all';
   year: number | 'all';
+  deadlineSoon: boolean;   // quick filter: deadline entro 30gg
 }
 
 const selectClass =
@@ -44,24 +40,24 @@ function filtersFromParams(params: URLSearchParams): Filters {
   const year = params.get('year');
   return {
     search: sp(params, 'q', ''),
-    outcome: sp(params, 'outcome', 'all') as Filters['outcome'],
     type: sp(params, 'type', 'all') as Filters['type'],
     partnerRole: sp(params, 'role', 'all') as Filters['partnerRole'],
     projectManagerId: sp(params, 'pm', 'all'),
     fundingCall: sp(params, 'call', 'all'),
     year: year && year !== 'all' ? Number(year) : 'all',
+    deadlineSoon: params.get('soon') === '1',
   };
 }
 
 function applyFilters(params: URLSearchParams, f: Filters): URLSearchParams {
   const next = new URLSearchParams(params);
   f.search ? next.set('q', f.search) : next.delete('q');
-  f.outcome !== 'all' ? next.set('outcome', f.outcome) : next.delete('outcome');
   f.type !== 'all' ? next.set('type', f.type) : next.delete('type');
   f.partnerRole !== 'all' ? next.set('role', f.partnerRole) : next.delete('role');
   f.projectManagerId !== 'all' ? next.set('pm', f.projectManagerId) : next.delete('pm');
   f.fundingCall !== 'all' ? next.set('call', f.fundingCall) : next.delete('call');
   f.year !== 'all' ? next.set('year', String(f.year)) : next.delete('year');
+  f.deadlineSoon ? next.set('soon', '1') : next.delete('soon');
   return next;
 }
 
@@ -86,7 +82,7 @@ export default function Offerte() {
   function clearFilters() {
     setSearchParams((p) => {
       const n = new URLSearchParams(p);
-      ['q', 'outcome', 'type', 'role', 'pm', 'call', 'year'].forEach((k) => n.delete(k));
+      ['q', 'type', 'role', 'pm', 'call', 'year', 'soon'].forEach((k) => n.delete(k));
       return n;
     }, { replace: true });
   }
@@ -103,7 +99,6 @@ export default function Offerte() {
     }, { replace: true });
   }
 
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Offer | null>(null);
   const [toDelete, setToDelete] = useState<Offer | null>(null);
@@ -127,12 +122,12 @@ export default function Offerte() {
   }
 
   const isFiltered =
-    filters.search ||
-    filters.outcome !== 'all' ||
+    !!filters.search ||
     filters.type !== 'all' ||
     filters.partnerRole !== 'all' ||
     filters.projectManagerId !== 'all' ||
-    filters.fundingCall !== 'all';
+    filters.fundingCall !== 'all' ||
+    filters.deadlineSoon;
 
   const yearScopedOffers = useMemo(
     () => filters.year === 'all' ? offers : offers.filter((o) => offerYear(o) === filters.year),
@@ -172,7 +167,6 @@ export default function Offerte() {
       } else {
         if (o.status !== view) return false;
         if (o.outcome !== 'nessuno') return false;
-        if (filters.outcome !== 'all' && o.outcome !== filters.outcome) return false;
       }
       if (filters.year !== 'all' && offerYear(o) !== filters.year) return false;
       if (search && !o.name.toLowerCase().includes(search)) return false;
@@ -183,6 +177,11 @@ export default function Offerte() {
         else if (o.project_manager_id !== filters.projectManagerId) return false;
       }
       if (filters.fundingCall !== 'all' && o.funding_call !== filters.fundingCall) return false;
+      if (filters.deadlineSoon) {
+        if (!o.deadline) return false;
+        const daysToDeadline = (new Date(o.deadline).getTime() - Date.now()) / 86_400_000;
+        if (daysToDeadline < 0 || daysToDeadline > 30) return false;
+      }
       return true;
     });
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -443,71 +442,100 @@ export default function Offerte() {
         </div>
       </div>
 
-      {/* Search + filter toggle */}
-      <div className="flex gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="search"
-            placeholder="Cerca per nome…"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-          />
-        </div>
-        <button
-          onClick={() => setFiltersOpen((v) => !v)}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border rounded-xl transition ${
-            filtersOpen || isFiltered
-              ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-          Filtri
-          {isFiltered && (
-            <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center font-medium">
-              {[filters.outcome, filters.type, filters.partnerRole, filters.projectManagerId, filters.fundingCall]
-                .filter((v) => v !== 'all').length}
-            </span>
-          )}
-        </button>
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input
+          type="search"
+          placeholder="Cerca per nome…"
+          value={filters.search}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+        />
       </div>
 
-      {/* Filter panel */}
-      {filtersOpen && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            <select value={filters.outcome} onChange={(e) => setFilters({ ...filters, outcome: e.target.value as Filters['outcome'] })} className={selectClass}>
-              <option value="all">Tutti gli esiti</option>
-              {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters['type'] })} className={selectClass}>
-              <option value="all">Tutte le tipologie</option>
-              {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <select value={filters.partnerRole} onChange={(e) => setFilters({ ...filters, partnerRole: e.target.value as Filters['partnerRole'] })} className={selectClass}>
-              <option value="all">Leader e Invitato</option>
-              <option value="leader">Solo Leader</option>
-              <option value="invited">Solo Invitato</option>
-            </select>
-            <select value={filters.projectManagerId} onChange={(e) => setFilters({ ...filters, projectManagerId: e.target.value })} className={selectClass}>
+      {/* Filtri sempre visibili */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-4 py-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick chips: Tipo */}
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 pr-1">Tipo</span>
+          <QuickChip
+            active={filters.type === 'financed'}
+            color="violet"
+            onClick={() => setFilters({ ...filters, type: filters.type === 'financed' ? 'all' : 'financed' })}
+          >
+            Finanziata
+          </QuickChip>
+          <QuickChip
+            active={filters.type === 'consulting'}
+            color="cyan"
+            onClick={() => setFilters({ ...filters, type: filters.type === 'consulting' ? 'all' : 'consulting' })}
+          >
+            Consulenza
+          </QuickChip>
+
+          <span className="w-px h-5 bg-slate-200 mx-1" aria-hidden="true" />
+
+          {/* Quick chips: Ruolo */}
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 pr-1">Ruolo</span>
+          <QuickChip
+            active={filters.partnerRole === 'leader'}
+            color="indigo"
+            onClick={() => setFilters({ ...filters, partnerRole: filters.partnerRole === 'leader' ? 'all' : 'leader' })}
+          >
+            Leader
+          </QuickChip>
+          <QuickChip
+            active={filters.partnerRole === 'invited'}
+            color="amber"
+            onClick={() => setFilters({ ...filters, partnerRole: filters.partnerRole === 'invited' ? 'all' : 'invited' })}
+          >
+            Invitato
+          </QuickChip>
+
+          <span className="w-px h-5 bg-slate-200 mx-1" aria-hidden="true" />
+
+          {/* Quick chip: Scadenza vicina */}
+          <QuickChip
+            active={filters.deadlineSoon}
+            color="rose"
+            onClick={() => setFilters({ ...filters, deadlineSoon: !filters.deadlineSoon })}
+          >
+            <Clock className="w-3 h-3 inline mr-1 -mt-0.5" />
+            Scadenza ≤ 30gg
+          </QuickChip>
+
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {/* Select PM e Bando */}
+            <select
+              value={filters.projectManagerId}
+              onChange={(e) => setFilters({ ...filters, projectManagerId: e.target.value })}
+              className={selectClass + ' text-xs py-1.5'}
+            >
               <option value="all">Tutti i PM</option>
               <option value="__none__">— Nessun PM</option>
               {projectManagers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <select value={filters.fundingCall} onChange={(e) => setFilters({ ...filters, fundingCall: e.target.value })} className={selectClass}>
+            <select
+              value={filters.fundingCall}
+              onChange={(e) => setFilters({ ...filters, fundingCall: e.target.value })}
+              className={selectClass + ' text-xs py-1.5'}
+            >
               <option value="all">Tutti i bandi</option>
               {fundingCalls.map((f) => <option key={f.id} value={f.code}>{f.code}</option>)}
             </select>
+
+            {isFiltered && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-md hover:bg-slate-100 transition"
+              >
+                <X className="w-3 h-3" /> Pulisci
+              </button>
+            )}
           </div>
-          {isFiltered && (
-            <button onClick={clearFilters} className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700">
-              <X className="w-3 h-3" /> Pulisci filtri
-            </button>
-          )}
         </div>
-      )}
+      </div>
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
@@ -718,5 +746,45 @@ export default function Offerte() {
         confirmLabel="Elimina" variant="danger"
         onConfirm={handleDelete} onCancel={() => setToDelete(null)} />
     </div>
+  );
+}
+
+// ── Quick filter chip ────────────────────────────────────────────────────────
+type ChipColor = 'indigo' | 'violet' | 'cyan' | 'amber' | 'rose' | 'emerald';
+
+const CHIP_ACTIVE: Record<ChipColor, string> = {
+  indigo:  'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-100',
+  violet:  'bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-100',
+  cyan:    'bg-cyan-600 text-white border-cyan-600 shadow-sm shadow-cyan-100',
+  amber:   'bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-100',
+  rose:    'bg-rose-600 text-white border-rose-600 shadow-sm shadow-rose-100',
+  emerald: 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-100',
+};
+
+const CHIP_INACTIVE: Record<ChipColor, string> = {
+  indigo:  'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-700',
+  violet:  'bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-700',
+  cyan:    'bg-white text-slate-600 border-slate-200 hover:border-cyan-400 hover:text-cyan-700',
+  amber:   'bg-white text-slate-600 border-slate-200 hover:border-amber-400 hover:text-amber-700',
+  rose:    'bg-white text-slate-600 border-slate-200 hover:border-rose-300 hover:text-rose-700',
+  emerald: 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-700',
+};
+
+function QuickChip({
+  active, color, onClick, children,
+}: {
+  active: boolean; color: ChipColor; onClick: () => void; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+        active ? CHIP_ACTIVE[color] : CHIP_INACTIVE[color]
+      }`}
+    >
+      {children}
+      {active && <X className="w-3 h-3 opacity-80 ml-0.5" />}
+    </button>
   );
 }
