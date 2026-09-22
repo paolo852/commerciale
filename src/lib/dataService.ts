@@ -1671,6 +1671,37 @@ export const offerAssigneesService = {
     return (data ?? []) as OfferAssignee[];
   },
 
+  // Bulk fetch di tutti gli assignees, raggruppati per offer_id.
+  // Usato dalla lista offerte per mostrare il team direttamente in riga.
+  async listAllByOffer(): Promise<Map<string, OfferAssignee[]>> {
+    const rows = isDemoMode
+      ? (() => {
+          const allOffers = demoOffers.list();
+          const pms = demoProjectManagers.list();
+          const flat: OfferAssignee[] = [];
+          for (const o of allOffers) {
+            for (const a of demoOfferAssignees.list(o.id)) {
+              flat.push({ ...a, project_manager: pms.find((p) => p.id === a.project_manager_id) ?? null });
+            }
+          }
+          return flat;
+        })()
+      : await (async () => {
+          const { data, error } = await ensureSb()
+            .from('offer_assignees')
+            .select('*, project_manager:project_managers(*)');
+          if (error) throw error;
+          return (data ?? []) as OfferAssignee[];
+        })();
+    const map = new Map<string, OfferAssignee[]>();
+    for (const a of rows) {
+      const arr = map.get(a.offer_id) ?? [];
+      arr.push(a);
+      map.set(a.offer_id, arr);
+    }
+    return map;
+  },
+
   async add(offerId: string, projectManagerId: string, role: OfferAssigneeRole = 'membro'): Promise<void> {
     if (isDemoMode) { demoOfferAssignees.add(offerId, projectManagerId, role); return; }
     const { error } = await ensureSb()

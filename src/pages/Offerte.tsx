@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Clock, Pencil, Plus, Search, Send, SlidersHorizontal, TrendingUp, X, XCircle } from 'lucide-react';
 import { useOffersData } from '../hooks/useOffersData';
-import { offersService, activityLogService } from '../lib/dataService';
+import { offersService, activityLogService, offerAssigneesService } from '../lib/dataService';
+import TeamAvatarStack from '../components/offerte/TeamAvatarStack';
 import { useAuth } from '../contexts/AuthContext';
 import { offerYear } from '../lib/analytics';
 import YearSelector from '../components/YearSelector';
@@ -15,7 +16,7 @@ import {
 import OfferFormModal from '../components/offerte/OfferFormModal';
 import OffersInPreparationSummary from '../components/offerte/OffersInPreparationSummary';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { Offer, OfferOutcome, OfferStatus, OfferType, PartnerRole } from '../types';
+import type { Offer, OfferAssignee, OfferOutcome, OfferStatus, OfferType, PartnerRole } from '../types';
 
 type SortBy = 'deadline' | 'budget' | 'created_at' | 'name';
 type SortDir = 'asc' | 'desc';
@@ -109,6 +110,13 @@ export default function Offerte() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<OfferStatus | ''>('');
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [assigneesByOffer, setAssigneesByOffer] = useState<Map<string, OfferAssignee[]>>(new Map());
+
+  useEffect(() => {
+    offerAssigneesService.listAllByOffer()
+      .then(setAssigneesByOffer)
+      .catch(() => setAssigneesByOffer(new Map()));
+  }, [offers.length]);
 
   const pmById = useMemo(() => new Map(projectManagers.map((p) => [p.id, p])), [projectManagers]);
 
@@ -531,7 +539,7 @@ export default function Offerte() {
                 </th>
                 <th className={thClass}>Tipo</th>
                 <th className={thClass}>Bando / Cliente</th>
-                <th className={thClass}>PM</th>
+                <th className={thClass}>Team</th>
                 <th className={thClass}>
                   <button onClick={() => toggleSort('deadline')} className="inline-flex items-center gap-1.5">Scadenza <SortIcon col="deadline" /></button>
                 </th>
@@ -586,7 +594,14 @@ export default function Offerte() {
                     <td className="px-4 py-3.5 text-sm text-slate-600 max-w-[160px] truncate">
                       {o.type === 'financed' ? o.funding_call : o.client}
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-slate-600">{pm?.name ?? <span className="text-slate-300">—</span>}</td>
+                    <td className="px-4 py-3.5">
+                      <TeamAvatarStack
+                        assignees={assigneesByOffer.get(o.id) ?? []}
+                        pmById={pmById}
+                        fallbackPm={pm ?? null}
+                        maxVisible={4}
+                      />
+                    </td>
                     <td className="px-4 py-3.5 text-sm text-slate-700 tabular-nums">{formatDate(o.deadline)}</td>
                     <td className="px-4 py-3.5 text-sm text-right tabular-nums font-medium text-slate-900">{formatEUR(o.budget)}</td>
                     <td className="px-4 py-3.5 min-w-[140px]">
