@@ -800,7 +800,10 @@ export const offersService = {
     }
     const { data, error } = await ensureSb()
       .from('offers')
-      .select('*, project_manager:project_managers(*)')
+      // Disambigua l'embed: usa la FK diretta offers.project_manager_id.
+      // Necessario dopo l'aggiunta di offer_assignees (v39) che crea una
+      // seconda relazione offers → project_managers many-to-many.
+      .select('*, project_manager:project_managers!project_manager_id(*)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data ?? []) as Offer[];
@@ -812,7 +815,7 @@ export const offersService = {
     }
     const { data, error } = await ensureSb()
       .from('offers')
-      .select('*, project_manager:project_managers(*)')
+      .select('*, project_manager:project_managers!project_manager_id(*)')
       .eq('id', id)
       .single();
     if (error) return null;
