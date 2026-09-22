@@ -122,6 +122,24 @@ export default function OfferFormModal({
 
   const allCalls = useMemo(() => [...fundingCalls, ...extraCalls], [fundingCalls, extraCalls]);
 
+  // Bandi mostrati nei dropdown: nasconde quelli scaduti, ma preserva
+  // sempre quello attualmente selezionato (per la modifica di un'offerta
+  // legata a un bando ormai chiuso).
+  const today = new Date().toISOString().slice(0, 10);
+  const selectableCallsForFinanced = useMemo(() => {
+    return allCalls.filter((fc) => {
+      if (fc.code === form.funding_call) return true;
+      return !fc.deadline || fc.deadline >= today;
+    }).sort((a, b) => (a.deadline ?? '9999-12-31').localeCompare(b.deadline ?? '9999-12-31'));
+  }, [allCalls, form.funding_call, today]);
+
+  const selectableCallsForConsulting = useMemo(() => {
+    return fundingCalls.filter((fc) => {
+      if (fc.id === form.consulting_call_id) return true;
+      return !fc.deadline || fc.deadline >= today;
+    }).sort((a, b) => (a.deadline ?? '9999-12-31').localeCompare(b.deadline ?? '9999-12-31'));
+  }, [fundingCalls, form.consulting_call_id, today]);
+
   const duplicateName = useMemo(() => {
     const trimmed = form.name.trim().toLowerCase();
     if (!trimmed) return null;
@@ -306,13 +324,16 @@ export default function OfferFormModal({
                 className={selectClass}
               >
                 <option value="">Seleziona bando…</option>
-                {allCalls.map((fc) => (
-                  <option key={fc.id} value={fc.code}>{fc.code} — {fc.name}</option>
+                {selectableCallsForFinanced.map((fc) => (
+                  <option key={fc.id} value={fc.code}>
+                    {fc.code} — {fc.name}
+                    {fc.deadline ? ` (scad. ${fc.deadline})` : ''}
+                  </option>
                 ))}
                 <option value="__new__">+ Crea nuovo bando in anagrafica…</option>
               </select>
-              {allCalls.length === 0 && !showNewCall && (
-                <p className="text-xs text-amber-600 mt-1">Nessun bando disponibile. Creane uno qui sotto o in Anagrafiche.</p>
+              {selectableCallsForFinanced.length === 0 && !showNewCall && (
+                <p className="text-xs text-amber-600 mt-1">Nessun bando aperto disponibile. Creane uno qui sotto o in Anagrafiche.</p>
               )}
 
               {showNewCall && (
@@ -383,8 +404,11 @@ export default function OfferFormModal({
               className={selectClass}
             >
               <option value="">— Nessuno —</option>
-              {fundingCalls.map((fc) => (
-                <option key={fc.id} value={fc.id}>{fc.code} — {fc.name}</option>
+              {selectableCallsForConsulting.map((fc) => (
+                <option key={fc.id} value={fc.id}>
+                  {fc.code} — {fc.name}
+                  {fc.deadline ? ` (scad. ${fc.deadline})` : ''}
+                </option>
               ))}
             </select>
           </div>
