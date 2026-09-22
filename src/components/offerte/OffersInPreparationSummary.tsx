@@ -18,6 +18,8 @@ interface Bucket {
   body?: string | null;  // ente/tipologia (sottotitolo)
   count: number;
   totalBudget: number;
+  financedCount: number;    // quante sono offerte finanziate
+  consultingCount: number;  // quante sono consulenze legate al bando
 }
 
 function compactEUR(v: number): string {
@@ -35,12 +37,14 @@ export default function OffersInPreparationSummary({ offers, fundingCalls, onSel
   );
 
   const fcByCode = useMemo(() => new Map(fundingCalls.map((fc) => [fc.code, fc])), [fundingCalls]);
+  const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
 
   const buckets = useMemo<Bucket[]>(() => {
     const map = new Map<string, Bucket>();
     for (const o of inPreparation) {
       let key: string, kind: Kind, code: string, name: string;
       let body: string | null = null;
+      let isConsulting = false;
 
       if (o.type === 'financed' && o.funding_call) {
         key = o.funding_call;
@@ -49,15 +53,31 @@ export default function OffersInPreparationSummary({ offers, fundingCalls, onSel
         code = fc?.code ?? o.funding_call;
         name = fc?.name ?? o.funding_call;
         body = fc?.body ?? null;
+      } else if (o.type === 'consulting' && o.consulting_call_id) {
+        // Consulenza legata a un bando → confluisce nel bucket del bando
+        const fc = fcById.get(o.consulting_call_id);
+        if (fc) {
+          key = fc.code;
+          kind = 'financed';
+          code = fc.code;
+          name = fc.name;
+          body = fc.body ?? null;
+          isConsulting = true;
+        } else {
+          // ID orfano — fallback a consulenza per cliente
+          key = `__consulting__:${o.client ?? '—'}`;
+          kind = 'consulting';
+          code = o.client ?? '—';
+          name = 'Consulenza';
+          isConsulting = true;
+        }
       } else if (o.type === 'consulting') {
+        // Consulenza libera senza bando di riferimento
         key = `__consulting__:${o.client ?? '—'}`;
         kind = 'consulting';
         code = o.client ?? '—';
         name = 'Consulenza';
-        const fc = o.consulting_call_id
-          ? fundingCalls.find((f) => f.id === o.consulting_call_id) ?? null
-          : null;
-        body = fc ? `Bando rif.: ${fc.code}` : null;
+        isConsulting = true;
       } else {
         key = '__nocall__';
         kind = 'none';
@@ -66,15 +86,20 @@ export default function OffersInPreparationSummary({ offers, fundingCalls, onSel
         body = null;
       }
 
-      const b = map.get(key) ?? { key, kind, code, name, body, count: 0, totalBudget: 0 };
+      const b = map.get(key) ?? {
+        key, kind, code, name, body, count: 0, totalBudget: 0,
+        financedCount: 0, consultingCount: 0,
+      };
       b.count += 1;
       b.totalBudget += o.budget;
+      if (isConsulting) b.consultingCount += 1;
+      else b.financedCount += 1;
       map.set(key, b);
     }
     return [...map.values()].sort(
       (a, b) => b.count - a.count || a.name.localeCompare(b.name, 'it'),
     );
-  }, [inPreparation, fcByCode, fundingCalls]);
+  }, [inPreparation, fcByCode, fcById]);
 
   if (inPreparation.length === 0) return null;
 
@@ -159,12 +184,24 @@ export default function OffersInPreparationSummary({ offers, fundingCalls, onSel
                         <Icon className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <p className={`text-sm font-mono font-bold truncate ${
-                          b.kind === 'financed' ? 'text-indigo-700' :
-                          b.kind === 'consulting' ? 'text-cyan-700' : 'text-slate-500'
-                        }`}>
-                          {b.code}
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className={`text-sm font-mono font-bold truncate ${
+                            b.kind === 'financed' ? 'text-indigo-700' :
+                            b.kind === 'consulting' ? 'text-cyan-700' : 'text-slate-500'
+                          }`}>
+                            {b.code}
+                          </p>
+                          {b.financedCount > 0 && b.consultingCount > 0 && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700 tabular-nums" title={`${b.financedCount} finanziate + ${b.consultingCount} consulenze`}>
+                              {b.financedCount}f · {b.consultingCount}c
+                            </span>
+                          )}
+                          {b.financedCount === 0 && b.consultingCount > 0 && b.kind === 'financed' && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700">
+                              consulenza
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-600 truncate">
                           {b.name}
                           {b.body && <span className="text-slate-400"> · {b.body}</span>}
