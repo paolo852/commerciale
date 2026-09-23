@@ -173,8 +173,17 @@ export default function Offerte() {
       if (filters.type !== 'all' && o.type !== filters.type) return false;
       if (filters.partnerRole !== 'all' && (o.partner_role ?? 'leader') !== filters.partnerRole) return false;
       if (filters.projectManagerId !== 'all') {
-        if (filters.projectManagerId === '__none__') { if (o.project_manager_id) return false; }
-        else if (o.project_manager_id !== filters.projectManagerId) return false;
+        // Il PM può essere agganciato come project_manager_id legacy oppure
+        // come membro del team (offer_assignees). Considera entrambi.
+        const teamPmIds = (assigneesByOffer.get(o.id) ?? []).map((a) => a.project_manager_id);
+        const allPmIds = new Set<string>(teamPmIds);
+        if (o.project_manager_id) allPmIds.add(o.project_manager_id);
+
+        if (filters.projectManagerId === '__none__') {
+          if (allPmIds.size > 0) return false;
+        } else if (!allPmIds.has(filters.projectManagerId)) {
+          return false;
+        }
       }
       if (filters.fundingCall !== 'all' && o.funding_call !== filters.fundingCall) return false;
       if (filters.deadlineSoon) {
@@ -193,7 +202,7 @@ export default function Offerte() {
       else cmp = a.name.localeCompare(b.name, 'it');
       return cmp * dir;
     });
-  }, [offers, filters, view, sortBy, sortDir]);
+  }, [offers, filters, view, sortBy, sortDir, assigneesByOffer]);
 
   function SortIcon({ col }: { col: SortBy }) {
     if (sortBy !== col) return <ArrowUpDown className="w-3 h-3 text-slate-300" />;
