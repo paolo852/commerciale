@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Archive, ArrowLeft, CheckCircle2, Clock, Edit3, Paperclip, Plus, Send, Trash2, X,
+  Archive, ArrowLeft, CheckCircle2, Clock, Edit3, FileText, Paperclip, Plus, Send, Trash2, X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
@@ -190,6 +190,24 @@ export default function LeadCandidateDetail() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {lead.status !== 'archiviato' && !lead.promoted_offer_id && (
+              <button
+                onClick={() => setPromoteOfferOpen(true)}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 border border-emerald-600 rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm shadow-emerald-200"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Promuovi a offerta
+              </button>
+            )}
+            {lead.status === 'promosso' && lead.promoted_offer_id && (
+              <button
+                onClick={() => navigate(`/offerte/${lead.promoted_offer_id}`)}
+                className="px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Vai all'offerta
+              </button>
+            )}
             {lead.status === 'attivo' && (
               <button
                 onClick={handleArchive}
