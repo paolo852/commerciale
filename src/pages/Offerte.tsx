@@ -129,6 +129,17 @@ export default function Offerte() {
     filters.fundingCall !== 'all' ||
     filters.deadlineSoon;
 
+  // Mappe per risolvere il bando di riferimento di un'offerta:
+  // - financed → o.funding_call (codice)
+  // - consulting con consulting_call_id → prende il codice del fc referenziato
+  const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
+
+  function offerBandoCode(o: Offer): string | null {
+    if (o.type === 'financed') return o.funding_call ?? null;
+    if (o.consulting_call_id) return fcById.get(o.consulting_call_id)?.code ?? null;
+    return null;
+  }
+
   const yearScopedOffers = useMemo(
     () => filters.year === 'all' ? offers : offers.filter((o) => offerYear(o) === filters.year),
     [offers, filters.year],
@@ -185,7 +196,7 @@ export default function Offerte() {
           return false;
         }
       }
-      if (filters.fundingCall !== 'all' && o.funding_call !== filters.fundingCall) return false;
+      if (filters.fundingCall !== 'all' && offerBandoCode(o) !== filters.fundingCall) return false;
       if (filters.deadlineSoon) {
         if (!o.deadline) return false;
         const daysToDeadline = (new Date(o.deadline).getTime() - Date.now()) / 86_400_000;
@@ -202,7 +213,7 @@ export default function Offerte() {
       else cmp = a.name.localeCompare(b.name, 'it');
       return cmp * dir;
     });
-  }, [offers, filters, view, sortBy, sortDir, assigneesByOffer]);
+  }, [offers, filters, view, sortBy, sortDir, assigneesByOffer, fcById]);
 
   function SortIcon({ col }: { col: SortBy }) {
     if (sortBy !== col) return <ArrowUpDown className="w-3 h-3 text-slate-300" />;
@@ -630,8 +641,24 @@ export default function Offerte() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5"><TypeBadge value={o.type} /></td>
-                    <td className="px-4 py-3.5 text-sm text-slate-600 max-w-[160px] truncate">
-                      {o.type === 'financed' ? o.funding_call : o.client}
+                    <td className="px-4 py-3.5 text-sm text-slate-600 max-w-[200px]">
+                      {(() => {
+                        if (o.type === 'financed') {
+                          return <span className="truncate block" title={o.funding_call ?? ''}>{o.funding_call || <span className="text-slate-300">—</span>}</span>;
+                        }
+                        // Consulenza: mostra cliente + eventuale codice bando di riferimento
+                        const refBandoCode = o.consulting_call_id ? fcById.get(o.consulting_call_id)?.code : null;
+                        return (
+                          <div className="min-w-0">
+                            <span className="truncate block" title={o.client ?? ''}>{o.client || <span className="text-slate-300">—</span>}</span>
+                            {refBandoCode && (
+                              <span className="text-[10px] font-mono font-semibold text-cyan-700 truncate block" title={`Bando di rif.: ${refBandoCode}`}>
+                                rif. {refBandoCode}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     {(() => {
                       const teamRows = assigneesByOffer.get(o.id) ?? [];
