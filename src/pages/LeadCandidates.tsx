@@ -524,10 +524,13 @@ export default function LeadCandidates() {
             const directConcepts = concepts.filter(c => c.funding_call_id === fcId && !promotedConceptIds.has(c.id));
             const conceptCount = promotedConceptIds.size + directConcepts.length;
 
-            const offerCount = fc ? offers.filter(o =>
-              (o.funding_call && fc.code && o.funding_call.includes(fc.code)) ||
-              o.consulting_call_id === fc.id
-            ).length : 0;
+            const financedOffers = fc ? offers.filter(o =>
+              o.type === 'financed' && o.funding_call && fc.code && o.funding_call.includes(fc.code)
+            ) : [];
+            const consultingOffers = fc ? offers.filter(o =>
+              o.type === 'consulting' && o.consulting_call_id === fc.id
+            ) : [];
+            const offerCount = financedOffers.length + consultingOffers.length;
             const target = fc?.target_offers ?? null;
 
             return (
@@ -560,10 +563,28 @@ export default function LeadCandidates() {
                   </div>
 
                   <div className="w-16 text-center shrink-0">
-                    <span className={`text-sm font-bold tabular-nums ${offerCount > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
-                      {offerCount > 0 ? offerCount : '—'}
-                    </span>
-                    {target != null && <span className="text-xs text-slate-400"> /{target}</span>}
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                      <span className={`text-sm font-bold tabular-nums ${offerCount > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
+                        {offerCount > 0 ? offerCount : '—'}
+                      </span>
+                      {target != null && <span className="text-xs text-slate-400">/{target}</span>}
+                    </div>
+                    {financedOffers.length > 0 && consultingOffers.length > 0 && (
+                      <span
+                        className="inline-block mt-0.5 text-[9px] font-bold px-1 py-px rounded bg-cyan-50 text-cyan-700 border border-cyan-100 tabular-nums"
+                        title={`${financedOffers.length} finanziate + ${consultingOffers.length} consulenze`}
+                      >
+                        {financedOffers.length}f + {consultingOffers.length}c
+                      </span>
+                    )}
+                    {financedOffers.length === 0 && consultingOffers.length > 0 && (
+                      <span
+                        className="inline-block mt-0.5 text-[9px] font-bold px-1 py-px rounded bg-cyan-50 text-cyan-700 border border-cyan-100"
+                        title={`${consultingOffers.length} consulenze`}
+                      >
+                        consulenza
+                      </span>
+                    )}
                   </div>
 
                   <div className="w-40 shrink-0">
