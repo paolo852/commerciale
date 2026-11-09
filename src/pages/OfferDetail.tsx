@@ -4,7 +4,7 @@ import { ArrowLeft, Calendar, CheckCircle2, Clock, Edit3, Euro, Percent, Trash2,
 import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
-import { offersService, activityLogService, conceptsService, leadCandidatesService } from '../lib/dataService';
+import { offersService, activityLogService, leadCandidatesService } from '../lib/dataService';
 import { formatDate, formatEUR } from '../lib/format';
 import { StatusBadge, OutcomeBadge, TypeBadge } from '../components/Badges';
 import OfferFormModal from '../components/offerte/OfferFormModal';
@@ -14,7 +14,7 @@ import EntityComments from '../components/EntityComments';
 import ProjectPipelineCard from '../components/ProjectPipelineCard';
 import OfferFilesAndReviews from '../components/offerte/OfferFilesAndReviews';
 import OfferTeamPanel from '../components/offerte/OfferTeamPanel';
-import type { Concept, LeadCandidate, Offer } from '../types';
+import type { LeadCandidate, Offer } from '../types';
 
 export default function OfferDetail() {
   const { id } = useParams<{ id: string }>();
@@ -23,7 +23,6 @@ export default function OfferDetail() {
   const { projectManagers, fundingCalls, offers, reload: reloadList } = useOffersData();
 
   const [offer, setOffer] = useState<Offer | null>(null);
-  const [pipelineConcept, setPipelineConcept] = useState<Concept | null>(null);
   const [pipelineLead, setPipelineLead] = useState<LeadCandidate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +43,7 @@ export default function OfferDetail() {
       if (!o) { setError('Offerta non trovata.'); }
       else {
         setOffer(o);
-        const concept = await conceptsService.findByPromotedOfferId(o.id);
-        setPipelineConcept(concept);
-        const lead = concept
-          ? await leadCandidatesService.findByPromotedConceptId(concept.id)
-          : await leadCandidatesService.findByPromotedOfferId(o.id);
+        const lead = await leadCandidatesService.findByPromotedOfferId(o.id);
         setPipelineLead(lead);
       }
     } catch (e) {
@@ -181,8 +176,7 @@ export default function OfferDetail() {
       {/* Pipeline */}
       <ProjectPipelineCard
         current="offer"
-        lead={pipelineLead    ? { id: pipelineLead.id,    label: pipelineLead.researcher_name } : null}
-        concept={pipelineConcept ? { id: pipelineConcept.id, label: pipelineConcept.name }      : null}
+        lead={pipelineLead ? { id: pipelineLead.id, label: pipelineLead.researcher_name } : null}
         offer={{ id: offer.id, label: offer.name }}
       />
 

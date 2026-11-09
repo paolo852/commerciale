@@ -2,17 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AtSign, CalendarClock, CheckCircle2, CheckSquare,
-  FlaskConical, Square, TrendingUp, Trophy, UserSearch,
+  Square, TrendingUp, Trophy, UserSearch,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
 import {
-  tasksService, conceptsService, leadCandidatesService,
-  conceptDeadlinesService, findMentionsForPm, type MentionResult,
+  tasksService, leadCandidatesService,
+  findMentionsForPm, type MentionResult,
 } from '../lib/dataService';
 import { offerYear } from '../lib/analytics';
 import { formatDate, formatEUR } from '../lib/format';
-import type { Concept, ConceptRevisionDeadline, LeadCandidate, Task } from '../types';
+import type { LeadCandidate, Task } from '../types';
 
 // ── helpers ─────────────────────────────────────────────────────
 
@@ -73,26 +73,20 @@ export default function Scrivania() {
   const { fundingCalls, offers } = useOffersData();
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [concepts, setConcepts] = useState<Concept[]>([]);
   const [leads, setLeads] = useState<LeadCandidate[]>([]);
-  const [revDeadlines, setRevDeadlines] = useState<ConceptRevisionDeadline[]>([]);
   const [mentions, setMentions] = useState<MentionResult[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (pmName?: string) => {
     setLoading(true);
     try {
-      const [t, c, l, rd, m] = await Promise.all([
+      const [t, l, m] = await Promise.all([
         tasksService.list(),
-        conceptsService.list(),
         leadCandidatesService.list(),
-        conceptDeadlinesService.listAll(),
         pmName ? findMentionsForPm(pmName) : Promise.resolve<MentionResult[]>([]),
       ]);
       setTasks(t);
-      setConcepts(c);
       setLeads(l);
-      setRevDeadlines(rd);
       setMentions(m);
     } finally {
       setLoading(false);
@@ -116,19 +110,10 @@ export default function Scrivania() {
 
   const myOpenTasks = useMemo(() => myTasks.filter((t) => !t.completed), [myTasks]);
 
-  const myConcepts = useMemo(
-    () => concepts.filter((c) =>
-      (c.assignees ?? []).some((a) => a.project_manager_id === pmId && a.role !== 'Panelist'),
-    ),
-    [concepts, pmId],
-  );
-
   const myLeads = useMemo(
     () => leads.filter((l) => l.pm_id === pmId),
     [leads, pmId],
   );
-
-  const myConceptIds = useMemo(() => new Set(myConcepts.map((c) => c.id)), [myConcepts]);
 
   const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
 
@@ -143,79 +128,12 @@ export default function Scrivania() {
     [approvedThisYear],
   );
 
-  // all upcoming deadlines relevant to me
-  const upcomingDeadlines = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const items: Array<{
-      id: string;
-      label: string;
-      conceptName: string;
-      conceptId: string;
-      due_date: string;
-      completed: boolean;
-    }> = [];
-
-    // concept main deadlines
-    myConcepts.forEach((c) => {
-      if (c.deadline) {
-        items.push({
-          id: `concept-${c.id}`,
-          label: 'Scadenza concept',
-          conceptName: c.name,
-          conceptId: c.id,
-          due_date: c.deadline,
-          completed: false,
-        });
-      }
-    });
-
-    // revision deadlines
-    revDeadlines
-      .filter((d) => myConceptIds.has(d.concept_id))
-      .forEach((d) => {
-        const c = myConcepts.find((x) => x.id === d.concept_id);
-        items.push({
-          id: d.id,
-          label: d.label,
-          conceptName: c?.name ?? '—',
-          conceptId: d.concept_id,
-          due_date: d.due_date,
-          completed: d.completed,
-        });
-      });
-
-    return items
-      .filter((d) => !d.completed && d.due_date >= today)
-      .sort((a, b) => a.due_date.localeCompare(b.due_date))
-      .slice(0, 20);
-  }, [myConcepts, revDeadlines, myConceptIds]);
-
-  const overdueDeadlines = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const items: typeof upcomingDeadlines = [];
-    myConcepts.forEach((c) => {
-      if (c.deadline && c.deadline < today) {
-        items.push({ id: `concept-${c.id}`, label: 'Scadenza concept', conceptName: c.name, conceptId: c.id, due_date: c.deadline, completed: false });
-      }
-    });
-    revDeadlines
-      .filter((d) => myConceptIds.has(d.concept_id) && !d.completed && d.due_date < today)
-      .forEach((d) => {
-        const c = myConcepts.find((x) => x.id === d.concept_id);
-        items.push({ id: d.id, label: d.label, conceptName: c?.name ?? '—', conceptId: d.concept_id, due_date: d.due_date, completed: false });
-      });
-    return items.sort((a, b) => b.due_date.localeCompare(a.due_date));
-  }, [myConcepts, revDeadlines, myConceptIds]);
-
-  const allDeadlines = [...overdueDeadlines, ...upcomingDeadlines];
-
-
   async function toggleTask(task: Task) {
     await tasksService.setCompleted(task.id, !task.completed);
     await load();
   }
 
-  const entityPath: Record<string, string> = { lead: '/leads', concept: '/concepts', offer: '/offerte' };
+  const entityPath: Record<string, string> = { lead: '/leads', offer: '/offerte' };
 
   if (currentPmReady && !currentPm) {
     return (
@@ -239,20 +157,20 @@ export default function Scrivania() {
       Icon: CheckSquare,
     },
     {
-      label: 'Scadenze imminenti',
-      value: upcomingDeadlines.filter((d) => daysFromNow(d.due_date) <= 14).length,
-      sub: `${overdueDeadlines.length} scadute`,
-      color: overdueDeadlines.length > 0 ? 'bg-red-50 text-red-700 border-red-100' : 'bg-amber-50 text-amber-700 border-amber-100',
-      iconColor: overdueDeadlines.length > 0 ? 'text-red-500' : 'text-amber-500',
+      label: 'Task in scadenza',
+      value: myTasks.filter((t) => t.due_date && daysFromNow(t.due_date) <= 7 && !t.completed).length,
+      sub: `${myTasks.filter((t) => t.due_date && daysFromNow(t.due_date) < 0 && !t.completed).length} scaduti`,
+      color: 'bg-amber-50 text-amber-700 border-amber-100',
+      iconColor: 'text-amber-500',
       Icon: CalendarClock,
     },
     {
-      label: 'Miei progetti',
-      value: myLeads.filter((l) => l.status === 'attivo').length + myConcepts.filter((c) => c.status === 'in_valutazione').length,
-      sub: 'lead attivi + concept',
+      label: 'Miei lead attivi',
+      value: myLeads.filter((l) => l.status === 'attivo').length,
+      sub: `${myLeads.length} totali`,
       color: 'bg-emerald-50 text-emerald-700 border-emerald-100',
       iconColor: 'text-emerald-500',
-      Icon: FlaskConical,
+      Icon: UserSearch,
     },
     {
       label: 'Menzioni recenti',
@@ -352,7 +270,7 @@ export default function Scrivania() {
                             onClick={() => navigate(entityLink)}
                             className="text-xs text-indigo-500 hover:underline mt-0.5"
                           >
-                            {task.entity_type === 'lead' ? 'Lead' : task.entity_type === 'concept' ? 'Concept' : 'Offerta'} →
+                            {task.entity_type === 'lead' ? 'Lead' : 'Offerta'} →
                           </button>
                         )}
                       </div>
@@ -373,70 +291,17 @@ export default function Scrivania() {
               )}
             </Section>
 
-            {/* ── Scadenze ─────────────────────────────────────── */}
-            <Section title="Scadenze" icon={CalendarClock} count={allDeadlines.length} empty="Nessuna scadenza nei prossimi 30 giorni.">
-              {allDeadlines.map((d) => {
-                const badge = deadlineBadge(d.due_date);
-                const overdue = daysFromNow(d.due_date) < 0;
-                return (
-                  <div
-                    key={d.id}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition cursor-pointer"
-                    onClick={() => navigate(`/concepts/${d.conceptId}`)}
-                  >
-                    <CalendarClock className={`w-4 h-4 shrink-0 ${overdue ? 'text-red-400' : 'text-amber-400'}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{d.label}</p>
-                      <p className="text-xs text-slate-500 truncate">{d.conceptName}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs text-slate-500">{formatDate(d.due_date)}</p>
-                      <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${badge.cls}`}>{badge.label}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </Section>
-
-            {/* ── I miei progetti ──────────────────────────────── */}
+            {/* ── I miei lead ──────────────────────────────── */}
             <Section
-              title="I miei progetti"
-              icon={FlaskConical}
-              count={myConcepts.length + myLeads.filter((l) => l.status !== 'archiviato').length}
-              empty="Nessun progetto assegnato."
+              title="I miei lead"
+              icon={UserSearch}
+              count={myLeads.filter((l) => l.status !== 'archiviato').length}
+              empty="Nessun lead assegnato."
             >
-              {/* Concepts */}
-              {myConcepts.map((c) => {
-                const ispm = (c.assignees ?? []).find((a) => a.project_manager_id === pmId)?.role === 'Project Manager';
-                const fc = c.funding_call_id ? fcById.get(c.funding_call_id) : null;
-                const statusCls = c.status === 'promosso'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : c.status === 'rifiutato'
-                  ? 'bg-slate-100 text-slate-500'
-                  : 'bg-amber-100 text-amber-700';
-                const statusLabel = c.status === 'promosso' ? 'Promosso' : c.status === 'rifiutato' ? 'Rifiutato' : 'In valutazione';
-                return (
-                  <div
-                    key={c.id}
-                    onClick={() => navigate(`/concepts/${c.id}`)}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    <FlaskConical className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{c.name}</p>
-                      <p className="text-xs text-slate-400 truncate">
-                        {ispm && <span className="text-indigo-600 font-semibold">PM · </span>}
-                        {fc ? fc.code : 'Nessun bando'}
-                      </p>
-                    </div>
-                    <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusCls}`}>{statusLabel}</span>
-                  </div>
-                );
-              })}
-              {/* Leads */}
               {myLeads.filter((l) => l.status !== 'archiviato').map((l) => {
                 const statusCls = l.status === 'promosso' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700';
                 const statusLabel = l.status === 'promosso' ? 'Promosso' : 'Attivo';
+                const fc = l.funding_call_id ? fcById.get(l.funding_call_id) : null;
                 return (
                   <div
                     key={l.id}
@@ -446,7 +311,9 @@ export default function Scrivania() {
                     <UserSearch className="w-4 h-4 text-amber-400 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">{l.researcher_name}</p>
-                      <p className="text-xs text-slate-400 truncate">Lead · {l.institution ?? 'Nessuna istituzione'}</p>
+                      <p className="text-xs text-slate-400 truncate">
+                        {fc ? `${fc.code} · ` : ''}{l.institution ?? 'Nessuna istituzione'}
+                      </p>
                     </div>
                     <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusCls}`}>{statusLabel}</span>
                   </div>
@@ -455,8 +322,8 @@ export default function Scrivania() {
             </Section>
 
             {/* ── Menzioni ─────────────────────────────────────── */}
-            <Section title="Menzioni recenti" icon={AtSign} count={mentions.length} empty="Nessuna menzione recente nei commenti.">
-              {mentions.map((m) => (
+            <Section title="Menzioni recenti" icon={AtSign} count={mentions.filter((m) => m.entity_type !== 'concept').length} empty="Nessuna menzione recente nei commenti.">
+              {mentions.filter((m) => m.entity_type !== 'concept').map((m) => (
                 <div
                   key={m.id}
                   onClick={() => navigate(`${entityPath[m.entity_type]}/${m.entity_id}`)}
@@ -467,8 +334,8 @@ export default function Scrivania() {
                     <p className="text-xs font-semibold text-slate-500 mb-0.5">{m.author_name} · {formatDate(m.created_at)}</p>
                     <p className="text-sm text-slate-700 leading-snug line-clamp-2">{m.body}</p>
                   </div>
-                  <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${m.entity_type === 'concept' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-700'}`}>
-                    {m.entity_type === 'concept' ? 'Concept' : 'Lead'}
+                  <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                    {m.entity_type === 'lead' ? 'Lead' : 'Offerta'}
                   </span>
                 </div>
               ))}

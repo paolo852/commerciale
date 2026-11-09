@@ -8,7 +8,6 @@ import {
   Clock,
   Download,
   FileText,
-  FlaskConical,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -28,7 +27,6 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/scrivania', label: 'Scrivania', icon: MonitorCheck },
   { to: '/leads', label: 'Lead Candidates', icon: UserSearch },
-  { to: '/concepts', label: 'Concept Development', icon: FlaskConical },
   { to: '/offerte', label: 'Offerte', icon: FileText },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/team', label: 'Team', icon: Users },
@@ -114,9 +112,8 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map(({ to, label, icon: Icon, end }) => {
           const count =
-            to === '/leads'    ? counts?.leads    :
-            to === '/concepts' ? counts?.concepts :
-            to === '/offerte'  ? counts?.offers   :
+            to === '/leads'   ? counts?.leads  :
+            to === '/offerte' ? counts?.offers :
             undefined;
           return (
             <NavLink

@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Archive, ArrowLeft, CheckCircle2, Clock, Edit3, FlaskConical, Paperclip, Plus, Send, Trash2, X,
+  Archive, ArrowLeft, CheckCircle2, Clock, Edit3, Paperclip, Plus, Send, Trash2, X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
-import { useNotifications } from '../contexts/NotificationsContext';
 import { useOffersData } from '../hooks/useOffersData';
-import { leadCandidatesService, leadUpdatesService, conceptsService, offersService, activityLogService } from '../lib/dataService';
+import { leadCandidatesService, leadUpdatesService, offersService, activityLogService } from '../lib/dataService';
 import { formatDate } from '../lib/format';
 import LeadCandidateFormModal from '../components/leads/LeadCandidateFormModal';
 import OfferFormModal from '../components/offerte/OfferFormModal';
@@ -16,7 +15,7 @@ import EntityTasks from '../components/EntityTasks';
 import MentionTextarea from '../components/MentionTextarea';
 import ProjectPipelineCard from '../components/ProjectPipelineCard';
 import { sendMentionNotifications } from '../lib/mentionNotify';
-import type { Concept, LeadCandidate, LeadCandidateStatus, LeadUpdate, Offer, ProjectManager } from '../types';
+import type { LeadCandidate, LeadCandidateStatus, LeadUpdate, Offer, ProjectManager } from '../types';
 
 const STATUS_MAP: Record<LeadCandidateStatus, { label: string; cls: string; Icon: typeof Clock }> = {
   attivo:    { label: 'Attivo',    cls: 'bg-sky-50 text-sky-700 border-sky-200',           Icon: Clock },
@@ -28,18 +27,15 @@ export default function LeadCandidateDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { notify } = useNotifications();
   const { fundingCalls, projectManagers } = useOffersData();
 
   const [lead, setLead] = useState<LeadCandidate | null>(null);
   const [updates, setUpdates] = useState<LeadUpdate[]>([]);
-  const [pipelineConcept, setPipelineConcept] = useState<Concept | null>(null);
   const [pipelineOffer, setPipelineOffer] = useState<Offer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [toDelete, setToDelete] = useState(false);
-  const [promoting, setPromoting] = useState(false);
   const [promoteOfferOpen, setPromoteOfferOpen] = useState(false);
 
   // New update form
@@ -64,11 +60,7 @@ export default function LeadCandidateDetail() {
       if (!l) { setError('Lead non trovato.'); }
       else {
         setLead(l);
-        const [pc, po] = await Promise.all([
-          l.promoted_concept_id ? conceptsService.get(l.promoted_concept_id) : Promise.resolve(null),
-          l.promoted_offer_id   ? offersService.get(l.promoted_offer_id)     : Promise.resolve(null),
-        ]);
-        setPipelineConcept(pc);
+        const po = l.promoted_offer_id ? await offersService.get(l.promoted_offer_id) : null;
         setPipelineOffer(po);
       }
       setUpdates(u);
@@ -136,36 +128,6 @@ export default function LeadCandidateDetail() {
     await reload();
   }
 
-  async function promoteToConc() {
-    if (!lead || !user) return;
-    setPromoting(true);
-    try {
-      const concept = await conceptsService.create({
-        name: lead.researcher_name,
-        pi: lead.researcher_name,
-        ente: lead.institution ?? null,
-        description: lead.potential_project ?? null,
-        status: 'in_valutazione',
-        notes: null,
-      }, user.id);
-      void activityLogService.add({ user_email: user?.email ?? '', user_name: null, action: 'approved', entity_type: 'lead', entity_id: lead.id, entity_name: lead.researcher_name });
-      await leadCandidatesService.update(lead.id, {
-        status: 'promosso',
-        promoted_concept_id: concept.id,
-      });
-      void notify({
-        type: 'lead_promoted',
-        title: `Lead promosso: ${lead.researcher_name}`,
-        body: `Promosso a concept development`,
-        entity_id: lead.id,
-        entity_type: 'lead',
-      });
-      navigate(`/concepts/${concept.id}`);
-    } catch (e) {
-      setError((e as { message?: string })?.message ?? 'Errore promozione');
-    } finally { setPromoting(false); }
-  }
-
   if (loading) return (
     <div className="bg-white rounded-2xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">
       Caricamento…
@@ -193,10 +155,8 @@ export default function LeadCandidateDetail() {
       <ProjectPipelineCard
         current="lead"
         lead={{ id: lead.id, label: lead.researcher_name }}
-        concept={pipelineConcept ? { id: pipelineConcept.id, label: pipelineConcept.name } : null}
-        offer={pipelineOffer   ? { id: pipelineOffer.id,    label: pipelineOffer.name }    : null}
-        onCreateConcept={lead.status === 'attivo' && !lead.promoted_concept_id ? () => void promoteToConc() : undefined}
-        onCreateOffer={lead.status === 'attivo' && !lead.promoted_offer_id ? () => setPromoteOfferOpen(true) : undefined}
+        offer={pipelineOffer ? { id: pipelineOffer.id, label: pipelineOffer.name } : null}
+        onCreateOffer={lead.status !== 'archiviato' && !lead.promoted_offer_id ? () => setPromoteOfferOpen(true) : undefined}
       />
 
       {/* Header */}
@@ -231,31 +191,12 @@ export default function LeadCandidateDetail() {
 
           <div className="flex items-center gap-2 flex-wrap">
             {lead.status === 'attivo' && (
-              <>
-                <button
-                  onClick={promoteToConc}
-                  disabled={promoting}
-                  className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition flex items-center gap-1.5"
-                >
-                  <FlaskConical className="w-3.5 h-3.5" />
-                  {promoting ? 'Promozione…' : 'Promuovi a concept'}
-                </button>
-                <button
-                  onClick={handleArchive}
-                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition flex items-center gap-1.5"
-                >
-                  <Archive className="w-3.5 h-3.5" />
-                  Archivia
-                </button>
-              </>
-            )}
-            {lead.status === 'promosso' && lead.promoted_concept_id && (
               <button
-                onClick={() => navigate(`/concepts/${lead.promoted_concept_id}`)}
-                className="px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition flex items-center gap-1.5"
+                onClick={handleArchive}
+                className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition flex items-center gap-1.5"
               >
-                <FlaskConical className="w-3.5 h-3.5" />
-                Vai al concept
+                <Archive className="w-3.5 h-3.5" />
+                Archivia
               </button>
             )}
             <button

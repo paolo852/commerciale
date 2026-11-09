@@ -2,29 +2,28 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, CalendarDays, CheckCircle2, ChevronDown, Circle,
-  FileText, FlaskConical, Plus, Trash2, UserSearch, Users, X,
+  FileText, Plus, Trash2, UserSearch, Users, X,
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
-import { leadCandidatesService, conceptsService, tasksService } from '../lib/dataService';
-import type { Concept, LeadCandidate, ProjectManager, Task } from '../types';
+import { leadCandidatesService, tasksService } from '../lib/dataService';
+import type { LeadCandidate, ProjectManager, Task } from '../types';
 
 type Tab = 'workload' | 'tasks';
 
 // ─── Workload tab ───────────────────────────────────────────────
 
 function WorkloadCard({
-  pm, leads, concepts, offers,
+  pm, leads, offers,
 }: {
   pm: ProjectManager;
   leads: LeadCandidate[];
-  concepts: Concept[];
   offers: { id: string; name: string }[];
 }) {
   const nav = useNavigate();
-  const [open, setOpen] = useState<'leads' | 'concepts' | 'offers' | null>(null);
-  const total = leads.length + concepts.length + offers.length;
+  const [open, setOpen] = useState<'leads' | 'offers' | null>(null);
+  const total = leads.length + offers.length;
 
   const sections = [
     {
@@ -34,14 +33,6 @@ function WorkloadCard({
       icon: UserSearch,
       color: 'text-sky-600 bg-sky-50',
       items: leads.map((l) => ({ id: l.id, name: l.researcher_name, sub: l.institution ?? null, path: `/leads/${l.id}` })),
-    },
-    {
-      key: 'concepts' as const,
-      label: 'Concept',
-      count: concepts.length,
-      icon: FlaskConical,
-      color: 'text-indigo-600 bg-indigo-50',
-      items: concepts.map((c) => ({ id: c.id, name: c.name, sub: c.ente ?? null, path: `/concepts/${c.id}` })),
     },
     {
       key: 'offers' as const,
@@ -146,7 +137,7 @@ function TaskRow({
               onClick={() => nav(entity.path)}
               className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 transition truncate max-w-[200px]"
             >
-              {task.entity_type === 'lead' ? <UserSearch className="w-3 h-3 shrink-0" /> : task.entity_type === 'concept' ? <FlaskConical className="w-3 h-3 shrink-0" /> : <FileText className="w-3 h-3 shrink-0" />}
+              {task.entity_type === 'lead' ? <UserSearch className="w-3 h-3 shrink-0" /> : <FileText className="w-3 h-3 shrink-0" />}
               <span className="truncate">{entity.name}</span>
             </button>
           )}
@@ -179,7 +170,6 @@ export default function Team() {
   const [tab, setTab] = useState<Tab>('workload');
 
   const [leads, setLeads] = useState<LeadCandidate[]>([]);
-  const [concepts, setConcepts] = useState<Concept[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -197,13 +187,11 @@ export default function Team() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [l, c, t] = await Promise.all([
+      const [l, t] = await Promise.all([
         leadCandidatesService.list(),
-        conceptsService.list(),
         tasksService.list(),
       ]);
       setLeads(l);
-      setConcepts(c);
       setTasks(t);
     } finally {
       setLoading(false);
@@ -218,17 +206,15 @@ export default function Team() {
   const entityNames = useMemo(() => {
     const map = new Map<string, { name: string; path: string }>();
     leads.forEach((l) => map.set(l.id, { name: l.researcher_name, path: `/leads/${l.id}` }));
-    concepts.forEach((c) => map.set(c.id, { name: c.name, path: `/concepts/${c.id}` }));
     offers.forEach((o) => map.set(o.id, { name: o.name, path: `/offerte/${o.id}` }));
     return map;
-  }, [leads, concepts, offers]);
+  }, [leads, offers]);
 
   const workload = useMemo(() => activePms.map((pm) => ({
     pm,
     leads: leads.filter((l) => l.pm_id === pm.id && l.status === 'attivo'),
-    concepts: concepts.filter((c) => c.status === 'in_valutazione' && c.assignees?.some((a) => a.project_manager_id === pm.id)),
     offers: offers.filter((o) => o.project_manager_id === pm.id && o.status === 'in_lavorazione').map((o) => ({ id: o.id, name: o.name })),
-  })), [activePms, leads, concepts, offers]);
+  })), [activePms, leads, offers]);
 
   // ── Task data ──
   const filteredTasks = useMemo(() => tasks.filter((t) => {
@@ -305,8 +291,8 @@ export default function Team() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {workload.map(({ pm, leads: l, concepts: c, offers: o }) => (
-                <WorkloadCard key={pm.id} pm={pm} leads={l} concepts={c} offers={o} />
+              {workload.map(({ pm, leads: l, offers: o }) => (
+                <WorkloadCard key={pm.id} pm={pm} leads={l} offers={o} />
               ))}
             </div>
           )}

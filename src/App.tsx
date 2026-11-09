@@ -8,8 +8,6 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import LeadCandidates from './pages/LeadCandidates';
 import LeadCandidateDetail from './pages/LeadCandidateDetail';
-import Concepts from './pages/Concepts';
-import ConceptDetail from './pages/ConceptDetail';
 import Offerte from './pages/Offerte';
 import OfferDetail from './pages/OfferDetail';
 import Analytics from './pages/Analytics';
@@ -38,8 +36,8 @@ export default function App() {
             <Route path="/scrivania" element={<Scrivania />} />
             <Route path="/leads" element={<LeadCandidates />} />
             <Route path="/leads/:id" element={<LeadCandidateDetail />} />
-            <Route path="/concepts" element={<Concepts />} />
-            <Route path="/concepts/:id" element={<ConceptDetail />} />
+            <Route path="/concepts" element={<Navigate to="/leads" replace />} />
+            <Route path="/concepts/:id" element={<Navigate to="/leads" replace />} />
             <Route path="/offerte" element={<Offerte />} />
             <Route path="/offerte/:id" element={<OfferDetail />} />
             <Route path="/analytics" element={<Analytics />} />
