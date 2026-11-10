@@ -2,17 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AtSign, CalendarClock, CheckCircle2, CheckSquare, FileText, FolderOpen, Mail, Pencil,
-  Square, TrendingUp, Trophy, UserSearch,
+  Send, Square, TrendingUp, Trophy,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
 import {
-  tasksService, leadCandidatesService,
-  findMentionsForPm, type MentionResult,
+  tasksService, findMentionsForPm, type MentionResult,
 } from '../lib/dataService';
 import { offerYear } from '../lib/analytics';
 import { formatDate, formatEUR } from '../lib/format';
-import type { FundingCall, LeadCandidate, Offer, Task } from '../types';
+import type { FundingCall, Offer, Task } from '../types';
 
 // ── helpers ─────────────────────────────────────────────────────
 
@@ -73,20 +72,17 @@ export default function Scrivania() {
   const { fundingCalls, offers } = useOffersData();
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [leads, setLeads] = useState<LeadCandidate[]>([]);
   const [mentions, setMentions] = useState<MentionResult[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (pmName?: string) => {
     setLoading(true);
     try {
-      const [t, l, m] = await Promise.all([
+      const [t, m] = await Promise.all([
         tasksService.list(),
-        leadCandidatesService.list(),
         pmName ? findMentionsForPm(pmName) : Promise.resolve<MentionResult[]>([]),
       ]);
       setTasks(t);
-      setLeads(l);
       setMentions(m);
     } finally {
       setLoading(false);
@@ -110,14 +106,14 @@ export default function Scrivania() {
 
   const myOpenTasks = useMemo(() => myTasks.filter((t) => !t.completed), [myTasks]);
 
-  const myLeads = useMemo(
-    () => leads.filter((l) => l.pm_id === pmId),
-    [leads, pmId],
-  );
-
   const fcById = useMemo(() => new Map(fundingCalls.map((fc) => [fc.id, fc])), [fundingCalls]);
 
   const currentYear = new Date().getFullYear();
+
+  const myOffers = useMemo(
+    () => offers.filter((o) => o.project_manager_id === pmId),
+    [offers, pmId],
+  );
 
   const approvedThisYear = useMemo(
     () => offers.filter((o) => o.outcome === 'approvato' && offerYear(o) === currentYear),
@@ -128,12 +124,20 @@ export default function Scrivania() {
     [approvedThisYear],
   );
 
+  // Ricavo potenziale: offerte in attesa (status=presentata, outcome=nessuno) ponderato dalla probabilità
+  const potentialRevenue = useMemo(
+    () => myOffers
+      .filter((o) => o.outcome === 'nessuno' && o.status === 'presentata')
+      .reduce((s, o) => s + o.budget * (o.probability ?? 50) / 100, 0),
+    [myOffers],
+  );
+
   async function toggleTask(task: Task) {
     await tasksService.setCompleted(task.id, !task.completed);
     await load();
   }
 
-  const entityPath: Record<string, string> = { lead: '/leads', offer: '/offerte' };
+  const entityPath: Record<string, string> = { offer: '/offerte' };
 
   if (currentPmReady && !currentPm) {
     return (
@@ -165,12 +169,12 @@ export default function Scrivania() {
       Icon: CalendarClock,
     },
     {
-      label: 'Miei lead attivi',
-      value: myLeads.filter((l) => l.status === 'attivo').length,
-      sub: `${myLeads.length} totali`,
+      label: 'Ricavo potenziale',
+      value: compactEUR(potentialRevenue),
+      sub: 'dalle offerte in attesa (ponderate)',
       color: 'bg-emerald-50 text-emerald-700 border-emerald-100',
       iconColor: 'text-emerald-500',
-      Icon: UserSearch,
+      Icon: TrendingUp,
     },
     {
       label: 'Menzioni recenti',
@@ -239,7 +243,7 @@ export default function Scrivania() {
 
           {/* ── Portafoglio: Le mie offerte ────────────────────── */}
           <MyOffersPortfolio
-            offers={offers.filter((o) => o.project_manager_id === pmId)}
+            offers={myOffers}
             fcById={fcById}
             onOpen={(id) => navigate(`/offerte/${id}`)}
           />
@@ -277,7 +281,7 @@ export default function Scrivania() {
                             onClick={() => navigate(entityLink)}
                             className="text-xs text-indigo-500 hover:underline mt-0.5"
                           >
-                            {task.entity_type === 'lead' ? 'Lead' : 'Offerta'} →
+                            Offerta →
                           </button>
                         )}
                       </div>
@@ -298,39 +302,9 @@ export default function Scrivania() {
               )}
             </Section>
 
-            {/* ── I miei lead ──────────────────────────────── */}
-            <Section
-              title="I miei lead"
-              icon={UserSearch}
-              count={myLeads.filter((l) => l.status !== 'archiviato').length}
-              empty="Nessun lead assegnato."
-            >
-              {myLeads.filter((l) => l.status !== 'archiviato').map((l) => {
-                const statusCls = l.status === 'promosso' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700';
-                const statusLabel = l.status === 'promosso' ? 'Promosso' : 'Attivo';
-                const fc = l.funding_call_id ? fcById.get(l.funding_call_id) : null;
-                return (
-                  <div
-                    key={l.id}
-                    onClick={() => navigate(`/leads/${l.id}`)}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    <UserSearch className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{l.researcher_name}</p>
-                      <p className="text-xs text-slate-400 truncate">
-                        {fc ? `${fc.code} · ` : ''}{l.institution ?? 'Nessuna istituzione'}
-                      </p>
-                    </div>
-                    <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusCls}`}>{statusLabel}</span>
-                  </div>
-                );
-              })}
-            </Section>
-
             {/* ── Menzioni ─────────────────────────────────────── */}
-            <Section title="Menzioni recenti" icon={AtSign} count={mentions.filter((m) => m.entity_type !== 'concept').length} empty="Nessuna menzione recente nei commenti.">
-              {mentions.filter((m) => m.entity_type !== 'concept').map((m) => (
+            <Section title="Menzioni recenti" icon={AtSign} count={mentions.filter((m) => m.entity_type !== 'concept' && m.entity_type !== 'lead').length} empty="Nessuna menzione recente nei commenti.">
+              {mentions.filter((m) => m.entity_type !== 'concept' && m.entity_type !== 'lead').map((m) => (
                 <div
                   key={m.id}
                   onClick={() => navigate(`${entityPath[m.entity_type]}/${m.entity_id}`)}
@@ -342,7 +316,7 @@ export default function Scrivania() {
                     <p className="text-sm text-slate-700 leading-snug line-clamp-2">{m.body}</p>
                   </div>
                   <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                    {m.entity_type === 'lead' ? 'Lead' : 'Offerta'}
+                    Offerta
                   </span>
                 </div>
               ))}
@@ -383,6 +357,8 @@ export default function Scrivania() {
 
 // ── Portafoglio offerte del PM ────────────────────────────────────────────────
 
+type OffersTab = 'lavorazione' | 'presentate';
+
 function MyOffersPortfolio({
   offers, fcById, onOpen,
 }: {
@@ -390,15 +366,27 @@ function MyOffersPortfolio({
   fcById: Map<string, FundingCall>;
   onOpen: (id: string) => void;
 }) {
-  const active = offers.filter((o) => o.outcome === 'nessuno' && o.status !== 'ferma');
-  const presented = active.filter((o) => o.status === 'presentata');
-  const preparing = active.filter((o) => o.status === 'in_lavorazione');
-  const won = offers.filter((o) => o.outcome === 'approvato');
+  const [tab, setTab] = useState<OffersTab>('lavorazione');
+
+  const preparing = offers.filter((o) => o.outcome === 'nessuno' && o.status === 'in_lavorazione');
+  const presented = offers.filter((o) => o.outcome === 'nessuno' && o.status === 'presentata');
+  const won       = offers.filter((o) => o.outcome === 'approvato');
+
+  const sorted = (tab === 'lavorazione' ? preparing : presented)
+    .slice()
+    .sort((a, b) => a.deadline.localeCompare(b.deadline));
+
+  // Se non ci sono in lavorazione ma ce ne sono presentate, apri direttamente quella tab
+  useEffect(() => {
+    if (preparing.length === 0 && presented.length > 0 && tab === 'lavorazione') {
+      setTab('presentate');
+    }
+  }, [preparing.length, presented.length, tab]);
 
   if (offers.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-8 text-center">
-        <FileText className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-10 text-center">
+        <FileText className="w-10 h-10 text-slate-200 mx-auto mb-2" />
         <p className="text-sm text-slate-500">Nessuna offerta assegnata a te come PM.</p>
       </div>
     );
@@ -406,34 +394,85 @@ function MyOffersPortfolio({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
-          <FileText className="w-4 h-4 text-indigo-600" />
+      {/* Header + tab */}
+      <div className="px-5 pt-4 pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+            <FileText className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-900">Le mie offerte</p>
+            <p className="text-xs text-slate-500 tabular-nums mt-0.5">
+              <strong className="text-emerald-600">{won.length}</strong> approvate quest'anno
+            </p>
+          </div>
         </div>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-slate-900">Le mie offerte</p>
-          <p className="text-xs text-slate-500 tabular-nums mt-0.5">
-            <strong className="text-slate-700">{preparing.length}</strong> in preparazione
-            {' · '}
-            <strong className="text-slate-700">{presented.length}</strong> in attesa
-            {' · '}
-            <strong className="text-emerald-600">{won.length}</strong> approvate
-          </p>
+
+        {/* Tab interni */}
+        <div className="inline-flex gap-1 bg-slate-100 p-1 rounded-xl">
+          <TabButton
+            active={tab === 'lavorazione'}
+            onClick={() => setTab('lavorazione')}
+            Icon={Pencil}
+            label="In lavorazione"
+            count={preparing.length}
+            activeColor="bg-white text-indigo-700"
+            badgeActive="bg-indigo-100 text-indigo-700"
+          />
+          <TabButton
+            active={tab === 'presentate'}
+            onClick={() => setTab('presentate')}
+            Icon={Send}
+            label="Presentate"
+            count={presented.length}
+            activeColor="bg-white text-amber-700"
+            badgeActive="bg-amber-100 text-amber-700"
+          />
         </div>
       </div>
 
-      {active.length === 0 ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-sm text-slate-400 italic">Nessuna offerta attiva in questo momento.</p>
+      {sorted.length === 0 ? (
+        <div className="px-5 py-10 text-center">
+          <p className="text-sm text-slate-400 italic">
+            {tab === 'lavorazione' ? 'Nessuna offerta in lavorazione.' : 'Nessuna offerta presentata in attesa.'}
+          </p>
         </div>
       ) : (
         <ul className="divide-y divide-slate-100">
-          {active
-            .sort((a, b) => a.deadline.localeCompare(b.deadline))
-            .map((o) => <OfferPortfolioCard key={o.id} offer={o} fcById={fcById} onOpen={onOpen} />)}
+          {sorted.map((o) => <OfferPortfolioCard key={o.id} offer={o} fcById={fcById} onOpen={onOpen} />)}
         </ul>
       )}
     </div>
+  );
+}
+
+function TabButton({
+  active, onClick, Icon, label, count, activeColor, badgeActive,
+}: {
+  active: boolean;
+  onClick: () => void;
+  Icon: typeof Pencil;
+  label: string;
+  count: number;
+  activeColor: string;
+  badgeActive: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all ${
+        active ? `${activeColor} shadow-sm` : 'text-slate-500 hover:text-slate-700'
+      }`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+      <span className={`text-xs px-1.5 py-0.5 rounded-md tabular-nums ${
+        active ? badgeActive : 'bg-slate-200/70 text-slate-500'
+      }`}>
+        {count}
+      </span>
+    </button>
   );
 }
 
