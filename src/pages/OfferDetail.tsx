@@ -14,6 +14,10 @@ import EntityComments from '../components/EntityComments';
 import ProjectPipelineCard from '../components/ProjectPipelineCard';
 import OfferFilesAndReviews from '../components/offerte/OfferFilesAndReviews';
 import OfferTeamPanel from '../components/offerte/OfferTeamPanel';
+import OfferLinksPanel from '../components/offerte/OfferLinksPanel';
+import OfferBudgetTracker from '../components/offerte/OfferBudgetTracker';
+import OfferTimeline from '../components/offerte/OfferTimeline';
+import OfferContactsPanel from '../components/offerte/OfferContactsPanel';
 import type { LeadCandidate, Offer } from '../types';
 
 export default function OfferDetail() {
@@ -321,6 +325,21 @@ export default function OfferDetail() {
         projectManagers={projectManagers}
       />
 
+      {/* Drive + Gmail + Note */}
+      <OfferLinksPanel
+        offer={offer}
+        onUpdate={(patch) => setOffer((o) => (o ? { ...o, ...patch } : o))}
+      />
+
+      {/* Contatti del progetto */}
+      <OfferContactsPanel offerId={offer.id} />
+
+      {/* Timeline progetto */}
+      <OfferTimeline offerId={offer.id} />
+
+      {/* Budget tracker */}
+      <OfferBudgetTracker offerId={offer.id} offerBudget={offer.budget} />
+
       {/* Documenti e revisioni */}
       <OfferFilesAndReviews
         offerId={offer.id}
@@ -328,7 +347,7 @@ export default function OfferDetail() {
         projectManagers={projectManagers}
       />
 
-      {/* Tasks */}
+      {/* Checklist (task) */}
       {user && (
         <EntityTasks
           entityId={offer.id}

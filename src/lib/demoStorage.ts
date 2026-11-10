@@ -5,6 +5,7 @@ import type {
   AppNotification, NotificationPreferences, NotificationType,
   Task, ConceptFile, ConceptFieldComment, EntityComment,
   OfferFile, OfferReview, OfferAssignee, OfferAssigneeRole,
+  OfferBudgetItem, OfferMilestone, OfferMilestoneStatus, OfferContact,
 } from '../types';
 
 // ============================================================
@@ -34,6 +35,9 @@ const KEYS = {
   offerFiles: 'commerciale.demo.offerFiles',
   offerReviews: 'commerciale.demo.offerReviews',
   offerAssignees: 'commerciale.demo.offerAssignees',
+  offerBudgetItems: 'commerciale.demo.offerBudgetItems',
+  offerMilestones: 'commerciale.demo.offerMilestones',
+  offerContacts: 'commerciale.demo.offerContacts',
 } as const;
 
 export interface DemoUser {
@@ -641,5 +645,95 @@ export const demoOfferAssignees = {
         (a) => !(a.offer_id === offerId && a.project_manager_id === pmId),
       ),
     );
+  },
+};
+
+// ============================================================
+// Offer Budget Items
+// ============================================================
+
+export const demoOfferBudgetItems = {
+  list(offerId: string): OfferBudgetItem[] {
+    return read<OfferBudgetItem[]>(KEYS.offerBudgetItems, [])
+      .filter((b) => b.offer_id === offerId)
+      .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
+  },
+  create(input: Omit<OfferBudgetItem, 'id' | 'created_at'>): OfferBudgetItem {
+    const all = read<OfferBudgetItem[]>(KEYS.offerBudgetItems, []);
+    const item: OfferBudgetItem = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    write(KEYS.offerBudgetItems, [...all, item]);
+    return item;
+  },
+  update(id: string, patch: Partial<OfferBudgetItem>): OfferBudgetItem | null {
+    const all = read<OfferBudgetItem[]>(KEYS.offerBudgetItems, []);
+    const idx = all.findIndex((b) => b.id === id);
+    if (idx < 0) return null;
+    all[idx] = { ...all[idx], ...patch };
+    write(KEYS.offerBudgetItems, all);
+    return all[idx];
+  },
+  remove(id: string): void {
+    write(KEYS.offerBudgetItems, read<OfferBudgetItem[]>(KEYS.offerBudgetItems, []).filter((b) => b.id !== id));
+  },
+};
+
+// ============================================================
+// Offer Milestones
+// ============================================================
+
+export const demoOfferMilestones = {
+  list(offerId: string): OfferMilestone[] {
+    return read<OfferMilestone[]>(KEYS.offerMilestones, [])
+      .filter((m) => m.offer_id === offerId)
+      .sort((a, b) => a.position - b.position || (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'));
+  },
+  create(input: Omit<OfferMilestone, 'id' | 'created_at'>): OfferMilestone {
+    const all = read<OfferMilestone[]>(KEYS.offerMilestones, []);
+    const item: OfferMilestone = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    write(KEYS.offerMilestones, [...all, item]);
+    return item;
+  },
+  update(id: string, patch: Partial<OfferMilestone>): OfferMilestone | null {
+    const all = read<OfferMilestone[]>(KEYS.offerMilestones, []);
+    const idx = all.findIndex((m) => m.id === id);
+    if (idx < 0) return null;
+    all[idx] = { ...all[idx], ...patch };
+    write(KEYS.offerMilestones, all);
+    return all[idx];
+  },
+  setStatus(id: string, status: OfferMilestoneStatus): OfferMilestone | null {
+    return demoOfferMilestones.update(id, { status });
+  },
+  remove(id: string): void {
+    write(KEYS.offerMilestones, read<OfferMilestone[]>(KEYS.offerMilestones, []).filter((m) => m.id !== id));
+  },
+};
+
+// ============================================================
+// Offer Contacts
+// ============================================================
+
+export const demoOfferContacts = {
+  list(offerId: string): OfferContact[] {
+    return read<OfferContact[]>(KEYS.offerContacts, [])
+      .filter((c) => c.offer_id === offerId)
+      .sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0) || a.position - b.position);
+  },
+  create(input: Omit<OfferContact, 'id' | 'created_at'>): OfferContact {
+    const all = read<OfferContact[]>(KEYS.offerContacts, []);
+    const item: OfferContact = { ...input, id: uuid(), created_at: new Date().toISOString() };
+    write(KEYS.offerContacts, [...all, item]);
+    return item;
+  },
+  update(id: string, patch: Partial<OfferContact>): OfferContact | null {
+    const all = read<OfferContact[]>(KEYS.offerContacts, []);
+    const idx = all.findIndex((c) => c.id === id);
+    if (idx < 0) return null;
+    all[idx] = { ...all[idx], ...patch };
+    write(KEYS.offerContacts, all);
+    return all[idx];
+  },
+  remove(id: string): void {
+    write(KEYS.offerContacts, read<OfferContact[]>(KEYS.offerContacts, []).filter((c) => c.id !== id));
   },
 };

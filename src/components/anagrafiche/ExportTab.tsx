@@ -183,6 +183,9 @@ export default function ExportTab() {
         reference_year: (o as { reference_year?: number | null }).reference_year ?? null,
         document_progress: (o as { document_progress?: number }).document_progress ?? 0,
         partner_role: (o as { partner_role?: 'leader' | 'invited' }).partner_role ?? 'leader',
+        drive_url: (o as { drive_url?: string | null }).drive_url ?? null,
+        gmail_query: (o as { gmail_query?: string | null }).gmail_query ?? null,
+        ideas: (o as { ideas?: string | null }).ideas ?? null,
       }, user.id)));
 
       setMsg({ type: 'ok', text: `Ripristino completato: +${newOffers.length} offerte, +${newPMs.length} PM, +${newFCs.length} bandi importati (duplicati ignorati).` });

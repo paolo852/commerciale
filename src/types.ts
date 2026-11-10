@@ -66,6 +66,9 @@ export interface Offer {
   reference_year: number | null;
   document_progress: number; // 0-100, percentuale completamento documento offerta
   partner_role: PartnerRole; // ruolo nel consorzio: leader (capofila) o invited (invitato)
+  drive_url: string | null;   // url cartella condivisa di progetto
+  gmail_query: string | null; // query Gmail per aprire la conversazione del progetto
+  ideas: string | null;       // note / idee libere sul progetto
 
   // Relazione opzionale (join)
   project_manager?: ProjectManager | null;
@@ -114,6 +117,9 @@ interface OfferFormBase {
   reference_year?: number | null;
   document_progress?: number;
   partner_role?: PartnerRole;
+  drive_url?: string | null;
+  gmail_query?: string | null;
+  ideas?: string | null;
 }
 
 export interface FinancedOfferForm extends OfferFormBase {
@@ -492,3 +498,54 @@ export interface OfferAssignee {
   added_at: string;
   project_manager?: ProjectManager | null;
 }
+
+// ============================================================
+// Offer project management: budget, milestones, contacts
+// ============================================================
+
+export interface OfferBudgetItem {
+  id: string;
+  offer_id: string;
+  label: string;
+  planned_eur: number;
+  actual_eur: number;
+  notes: string | null;
+  position: number;
+  created_at: string;
+}
+
+export type CreateOfferBudgetItemInput = Pick<OfferBudgetItem, 'offer_id' | 'label' | 'planned_eur' | 'actual_eur' | 'notes' | 'position'>;
+export type UpdateOfferBudgetItemInput = Partial<Pick<OfferBudgetItem, 'label' | 'planned_eur' | 'actual_eur' | 'notes' | 'position'>>;
+
+export type OfferMilestoneStatus = 'pending' | 'done';
+
+export interface OfferMilestone {
+  id: string;
+  offer_id: string;
+  label: string;
+  due_date: string | null;
+  status: OfferMilestoneStatus;
+  notes: string | null;
+  position: number;
+  created_at: string;
+}
+
+export type CreateOfferMilestoneInput = Pick<OfferMilestone, 'offer_id' | 'label' | 'due_date' | 'status' | 'notes' | 'position'>;
+export type UpdateOfferMilestoneInput = Partial<Pick<OfferMilestone, 'label' | 'due_date' | 'status' | 'notes' | 'position'>>;
+
+export interface OfferContact {
+  id: string;
+  offer_id: string;
+  name: string;
+  role: string | null;
+  organization: string | null;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  is_primary: boolean;
+  position: number;
+  created_at: string;
+}
+
+export type CreateOfferContactInput = Pick<OfferContact, 'offer_id' | 'name' | 'role' | 'organization' | 'email' | 'phone' | 'notes' | 'is_primary' | 'position'>;
+export type UpdateOfferContactInput = Partial<Pick<OfferContact, 'name' | 'role' | 'organization' | 'email' | 'phone' | 'notes' | 'is_primary' | 'position'>>;

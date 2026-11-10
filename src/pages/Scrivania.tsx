@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AtSign, CalendarClock, CheckCircle2, CheckSquare,
+  AtSign, CalendarClock, CheckCircle2, CheckSquare, FileText, FolderOpen, Mail, Pencil,
   Square, TrendingUp, Trophy, UserSearch,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,7 +12,7 @@ import {
 } from '../lib/dataService';
 import { offerYear } from '../lib/analytics';
 import { formatDate, formatEUR } from '../lib/format';
-import type { LeadCandidate, Task } from '../types';
+import type { FundingCall, LeadCandidate, Offer, Task } from '../types';
 
 // ── helpers ─────────────────────────────────────────────────────
 
@@ -237,6 +237,13 @@ export default function Scrivania() {
             ))}
           </div>
 
+          {/* ── Portafoglio: Le mie offerte ────────────────────── */}
+          <MyOffersPortfolio
+            offers={offers.filter((o) => o.project_manager_id === pmId)}
+            fcById={fcById}
+            onOpen={(id) => navigate(`/offerte/${id}`)}
+          />
+
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
 
             {/* ── Task ─────────────────────────────────────────── */}
@@ -371,5 +378,149 @@ export default function Scrivania() {
         </>
       )}
     </div>
+  );
+}
+
+// ── Portafoglio offerte del PM ────────────────────────────────────────────────
+
+function MyOffersPortfolio({
+  offers, fcById, onOpen,
+}: {
+  offers: Offer[];
+  fcById: Map<string, FundingCall>;
+  onOpen: (id: string) => void;
+}) {
+  const active = offers.filter((o) => o.outcome === 'nessuno' && o.status !== 'ferma');
+  const presented = active.filter((o) => o.status === 'presentata');
+  const preparing = active.filter((o) => o.status === 'in_lavorazione');
+  const won = offers.filter((o) => o.outcome === 'approvato');
+
+  if (offers.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-8 text-center">
+        <FileText className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+        <p className="text-sm text-slate-500">Nessuna offerta assegnata a te come PM.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+          <FileText className="w-4 h-4 text-indigo-600" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-slate-900">Le mie offerte</p>
+          <p className="text-xs text-slate-500 tabular-nums mt-0.5">
+            <strong className="text-slate-700">{preparing.length}</strong> in preparazione
+            {' · '}
+            <strong className="text-slate-700">{presented.length}</strong> in attesa
+            {' · '}
+            <strong className="text-emerald-600">{won.length}</strong> approvate
+          </p>
+        </div>
+      </div>
+
+      {active.length === 0 ? (
+        <div className="px-5 py-6 text-center">
+          <p className="text-sm text-slate-400 italic">Nessuna offerta attiva in questo momento.</p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {active
+            .sort((a, b) => a.deadline.localeCompare(b.deadline))
+            .map((o) => <OfferPortfolioCard key={o.id} offer={o} fcById={fcById} onOpen={onOpen} />)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function OfferPortfolioCard({
+  offer, fcById, onOpen,
+}: {
+  offer: Offer;
+  fcById: Map<string, FundingCall>;
+  onOpen: (id: string) => void;
+}) {
+  const days = Math.ceil((new Date(offer.deadline).getTime() - Date.now()) / 86_400_000);
+  const overdue = days < 0;
+  const urgent = !overdue && days <= 14;
+  const soon = !overdue && !urgent && days <= 30;
+
+  const bandoLabel = offer.type === 'financed'
+    ? offer.funding_call ?? '—'
+    : (offer.client ?? '—') + (offer.consulting_call_id ? ` · rif. ${fcById.get(offer.consulting_call_id)?.code ?? ''}` : '');
+
+  const progress = offer.document_progress ?? 0;
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(offer.id)}
+        className="w-full flex items-center gap-4 px-5 py-3 hover:bg-indigo-50/20 transition text-left"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-slate-900 truncate">{offer.name}</span>
+            <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md shrink-0 ${
+              offer.status === 'presentata' ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+            }`}>
+              {offer.status === 'presentata' ? 'In attesa' : 'In preparazione'}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 truncate mt-0.5">{bandoLabel}</p>
+
+          {/* Mini quick-link icons se presenti */}
+          <div className="flex items-center gap-2 mt-1.5">
+            {offer.drive_url && (
+              <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <FolderOpen className="w-2.5 h-2.5" /> Drive
+              </span>
+            )}
+            {offer.gmail_query && (
+              <span className="text-[10px] text-red-700 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <Mail className="w-2.5 h-2.5" /> Gmail
+              </span>
+            )}
+            {offer.ideas && (
+              <span className="text-[10px] text-violet-700 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <Pencil className="w-2.5 h-2.5" /> Note
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Avanzamento */}
+        <div className="w-24 shrink-0">
+          <div className="flex items-center gap-1.5 justify-end">
+            <span className="text-xs font-semibold tabular-nums text-slate-600">{progress}%</span>
+          </div>
+          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+            <div className={`h-full transition-all ${
+              progress >= 80 ? 'bg-emerald-500'
+              : progress >= 40 ? 'bg-indigo-500'
+              : progress > 0 ? 'bg-slate-400' : 'bg-slate-200'
+            }`} style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+
+        {/* Scadenza */}
+        <div className="w-28 text-right shrink-0">
+          <p className="text-xs text-slate-500 tabular-nums">{offer.deadline}</p>
+          <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums mt-0.5 ${
+            overdue ? 'bg-red-100 text-red-700'
+            : urgent ? 'bg-amber-100 text-amber-700'
+            : soon ? 'bg-yellow-100 text-yellow-800'
+            : 'bg-slate-100 text-slate-500'
+          }`}>
+            {overdue ? `${Math.abs(days)}gg fa` : days === 0 ? 'oggi!' : `tra ${days}gg`}
+          </span>
+        </div>
+      </button>
+    </li>
   );
 }

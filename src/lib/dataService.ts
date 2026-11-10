@@ -20,6 +20,9 @@ import {
   demoOfferFiles,
   demoOfferReviews,
   demoOfferAssignees,
+  demoOfferBudgetItems,
+  demoOfferMilestones,
+  demoOfferContacts,
 } from './demoStorage';
 import type {
   AllowedUser,
@@ -60,6 +63,16 @@ import type {
   CreateOfferReviewInput,
   OfferAssignee,
   OfferAssigneeRole,
+  OfferBudgetItem,
+  CreateOfferBudgetItemInput,
+  UpdateOfferBudgetItemInput,
+  OfferMilestone,
+  OfferMilestoneStatus,
+  CreateOfferMilestoneInput,
+  UpdateOfferMilestoneInput,
+  OfferContact,
+  CreateOfferContactInput,
+  UpdateOfferContactInput,
 } from '../types';
 
 // ============================================================
@@ -1727,6 +1740,163 @@ export const offerAssigneesService = {
       .delete()
       .eq('offer_id', offerId)
       .eq('project_manager_id', projectManagerId);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Offer Budget Items
+// ----------------------------------------------------------------
+
+export const offerBudgetItemsService = {
+  async list(offerId: string): Promise<OfferBudgetItem[]> {
+    if (isDemoMode) return demoOfferBudgetItems.list(offerId);
+    const { data, error } = await ensureSb()
+      .from('offer_budget_items')
+      .select('*')
+      .eq('offer_id', offerId)
+      .order('position', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as OfferBudgetItem[];
+  },
+
+  async create(input: CreateOfferBudgetItemInput): Promise<OfferBudgetItem> {
+    if (isDemoMode) return demoOfferBudgetItems.create(input);
+    const { data, error } = await ensureSb()
+      .from('offer_budget_items')
+      .insert(input)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as OfferBudgetItem;
+  },
+
+  async update(id: string, patch: UpdateOfferBudgetItemInput): Promise<OfferBudgetItem> {
+    if (isDemoMode) {
+      const u = demoOfferBudgetItems.update(id, patch);
+      if (!u) throw new Error('Budget item non trovato');
+      return u;
+    }
+    const { data, error } = await ensureSb()
+      .from('offer_budget_items')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as OfferBudgetItem;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoOfferBudgetItems.remove(id); return; }
+    const { error } = await ensureSb().from('offer_budget_items').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Offer Milestones
+// ----------------------------------------------------------------
+
+export const offerMilestonesService = {
+  async list(offerId: string): Promise<OfferMilestone[]> {
+    if (isDemoMode) return demoOfferMilestones.list(offerId);
+    const { data, error } = await ensureSb()
+      .from('offer_milestones')
+      .select('*')
+      .eq('offer_id', offerId)
+      .order('position', { ascending: true })
+      .order('due_date', { ascending: true, nullsFirst: false });
+    if (error) throw error;
+    return (data ?? []) as OfferMilestone[];
+  },
+
+  async create(input: CreateOfferMilestoneInput): Promise<OfferMilestone> {
+    if (isDemoMode) return demoOfferMilestones.create(input);
+    const { data, error } = await ensureSb()
+      .from('offer_milestones')
+      .insert(input)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as OfferMilestone;
+  },
+
+  async update(id: string, patch: UpdateOfferMilestoneInput): Promise<OfferMilestone> {
+    if (isDemoMode) {
+      const u = demoOfferMilestones.update(id, patch);
+      if (!u) throw new Error('Milestone non trovata');
+      return u;
+    }
+    const { data, error } = await ensureSb()
+      .from('offer_milestones')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as OfferMilestone;
+  },
+
+  async setStatus(id: string, status: OfferMilestoneStatus): Promise<OfferMilestone> {
+    return offerMilestonesService.update(id, { status });
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoOfferMilestones.remove(id); return; }
+    const { error } = await ensureSb().from('offer_milestones').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ----------------------------------------------------------------
+// Offer Contacts
+// ----------------------------------------------------------------
+
+export const offerContactsService = {
+  async list(offerId: string): Promise<OfferContact[]> {
+    if (isDemoMode) return demoOfferContacts.list(offerId);
+    const { data, error } = await ensureSb()
+      .from('offer_contacts')
+      .select('*')
+      .eq('offer_id', offerId)
+      .order('is_primary', { ascending: false })
+      .order('position', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as OfferContact[];
+  },
+
+  async create(input: CreateOfferContactInput): Promise<OfferContact> {
+    if (isDemoMode) return demoOfferContacts.create(input);
+    const { data, error } = await ensureSb()
+      .from('offer_contacts')
+      .insert(input)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as OfferContact;
+  },
+
+  async update(id: string, patch: UpdateOfferContactInput): Promise<OfferContact> {
+    if (isDemoMode) {
+      const u = demoOfferContacts.update(id, patch);
+      if (!u) throw new Error('Contatto non trovato');
+      return u;
+    }
+    const { data, error } = await ensureSb()
+      .from('offer_contacts')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as OfferContact;
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isDemoMode) { demoOfferContacts.remove(id); return; }
+    const { error } = await ensureSb().from('offer_contacts').delete().eq('id', id);
     if (error) throw error;
   },
 };

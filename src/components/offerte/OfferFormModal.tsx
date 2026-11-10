@@ -47,6 +47,8 @@ interface FormState {
   notes: string;
   document_progress: number;
   partner_role: PartnerRole;
+  drive_url: string;
+  gmail_query: string;
 }
 
 const emptyForm: FormState = {
@@ -57,6 +59,8 @@ const emptyForm: FormState = {
   outcome: 'nessuno', submitted_at: '', decided_at: '', notes: '',
   document_progress: 0,
   partner_role: 'leader',
+  drive_url: '',
+  gmail_query: '',
 };
 
 function fromOffer(o: Offer): FormState {
@@ -77,6 +81,8 @@ function fromOffer(o: Offer): FormState {
     notes: o.notes ?? '',
     document_progress: o.document_progress ?? 0,
     partner_role: o.partner_role ?? 'leader',
+    drive_url: o.drive_url ?? '',
+    gmail_query: o.gmail_query ?? '',
   };
 }
 
@@ -272,6 +278,9 @@ export default function OfferFormModal({
         notes: form.notes.trim() || null,
         document_progress: form.document_progress,
         partner_role: form.partner_role,
+        drive_url: form.drive_url.trim() || null,
+        gmail_query: form.gmail_query.trim() || null,
+        ideas: offer?.ideas ?? null,
       };
       const saved = offer
         ? await offersService.update(offer.id, payload)
