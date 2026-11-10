@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, Edit3, Euro, Percent, Trash2, User, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarClock, CheckCircle2, CheckSquare, Clock, Edit3, Euro, FolderCheck, LayoutGrid, Percent, Trash2, User, XCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffersData } from '../hooks/useOffersData';
@@ -11,7 +11,6 @@ import OfferFormModal from '../components/offerte/OfferFormModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EntityTasks from '../components/EntityTasks';
 import EntityComments from '../components/EntityComments';
-import ProjectPipelineCard from '../components/ProjectPipelineCard';
 import OfferFilesAndReviews from '../components/offerte/OfferFilesAndReviews';
 import OfferTeamPanel from '../components/offerte/OfferTeamPanel';
 import OfferLinksPanel from '../components/offerte/OfferLinksPanel';
@@ -19,6 +18,40 @@ import OfferBudgetTracker from '../components/offerte/OfferBudgetTracker';
 import OfferTimeline from '../components/offerte/OfferTimeline';
 import OfferContactsPanel from '../components/offerte/OfferContactsPanel';
 import type { LeadCandidate, Offer } from '../types';
+
+type TabId = 'progetto' | 'planning' | 'docs' | 'activity';
+
+const TAB_META: Record<TabId, { label: string; Icon: typeof LayoutGrid }> = {
+  progetto: { label: 'Progetto',           Icon: LayoutGrid },
+  planning: { label: 'Pianificazione',     Icon: CalendarClock },
+  docs:     { label: 'Documenti',          Icon: FolderCheck },
+  activity: { label: 'Checklist & commenti', Icon: CheckSquare },
+};
+
+// Mini-card KPI usata nello strip metrico dell'header
+function KpiCell({ Icon, label, value, valueClass }: {
+  Icon: typeof LayoutGrid; label: string; value: string; valueClass?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 px-4 py-2.5 flex-1 min-w-[140px] border-r border-slate-200/70 last:border-r-0">
+      <Icon className="w-4 h-4 text-slate-400 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">{label}</p>
+        <p className={`text-sm font-semibold mt-0.5 truncate ${valueClass ?? 'text-slate-900'}`} title={value}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+// Elemento inline label:valore per meta-info sotto le metriche
+function MetaItem({ label, value, valueCls }: { label: string; value: string; valueCls?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+      <span className={`text-slate-700 ${valueCls ?? ''}`}>{value}</span>
+    </span>
+  );
+}
 
 export default function OfferDetail() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +71,7 @@ export default function OfferDetail() {
   const [rejecting, setRejecting] = useState(false);
   const [toReserve, setToReserve] = useState(false);
   const [reserving, setReserving] = useState(false);
+  const [tab, setTab] = useState<TabId>('progetto');
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -177,18 +211,20 @@ export default function OfferDetail() {
         <ArrowLeft className="w-3.5 h-3.5" /> Torna alle offerte
       </button>
 
-      {/* Pipeline */}
-      <ProjectPipelineCard
-        current="offer"
-        lead={pipelineLead ? { id: pipelineLead.id, label: pipelineLead.researcher_name } : null}
-        offer={{ id: offer.id, label: offer.name }}
-      />
-
       {/* Header card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
+            {/* Breadcrumb lead */}
+            {pipelineLead && (
+              <button
+                onClick={() => navigate(`/leads/${pipelineLead.id}`)}
+                className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 transition mb-1"
+              >
+                ← Dal lead · {pipelineLead.researcher_name}
+              </button>
+            )}
+            <div className="flex items-center gap-2 flex-wrap mb-1.5">
               <h1 className="text-xl font-semibold text-slate-900">{offer.name}</h1>
               <TypeBadge value={offer.type} />
               <StatusBadge value={offer.status} />
@@ -240,126 +276,116 @@ export default function OfferDetail() {
           </div>
         </div>
 
-        {/* Key metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
-            <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-            <div>
-              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Scadenza</p>
-              <p className="text-sm font-semibold text-slate-900 mt-0.5">{formatDate(offer.deadline)}</p>
-            </div>
-          </div>
-          <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
-            <Euro className="w-4 h-4 text-slate-400 shrink-0" />
-            <div>
-              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Importo</p>
-              <p className="text-sm font-semibold text-slate-900 mt-0.5">{formatEUR(offer.budget)}</p>
-            </div>
-          </div>
-          <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
-            <Percent className="w-4 h-4 text-slate-400 shrink-0" />
-            <div>
-              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Probabilità</p>
-              <p className={`text-sm font-semibold mt-0.5 ${probColor}`}>{prob}%</p>
-            </div>
-          </div>
-          <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
-            <User className="w-4 h-4 text-slate-400 shrink-0" />
-            <div>
-              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">
-                {offer.type === 'financed' ? 'Bando' : 'Cliente'}
-              </p>
-              <p className="text-sm font-semibold text-slate-900 mt-0.5 truncate max-w-[140px]">
-                {offer.type === 'financed' ? (offer.funding_call || '—') : (offer.client || '—')}
-              </p>
-            </div>
-          </div>
+        {/* Key metrics strip (più leggera, divisori verticali) */}
+        <div className="flex items-stretch gap-0 flex-wrap bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+          <KpiCell Icon={Calendar} label="Scadenza" value={formatDate(offer.deadline)} />
+          <KpiCell Icon={Euro}     label="Importo"  value={formatEUR(offer.budget)} />
+          <KpiCell Icon={Percent}  label="Probabilità" value={`${prob}%`} valueClass={probColor} />
+          <KpiCell
+            Icon={User}
+            label={offer.type === 'financed' ? 'Bando' : 'Cliente'}
+            value={offer.type === 'financed' ? (offer.funding_call || '—') : (offer.client || '—')}
+          />
         </div>
 
-        {/* PI / Ente */}
-        {(offer.pi || offer.ente) && (
-          <div className="mt-3 grid grid-cols-2 gap-3">
+        {/* PI / Ente / Bando rif. / Note / Date — raccolti in una riga di meta-info */}
+        {(offer.pi || offer.ente || linkedCall || offer.notes || offer.submitted_at || offer.decided_at) && (
+          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-start gap-x-6 gap-y-2 text-xs">
             {offer.pi && (
-              <div className="bg-slate-50 rounded-xl px-4 py-3">
-                <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide mb-0.5">PI</p>
-                <p className="text-sm text-slate-700">{offer.pi}</p>
-              </div>
+              <MetaItem label="PI" value={offer.pi} />
             )}
             {offer.ente && (
-              <div className="bg-slate-50 rounded-xl px-4 py-3">
-                <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide mb-0.5">Ente</p>
-                <p className="text-sm text-slate-700">{offer.ente}</p>
-              </div>
+              <MetaItem label="Ente" value={offer.ente} />
+            )}
+            {linkedCall && (
+              <MetaItem label="Bando rif." value={`${linkedCall.code} — ${linkedCall.name}`} valueCls="text-indigo-700 font-medium" />
+            )}
+            {offer.submitted_at && (
+              <MetaItem label="Presentata" value={formatDate(offer.submitted_at)} />
+            )}
+            {offer.decided_at && (
+              <MetaItem label="Decisa" value={formatDate(offer.decided_at)} />
             )}
           </div>
         )}
-
-        {/* Linked consulting call */}
-        {linkedCall && (
-          <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3">
-            <p className="text-[11px] text-indigo-500 font-medium uppercase tracking-wide mb-0.5">Bando di riferimento</p>
-            <p className="text-sm font-medium text-indigo-800">{linkedCall.code} — {linkedCall.name}</p>
-          </div>
-        )}
-
-        {/* Notes */}
         {offer.notes && (
-          <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-            <p className="text-[11px] text-amber-600 font-medium uppercase tracking-wide mb-1">Note</p>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{offer.notes}</p>
-          </div>
-        )}
-
-        {/* Dates */}
-        {(offer.submitted_at || offer.decided_at) && (
-          <div className="mt-3 flex gap-4 flex-wrap text-xs text-slate-500">
-            {offer.submitted_at && <span>Presentata: <strong>{formatDate(offer.submitted_at)}</strong></span>}
-            {offer.decided_at && <span>Decisa: <strong>{formatDate(offer.decided_at)}</strong></span>}
+          <div className="mt-3 bg-amber-50/50 border border-amber-100 rounded-xl px-3.5 py-2.5">
+            <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide mb-0.5">Note offerta</p>
+            <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{offer.notes}</p>
           </div>
         )}
       </div>
 
-      {/* Team di lavoro */}
-      <OfferTeamPanel
-        offerId={offer.id}
-        projectManagers={projectManagers}
-      />
+      {/* ── Tab navigation ─────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-1.5 inline-flex flex-wrap gap-1 w-fit max-w-full">
+        {(['progetto', 'planning', 'docs', 'activity'] as const).map((t) => {
+          const meta = TAB_META[t];
+          const isActive = tab === t;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-medium transition-all ${
+                isActive
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <meta.Icon className="w-3.5 h-3.5" />
+              {meta.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Drive + Gmail + Note */}
-      <OfferLinksPanel
-        offer={offer}
-        onUpdate={(patch) => setOffer((o) => (o ? { ...o, ...patch } : o))}
-      />
+      {/* ── Tab content ────────────────────────────────────────── */}
+      {tab === 'progetto' && (
+        <div className="space-y-5">
+          <OfferTeamPanel
+            offerId={offer.id}
+            projectManagers={projectManagers}
+          />
 
-      {/* Contatti del progetto */}
-      <OfferContactsPanel offerId={offer.id} />
+          <OfferLinksPanel
+            offer={offer}
+            onUpdate={(patch) => setOffer((o) => (o ? { ...o, ...patch } : o))}
+          />
 
-      {/* Timeline progetto */}
-      <OfferTimeline offerId={offer.id} />
-
-      {/* Budget tracker */}
-      <OfferBudgetTracker offerId={offer.id} offerBudget={offer.budget} />
-
-      {/* Documenti e revisioni */}
-      <OfferFilesAndReviews
-        offerId={offer.id}
-        offerName={offer.name}
-        projectManagers={projectManagers}
-      />
-
-      {/* Checklist (task) */}
-      {user && (
-        <EntityTasks
-          entityId={offer.id}
-          entityType="offer"
-          entityName={offer.name}
-          projectManagers={projectManagers}
-          userId={user.id}
-        />
+          <OfferContactsPanel offerId={offer.id} />
+        </div>
       )}
 
-      {/* Comments */}
-      <EntityComments entityType="offer" entityId={offer.id} projectManagers={projectManagers} />
+      {tab === 'planning' && (
+        <div className="space-y-5">
+          <OfferTimeline offerId={offer.id} />
+          <OfferBudgetTracker offerId={offer.id} offerBudget={offer.budget} />
+        </div>
+      )}
+
+      {tab === 'docs' && (
+        <div className="space-y-5">
+          <OfferFilesAndReviews
+            offerId={offer.id}
+            offerName={offer.name}
+            projectManagers={projectManagers}
+          />
+        </div>
+      )}
+
+      {tab === 'activity' && (
+        <div className="space-y-5">
+          {user && (
+            <EntityTasks
+              entityId={offer.id}
+              entityType="offer"
+              entityName={offer.name}
+              projectManagers={projectManagers}
+              userId={user.id}
+            />
+          )}
+          <EntityComments entityType="offer" entityId={offer.id} projectManagers={projectManagers} />
+        </div>
+      )}
 
       <OfferFormModal
         open={editOpen}
