@@ -436,10 +436,145 @@ function MyOffersPortfolio({
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-slate-100">
-          {sorted.map((o) => <OfferPortfolioCard key={o.id} offer={o} fcById={fcById} onOpen={onOpen} />)}
-        </ul>
+        <div className="p-3 space-y-2.5">
+          {groupOffersByCall(sorted, fcById).map((group) => (
+            <CallGroupBox key={group.key} group={group} onOpen={onOpen} />
+          ))}
+        </div>
       )}
+    </div>
+  );
+}
+
+// ── Raggruppamento offerte per bando ─────────────────────────────────────────
+
+interface CallGroup {
+  key: string;
+  kind: 'financed' | 'consulting' | 'none';
+  code: string;
+  name: string;
+  body: string | null;
+  deadline: string | null;  // deadline del bando
+  offers: Offer[];
+}
+
+function groupOffersByCall(offers: Offer[], fcById: Map<string, FundingCall>): CallGroup[] {
+  const map = new Map<string, CallGroup>();
+  const fcByCode = new Map<string, FundingCall>();
+  for (const fc of fcById.values()) fcByCode.set(fc.code, fc);
+
+  for (const o of offers) {
+    let key: string;
+    let kind: CallGroup['kind'];
+    let code: string, name: string;
+    let body: string | null = null;
+    let deadline: string | null = null;
+
+    if (o.type === 'financed' && o.funding_call) {
+      const fc = fcByCode.get(o.funding_call);
+      key = o.funding_call;
+      kind = 'financed';
+      code = fc?.code ?? o.funding_call;
+      name = fc?.name ?? o.funding_call;
+      body = fc?.body ?? null;
+      deadline = fc?.deadline ?? null;
+    } else if (o.type === 'consulting' && o.consulting_call_id) {
+      const fc = fcById.get(o.consulting_call_id);
+      if (fc) {
+        key = fc.code;
+        kind = 'financed';
+        code = fc.code;
+        name = fc.name;
+        body = fc.body ?? null;
+        deadline = fc.deadline ?? null;
+      } else {
+        key = `__client__:${o.client ?? '—'}`;
+        kind = 'consulting';
+        code = o.client ?? '—';
+        name = 'Consulenza';
+      }
+    } else if (o.type === 'consulting') {
+      key = `__client__:${o.client ?? '—'}`;
+      kind = 'consulting';
+      code = o.client ?? '—';
+      name = 'Consulenza';
+    } else {
+      key = '__nocall__';
+      kind = 'none';
+      code = 'Senza bando';
+      name = 'Da assegnare';
+    }
+
+    const g = map.get(key) ?? { key, kind, code, name, body, deadline, offers: [] };
+    g.offers.push(o);
+    map.set(key, g);
+  }
+
+  // Ordina gruppi: scadenza bando crescente → senza-deadline → no-call in fondo
+  return [...map.values()].sort((a, b) => {
+    const aNo = a.kind === 'none';
+    const bNo = b.kind === 'none';
+    if (aNo !== bNo) return aNo ? 1 : -1;
+    if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
+    if (a.deadline) return -1;
+    if (b.deadline) return 1;
+    return a.name.localeCompare(b.name, 'it');
+  });
+}
+
+function CallGroupBox({ group, onOpen }: { group: CallGroup; onOpen: (id: string) => void }) {
+  const totalBudget = group.offers.reduce((s, o) => s + o.budget, 0);
+  const days = group.deadline ? Math.ceil((new Date(group.deadline).getTime() - Date.now()) / 86_400_000) : null;
+  const overdue = days !== null && days < 0;
+  const urgent = days !== null && days >= 0 && days <= 14;
+
+  const accent =
+    group.kind === 'financed' ? 'border-indigo-200 bg-indigo-50/20'
+    : group.kind === 'consulting' ? 'border-cyan-200 bg-cyan-50/20'
+    : 'border-slate-200 bg-slate-50/30';
+
+  const codeColor =
+    group.kind === 'financed' ? 'text-indigo-700'
+    : group.kind === 'consulting' ? 'text-cyan-700'
+    : 'text-slate-500';
+
+  return (
+    <div className={`rounded-xl border ${accent} overflow-hidden`}>
+      {/* Header del bando */}
+      <div className="px-4 py-2.5 border-b border-slate-100/70 bg-white/60">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-sm font-mono font-extrabold ${codeColor} shrink-0`}>{group.code}</span>
+          <span className="text-sm text-slate-700 truncate">{group.name}</span>
+          <span className="ml-auto flex items-center gap-2 shrink-0">
+            {group.deadline && (
+              <span className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums ${
+                overdue ? 'bg-red-100 text-red-700'
+                : urgent ? 'bg-amber-100 text-amber-700'
+                : 'bg-slate-100 text-slate-600'
+              }`} title={`Scadenza bando: ${group.deadline}`}>
+                {overdue ? `${Math.abs(days!)}gg fa` : days === 0 ? 'oggi!' : `tra ${days}gg`}
+              </span>
+            )}
+            <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 rounded-lg text-xs font-bold tabular-nums bg-indigo-600 text-white">
+              {group.offers.length}
+            </span>
+          </span>
+        </div>
+        <div className="flex items-center gap-3 mt-0.5 text-[11px] text-slate-500">
+          {group.body && <span className="truncate">{group.body}</span>}
+          <span className="tabular-nums shrink-0 ml-auto">
+            Budget tot. <strong className="text-slate-700">{formatEUR(totalBudget)}</strong>
+          </span>
+        </div>
+      </div>
+
+      {/* Lista offerte del bando */}
+      <ul className="divide-y divide-slate-100">
+        {group.offers
+          .slice()
+          .sort((a, b) => a.deadline.localeCompare(b.deadline))
+          .map((o) => <OfferPortfolioCard key={o.id} offer={o} onOpen={onOpen} />)}
+      </ul>
     </div>
   );
 }
@@ -475,20 +610,15 @@ function TabButton({
 }
 
 function OfferPortfolioCard({
-  offer, fcById, onOpen,
+  offer, onOpen,
 }: {
   offer: Offer;
-  fcById: Map<string, FundingCall>;
   onOpen: (id: string) => void;
 }) {
   const days = Math.ceil((new Date(offer.deadline).getTime() - Date.now()) / 86_400_000);
   const overdue = days < 0;
   const urgent = !overdue && days <= 14;
   const soon = !overdue && !urgent && days <= 30;
-
-  const bandoLabel = offer.type === 'financed'
-    ? offer.funding_call ?? '—'
-    : (offer.client ?? '—') + (offer.consulting_call_id ? ` · rif. ${fcById.get(offer.consulting_call_id)?.code ?? ''}` : '');
 
   const progress = offer.document_progress ?? 0;
 
@@ -497,38 +627,38 @@ function OfferPortfolioCard({
       <button
         type="button"
         onClick={() => onOpen(offer.id)}
-        className="w-full flex items-center gap-4 px-5 py-3 hover:bg-indigo-50/20 transition text-left"
+        className="w-full flex items-center gap-4 px-4 py-2.5 hover:bg-indigo-50/30 transition text-left"
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-slate-900 truncate">{offer.name}</span>
-            <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md shrink-0 ${
-              offer.status === 'presentata' ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-            }`}>
-              {offer.status === 'presentata' ? 'In attesa' : 'In preparazione'}
-            </span>
+            {offer.type === 'consulting' && (
+              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-100 shrink-0">
+                Consulenza
+              </span>
+            )}
           </div>
-          <p className="text-xs text-slate-500 truncate mt-0.5">{bandoLabel}</p>
 
           {/* Mini quick-link icons se presenti */}
-          <div className="flex items-center gap-2 mt-1.5">
-            {offer.drive_url && (
-              <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <FolderOpen className="w-2.5 h-2.5" /> Drive
-              </span>
-            )}
-            {offer.gmail_query && (
-              <span className="text-[10px] text-red-700 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <Mail className="w-2.5 h-2.5" /> Gmail
-              </span>
-            )}
-            {offer.ideas && (
-              <span className="text-[10px] text-violet-700 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <Pencil className="w-2.5 h-2.5" /> Note
-              </span>
-            )}
-          </div>
+          {(offer.drive_url || offer.gmail_query || offer.ideas) && (
+            <div className="flex items-center gap-2 mt-1">
+              {offer.drive_url && (
+                <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                  <FolderOpen className="w-2.5 h-2.5" /> Drive
+                </span>
+              )}
+              {offer.gmail_query && (
+                <span className="text-[10px] text-red-700 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                  <Mail className="w-2.5 h-2.5" /> Gmail
+                </span>
+              )}
+              {offer.ideas && (
+                <span className="text-[10px] text-violet-700 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                  <Pencil className="w-2.5 h-2.5" /> Note
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Avanzamento */}
