@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, ExternalLink, FolderOpen, Lightbulb, Mail, Pencil, Save, X } from 'lucide-react';
 import { offersService } from '../../lib/dataService';
+import { RichTextArea } from '../RichText';
 import type { Offer } from '../../types';
 
 interface Props {
@@ -250,12 +251,11 @@ function IdeasBox({ offer, onUpdate }: Props) {
         )}
       </div>
 
-      <textarea
-        rows={5}
+      <RichTextArea
+        rows={6}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Idee, appunti, promemoria per questo progetto…"
-        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y leading-relaxed"
+        onChange={setValue}
+        placeholder="Idee, appunti, promemoria per questo progetto… **Grassetto**, *corsivo*, - liste, [link](url)."
       />
     </div>
   );

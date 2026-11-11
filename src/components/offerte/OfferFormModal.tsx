@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import Modal from '../Modal';
+import { RichTextArea } from '../RichText';
 import { useAuth } from '../../contexts/AuthContext';
 import { offersService, fundingCallsService } from '../../lib/dataService';
 import { toDateInputValue } from '../../lib/format';
@@ -577,8 +578,12 @@ export default function OfferFormModal({
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
-          <textarea rows={2} value={form.notes} onChange={(e) => update('notes', e.target.value)}
-            className={`${inputClass} resize-none`} />
+          <RichTextArea
+            rows={3}
+            value={form.notes}
+            onChange={(v) => update('notes', v)}
+            placeholder="Note sull'offerta…"
+          />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

@@ -17,6 +17,7 @@ import OfferLinksPanel from '../components/offerte/OfferLinksPanel';
 import OfferBudgetTracker from '../components/offerte/OfferBudgetTracker';
 import OfferTimeline from '../components/offerte/OfferTimeline';
 import OfferContactsPanel from '../components/offerte/OfferContactsPanel';
+import { RichTextView } from '../components/RichText';
 import type { LeadCandidate, Offer } from '../types';
 
 type TabId = 'progetto' | 'planning' | 'docs' | 'activity';
@@ -311,7 +312,7 @@ export default function OfferDetail() {
         {offer.notes && (
           <div className="mt-3 bg-amber-50/50 border border-amber-100 rounded-xl px-3.5 py-2.5">
             <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide mb-0.5">Note offerta</p>
-            <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{offer.notes}</p>
+            <RichTextView content={offer.notes} />
           </div>
         )}
       </div>

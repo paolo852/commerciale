@@ -5,6 +5,7 @@ import { entityCommentsService } from '../lib/dataService';
 import { sendMentionNotifications } from '../lib/mentionNotify';
 import { formatDate } from '../lib/format';
 import MentionTextarea from './MentionTextarea';
+import { RichTextView } from './RichText';
 import type { EntityComment, ProjectManager } from '../types';
 
 interface Props {
@@ -118,7 +119,9 @@ export default function EntityComments({ entityType, entityId, projectManagers }
                   <span className="text-xs font-semibold text-slate-800 truncate">{c.author_name}</span>
                   <span className="text-[11px] text-slate-400 shrink-0">{formatDate(c.created_at)}</span>
                 </div>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed mt-0.5">{c.body}</p>
+                <div className="mt-0.5">
+                  <RichTextView content={c.body} />
+                </div>
               </div>
               {user && (c.user_id === user.id || !c.user_id) && (
                 <button

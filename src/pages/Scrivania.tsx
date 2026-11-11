@@ -42,18 +42,20 @@ function greeting(name: string) {
 
 // ── sub-components ───────────────────────────────────────────────
 
-function Section({ title, icon: Icon, count, children, empty }: {
+function Section({ title, icon: Icon, count, children, empty, headerAction }: {
   title: string;
   icon: React.ElementType;
   count: number;
   children: React.ReactNode;
   empty?: string;
+  headerAction?: React.ReactNode;
 }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100">
         <Icon className="w-4 h-4 text-indigo-500 shrink-0" />
         <h2 className="text-sm font-semibold text-slate-900 flex-1">{title}</h2>
+        {headerAction}
         <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-semibold tabular-nums">{count}</span>
       </div>
       {count === 0
@@ -74,6 +76,7 @@ export default function Scrivania() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [mentions, setMentions] = useState<MentionResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
 
   const load = useCallback(async (pmName?: string) => {
     setLoading(true);
@@ -116,8 +119,8 @@ export default function Scrivania() {
   );
 
   const approvedThisYear = useMemo(
-    () => offers.filter((o) => o.outcome === 'approvato' && offerYear(o) === currentYear),
-    [offers, currentYear],
+    () => offers.filter((o) => o.outcome === 'approvato' && offerYear(o) === currentYear && o.project_manager_id === pmId),
+    [offers, currentYear, pmId],
   );
   const revenueThisYear = useMemo(
     () => approvedThisYear.reduce((s, o) => s + o.budget, 0),
@@ -209,9 +212,9 @@ export default function Scrivania() {
                 <Trophy className="w-6 h-6 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 opacity-80">Approvate {currentYear}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 opacity-80">Mie approvate {currentYear}</p>
                 <p className="text-4xl font-black tabular-nums text-emerald-700 leading-tight">{approvedThisYear.length}</p>
-                <p className="text-xs text-emerald-600 opacity-70">progetti vinti</p>
+                <p className="text-xs text-emerald-600 opacity-70">progetti vinti da me</p>
               </div>
             </div>
             <div className="hidden sm:block w-px h-12 bg-emerald-200 shrink-0" />
@@ -220,9 +223,9 @@ export default function Scrivania() {
                 <TrendingUp className="w-6 h-6 text-teal-600" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 opacity-80">Ricavo {currentYear}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 opacity-80">Mio ricavo {currentYear}</p>
                 <p className="text-4xl font-black tabular-nums text-teal-700 leading-tight">{compactEUR(revenueThisYear)}</p>
-                <p className="text-xs text-teal-600 opacity-70">da offerte approvate</p>
+                <p className="text-xs text-teal-600 opacity-70">da offerte che ho seguito</p>
               </div>
             </div>
           </div>
@@ -251,30 +254,58 @@ export default function Scrivania() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
 
             {/* ── Task ─────────────────────────────────────────── */}
-            <Section title="I miei task" icon={CheckSquare} count={myOpenTasks.length} empty="Nessun task aperto — ottimo lavoro!">
-              {myOpenTasks
+            <Section
+              title="I miei task"
+              icon={CheckSquare}
+              count={showCompletedTasks ? myTasks.length : myOpenTasks.length}
+              empty={showCompletedTasks ? 'Nessun task.' : 'Nessun task aperto — ottimo lavoro!'}
+              headerAction={
+                myTasks.filter((t) => t.completed).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCompletedTasks((v) => !v)}
+                    className={`flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md transition ${
+                      showCompletedTasks
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'text-slate-500 hover:bg-slate-100 border border-transparent'
+                    }`}
+                    title={showCompletedTasks ? 'Nascondi completati' : 'Mostra anche i completati'}
+                  >
+                    {showCompletedTasks ? <CheckCircle2 className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+                    Completati ({myTasks.filter((t) => t.completed).length})
+                  </button>
+                )
+              }
+            >
+              {(showCompletedTasks ? myTasks : myOpenTasks)
                 .sort((a, b) => {
+                  // Open first, then by due_date
+                  if (a.completed !== b.completed) return a.completed ? 1 : -1;
                   if (!a.due_date && !b.due_date) return 0;
                   if (!a.due_date) return 1;
                   if (!b.due_date) return -1;
                   return a.due_date.localeCompare(b.due_date);
                 })
                 .map((task) => {
-                  const badge = task.due_date ? deadlineBadge(task.due_date) : null;
+                  const badge = task.due_date && !task.completed ? deadlineBadge(task.due_date) : null;
                   const entityLink = task.entity_id && task.entity_type
                     ? `${entityPath[task.entity_type]}/${task.entity_id}`
                     : null;
                   return (
-                    <div key={task.id} className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition group">
+                    <div key={task.id} className={`flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition group ${task.completed ? 'opacity-60' : ''}`}>
                       <button
                         onClick={() => void toggleTask(task)}
-                        className="mt-0.5 shrink-0 text-slate-300 hover:text-indigo-600 transition"
-                        title="Segna come completato"
+                        className={`mt-0.5 shrink-0 transition ${
+                          task.completed ? 'text-emerald-500 hover:text-slate-300' : 'text-slate-300 hover:text-indigo-600'
+                        }`}
+                        title={task.completed ? 'Riapri task' : 'Segna come completato'}
                       >
-                        <Square className="w-4 h-4" />
+                        {task.completed ? <CheckCircle2 className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                       </button>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 leading-snug">{task.title}</p>
+                        <p className={`text-sm font-medium leading-snug ${task.completed ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+                          {task.title}
+                        </p>
                         {task.body && <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{task.body}</p>}
                         {entityLink && (
                           <button
@@ -293,13 +324,6 @@ export default function Scrivania() {
                     </div>
                   );
                 })}
-              {myTasks.filter((t) => t.completed).length > 0 && (
-                <div className="px-5 py-2 bg-slate-50 border-t border-slate-100">
-                  <p className="text-xs text-slate-400">
-                    {myTasks.filter((t) => t.completed).length} task completati (nascosti)
-                  </p>
-                </div>
-              )}
             </Section>
 
             {/* ── Menzioni ─────────────────────────────────────── */}
@@ -323,32 +347,6 @@ export default function Scrivania() {
             </Section>
 
           </div>
-
-          {/* Completed tasks (collapsed section at bottom) */}
-          {myTasks.filter((t) => t.completed).length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-3.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <h2 className="text-sm font-semibold text-slate-700 flex-1">Task completati</h2>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">{myTasks.filter((t) => t.completed).length}</span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {myTasks.filter((t) => t.completed).map((task) => (
-                  <div key={task.id} className="flex items-center gap-3 px-5 py-2.5 opacity-50">
-                    <button
-                      onClick={() => void toggleTask(task)}
-                      className="shrink-0 text-emerald-500"
-                      title="Riapri task"
-                    >
-                      <CheckSquare className="w-4 h-4" />
-                    </button>
-                    <p className="text-sm text-slate-500 line-through flex-1 truncate">{task.title}</p>
-                    {task.due_date && <span className="text-xs text-slate-400 shrink-0">{formatDate(task.due_date)}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>
