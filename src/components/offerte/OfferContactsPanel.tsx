@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Mail, Phone, Plus, Star, Trash2, User, X } from 'lucide-react';
 import Modal from '../Modal';
+import { RichTextArea, RichTextView } from '../RichText';
 import { offerContactsService } from '../../lib/dataService';
 import type { OfferContact } from '../../types';
 
@@ -198,7 +199,9 @@ export default function OfferContactsPanel({ offerId }: Props) {
                       )}
                     </div>
                     {c.notes && (
-                      <p className="mt-1 text-xs text-slate-500 italic whitespace-pre-wrap leading-snug">{c.notes}</p>
+                      <div className="mt-1.5 text-xs">
+                        <RichTextView content={c.notes} />
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
@@ -266,9 +269,8 @@ export default function OfferContactsPanel({ offerId }: Props) {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Note</label>
-            <textarea rows={2} value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            <RichTextArea rows={3} value={form.notes}
+              onChange={(v) => setForm((f) => ({ ...f, notes: v }))}
               placeholder="Riferimenti, orari, note…" />
           </div>
           <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">

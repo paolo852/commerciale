@@ -14,6 +14,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import EntityTasks from '../components/EntityTasks';
 import MentionTextarea from '../components/MentionTextarea';
 import ProjectPipelineCard from '../components/ProjectPipelineCard';
+import { RichTextView } from '../components/RichText';
 import { sendMentionNotifications } from '../lib/mentionNotify';
 import type { LeadCandidate, LeadCandidateStatus, LeadUpdate, Offer, ProjectManager } from '../types';
 
@@ -295,7 +296,7 @@ export default function LeadCandidateDetail() {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{u.body}</p>
+                  <RichTextView content={u.body} />
                   {u.attachment_url && (
                     <a
                       href={u.attachment_url}
